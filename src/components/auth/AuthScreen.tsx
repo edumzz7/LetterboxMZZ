@@ -97,7 +97,7 @@ export default function AuthScreen({
                   value={username}
                   onChange={(event) => setUsername(event.target.value)}
                   className="w-full bg-transparent outline-none"
-                  placeholder="edumzz"
+                  placeholder="seu_usuario"
                   autoComplete="username"
                 />
               </div>

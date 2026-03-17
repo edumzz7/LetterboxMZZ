@@ -11,6 +11,7 @@ import { bootstrapApp, loginUser, registerUser } from './lib/appData';
 import type { SessionUser } from './types/app';
 
 const SESSION_KEY = 'letterboxmzz_session_v1';
+const OSCAR_ADMIN_USERNAME = (import.meta.env.VITE_OSCAR_ADMIN_USERNAME ?? '').trim().toLowerCase();
 
 function readStoredSession(): SessionUser | null {
   if (typeof window === 'undefined') return null;
@@ -46,7 +47,7 @@ function App() {
           const message =
             error instanceof Error
               ? error.message
-              : 'Nao foi possivel iniciar o banco. Rode o SQL novo no Supabase.';
+              : 'Nao foi possivel iniciar o banco. Revise configuracao e permissoes do Appwrite.';
           setBootstrapError(message);
         }
       } finally {
@@ -77,7 +78,10 @@ function App() {
   const currentUser = users.find((user) => user.id === session?.id) || session || null;
   const isOwnDashboard = Boolean(session?.id && viewedUser?.id === session.id);
   const canAccessOscars = isOwnDashboard;
-  const canAddOscarMovie = session?.username === 'edumzz' && isOwnDashboard;
+  const canAddOscarMovie =
+    Boolean(OSCAR_ADMIN_USERNAME) &&
+    session?.username.toLowerCase() === OSCAR_ADMIN_USERNAME &&
+    isOwnDashboard;
 
   useEffect(() => {
     if (!canAccessOscars && activeTab === 'oscars') {
@@ -172,7 +176,7 @@ function App() {
           <h1 className="text-2xl uppercase tracking-[0.15em] text-red-200">Bootstrap falhou</h1>
           <p className="text-red-100/90 leading-relaxed">{bootstrapError}</p>
           <p className="text-sm text-red-100/70">
-            Rode o SQL atualizado no Supabase e recarregue a aplicacao.
+            Revise as variaveis de ambiente e permissoes das colecoes no Appwrite, depois recarregue.
           </p>
         </div>
       </div>

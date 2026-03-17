@@ -1,6 +1,6 @@
 import type { Models } from 'appwrite';
 import { databases, ID, Query } from './appwrite';
-import { hashPassword, normalizeUsername } from './auth';
+import { hashPassword, normalizeUsername, verifyPassword } from './auth';
 import { DEFAULT_OSCAR_MOVIES, readLegacyMovieData, readLegacySeriesData } from './catalog';
 import type {
   AppUser,
@@ -65,6 +65,8 @@ const COLLECTION_PERSONAL_MOVIES =
   import.meta.env.VITE_APPWRITE_COLLECTION_PERSONAL_MOVIES ?? 'personal_movies';
 const COLLECTION_PERSONAL_SERIES =
   import.meta.env.VITE_APPWRITE_COLLECTION_PERSONAL_SERIES ?? 'series_pessoais';
+const SEED_USERNAME = import.meta.env.VITE_SEED_USERNAME?.trim();
+const SEED_PASSWORD = import.meta.env.VITE_SEED_PASSWORD?.trim();
 
 function titleKey(title: string) {
   return title.trim().toLowerCase();
@@ -216,7 +218,12 @@ export async function bootstrapApp() {
     );
   }
 
-  const normalized = normalizeUsername('edumzz');
+  if (!SEED_USERNAME || !SEED_PASSWORD) {
+    sessionStorage.setItem(BOOTSTRAP_KEY, '1');
+    return;
+  }
+
+  const normalized = normalizeUsername(SEED_USERNAME);
   const existingUser = await firstDocument<AppwriteUserDoc>(COLLECTION_APP_USERS, [
     Query.equal('username', [normalized]),
   ]);
@@ -224,7 +231,7 @@ export async function bootstrapApp() {
   let userId = existingUser?.$id;
 
   if (!userId) {
-    const passwordHash = await hashPassword('finho');
+    const passwordHash = await hashPassword(SEED_PASSWORD);
     const insertedUser = await databases.createDocument(DATABASE_ID, COLLECTION_APP_USERS, ID.unique(), {
       username: normalized,
       password_hash: passwordHash,
@@ -291,13 +298,12 @@ export async function bootstrapApp() {
 
 export async function loginUser(username: string, password: string) {
   const normalized = normalizeUsername(username);
-  const passwordHash = await hashPassword(password);
 
   const data = await firstDocument<AppwriteUserDoc>(COLLECTION_APP_USERS, [
     Query.equal('username', [normalized]),
   ]);
 
-  if (!data || data.password_hash !== passwordHash) {
+  if (!data || !(await verifyPassword(password, data.password_hash))) {
     throw new Error('Usuario ou senha invalidos.');
   }
 

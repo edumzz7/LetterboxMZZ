@@ -6,6 +6,8 @@ import AuthScreen from './components/auth/AuthScreen';
 import MoviesSection from './components/movies/MoviesSection';
 import PersonalMoviesSection from './components/movies/PersonalMoviesSection';
 import SeriesSection from './components/series/SeriesSection';
+import ActivityFeed from './components/layout/ActivityFeed';
+import CineMatchModal from './components/layout/CineMatchModal';
 import { useUsers } from './hooks/useUsers';
 import { bootstrapApp, loginUser, registerUser } from './lib/appData';
 import type { SessionUser } from './types/app';
@@ -32,6 +34,7 @@ function App() {
   const [authPending, setAuthPending] = useState(false);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const usersQuery = useUsers();
   const { refetch: refetchUsers } = usersQuery;
@@ -204,6 +207,8 @@ function App() {
             selectedUserId={selectedUserId || session.id}
             onSelectUser={setSelectedUserId}
             onLogout={handleLogout}
+            isOpen={sidebarOpen}
+            onClose={() => setSidebarOpen(false)}
           />
 
           <div className="flex-1 border border-[#151515] rounded-[32px] bg-[radial-gradient(circle_at_top_right,_rgba(212,175,55,0.08),_transparent_22%),linear-gradient(180deg,_rgba(9,12,18,0.96),_rgba(0,0,0,0.98))] px-5 sm:px-8 lg:px-10 py-8 flex flex-col gap-12 min-w-0">
@@ -213,7 +218,11 @@ function App() {
               title={headerCopy.title}
               subtitle={headerCopy.subtitle}
               canAccessOscars={canAccessOscars}
+              onToggleSidebar={() => setSidebarOpen(true)}
+              rightSlot={<CineMatchModal currentUserId={session.id} users={users} />}
             />
+
+            <ActivityFeed />
 
             {usersQuery.isLoading || !viewedUser ? (
               <div className="flex justify-center items-center py-20 text-brand-gold-alt opacity-50">
@@ -243,7 +252,7 @@ function App() {
         <footer className="mt-auto py-8 text-center text-sm text-brand-text-muted border-t border-[#111] border-opacity-50">
           <p className="flex items-center justify-center gap-2">
             <Film size={16} className="text-brand-gold-alt" />
-            LetterboxZZO â€¢ {currentUser?.username || 'Sessao ativa'}
+            LetterboxZZO • {currentUser?.username || 'Sessao ativa'}
           </p>
         </footer>
       </div>

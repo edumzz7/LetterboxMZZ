@@ -12,9 +12,13 @@ export function useOscarMovies(userId: string | null) {
   });
 
   const addMovieMutation = useMutation({
-    mutationFn: (movie: Omit<OscarMovie, 'id'>) => addOscarMovie(movie),
+    mutationFn: (movie: Omit<OscarMovie, 'id'>) => addOscarMovie(userId as string, movie),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['oscar-movies'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['oscar-movies'] }),
+        queryClient.invalidateQueries({ queryKey: ['users'] }),
+        queryClient.invalidateQueries({ queryKey: ['activities'] }),
+      ]);
     },
   });
 
@@ -25,6 +29,8 @@ export function useOscarMovies(userId: string | null) {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['oscar-movies', userId] }),
         queryClient.invalidateQueries({ queryKey: ['personal-movies', userId] }),
+        queryClient.invalidateQueries({ queryKey: ['users'] }),
+        queryClient.invalidateQueries({ queryKey: ['activities'] }),
       ]);
     },
   });

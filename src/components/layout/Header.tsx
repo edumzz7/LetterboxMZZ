@@ -1,4 +1,6 @@
 import clsx from 'clsx';
+import { Menu } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 interface HeaderProps {
   activeTab: 'oscars' | 'personal';
@@ -6,17 +8,38 @@ interface HeaderProps {
   title: string;
   subtitle: string;
   canAccessOscars: boolean;
+  onToggleSidebar: () => void;
+  rightSlot?: ReactNode;
 }
 
-const Header = ({ activeTab, onTabChange, title, subtitle, canAccessOscars }: HeaderProps) => {
+const Header = ({
+  activeTab,
+  onTabChange,
+  title,
+  subtitle,
+  canAccessOscars,
+  onToggleSidebar,
+  rightSlot,
+}: HeaderProps) => {
   return (
     <header className="flex flex-col gap-6">
       <div className="w-24 h-[1px] bg-brand-gold opacity-50" />
 
       <div className="space-y-3">
-        <h1 className="text-3xl md:text-4xl font-light tracking-widest text-brand-text uppercase">
-          {title}
-        </h1>
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-3xl md:text-4xl font-light tracking-widest text-brand-text uppercase">
+            {title}
+          </h1>
+          <div className="flex items-center gap-2">
+            {rightSlot}
+            <button
+              onClick={onToggleSidebar}
+              className="xl:hidden inline-flex items-center gap-2 px-3 py-2 border border-[#222] rounded-lg text-xs uppercase tracking-[0.14em] text-brand-text-muted hover:text-brand-gold"
+            >
+              <Menu size={14} /> Ranking
+            </button>
+          </div>
+        </div>
         <p className="text-sm md:text-base text-brand-text-muted tracking-[0.18em] uppercase">
           {subtitle}
         </p>

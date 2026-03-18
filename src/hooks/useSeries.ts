@@ -42,7 +42,11 @@ export function useSeries(userId: string | null) {
       });
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['series', userId] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['series', userId] }),
+        queryClient.invalidateQueries({ queryKey: ['users'] }),
+        queryClient.invalidateQueries({ queryKey: ['activities'] }),
+      ]);
     },
   });
 
@@ -50,7 +54,11 @@ export function useSeries(userId: string | null) {
     mutationFn: (newSeries: Omit<SeriesEntry, 'id' | 'user_id' | 'created_at'>) =>
       addSeries(userId as string, newSeries),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['series', userId] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['series', userId] }),
+        queryClient.invalidateQueries({ queryKey: ['users'] }),
+        queryClient.invalidateQueries({ queryKey: ['activities'] }),
+      ]);
     },
   });
 

@@ -20,7 +20,10 @@ export function usePersonalMovies(userId: string | null) {
     mutationFn: (movie: Omit<PersonalMovie, 'id' | 'user_id' | 'created_at'>) =>
       addPersonalMovie(userId as string, movie),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['personal-movies', userId] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['personal-movies', userId] }),
+        queryClient.invalidateQueries({ queryKey: ['activities'] }),
+      ]);
     },
   });
 
@@ -36,7 +39,11 @@ export function usePersonalMovies(userId: string | null) {
     mutationFn: ({ id, status }: { id: string; status: MovieStatus }) =>
       updatePersonalMovie(id, { status }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['personal-movies', userId] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['personal-movies', userId] }),
+        queryClient.invalidateQueries({ queryKey: ['users'] }),
+        queryClient.invalidateQueries({ queryKey: ['activities'] }),
+      ]);
     },
   });
 

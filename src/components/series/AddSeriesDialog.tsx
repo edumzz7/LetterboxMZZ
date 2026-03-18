@@ -19,6 +19,7 @@ export default function AddSeriesDialog({ onSubmit, isPending }: AddSeriesDialog
   const [searchResults, setSearchResults] = useState<TMDBSeries[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const searchTimeout = useRef<number | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -41,6 +42,7 @@ export default function AddSeriesDialog({ onSubmit, isPending }: AddSeriesDialog
     setTotalEps('10');
     setSearchResults([]);
     setShowDropdown(false);
+    setSubmitError(null);
   };
 
   const handleTitleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -79,18 +81,23 @@ export default function AddSeriesDialog({ onSubmit, isPending }: AddSeriesDialog
     if (!titulo.trim()) return;
 
     const total = parseInt(totalEps, 10) || 0;
+    setSubmitError(null);
 
-    await onSubmit({
-      titulo,
-      capa_url: capaUrl.trim() || null,
-      temporada: parseInt(temporada, 10) || 1,
-      total_episodios: total,
-      episodios_vistos: 0,
-      status: total === 0 ? 'watching' : 'watching',
-      plataforma_slug: 'stremio',
-    });
+    try {
+      await onSubmit({
+        titulo,
+        capa_url: capaUrl.trim() || null,
+        temporada: parseInt(temporada, 10) || 1,
+        total_episodios: total,
+        episodios_vistos: 0,
+        status: 'watching',
+        plataforma_slug: 'stremio',
+      });
 
-    resetForm();
+      resetForm();
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Falha ao adicionar serie.');
+    }
   };
 
   return (
@@ -223,6 +230,12 @@ export default function AddSeriesDialog({ onSubmit, isPending }: AddSeriesDialog
                 />
               </div>
             </div>
+
+            {submitError ? (
+              <div className="text-xs text-red-300 border border-red-500/40 rounded p-2 bg-red-500/10">
+                {submitError}
+              </div>
+            ) : null}
 
             <div className="flex gap-3 justify-end mt-4">
               <Dialog.Close asChild>

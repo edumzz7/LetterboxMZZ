@@ -8,6 +8,7 @@ import PersonalMoviesSection from './components/movies/PersonalMoviesSection';
 import SeriesSection from './components/series/SeriesSection';
 import ActivityFeed from './components/layout/ActivityFeed';
 import CineMatchModal from './components/layout/CineMatchModal';
+import SuggestMovieModal from './components/layout/SuggestMovieModal';
 import { useUsers } from './hooks/useUsers';
 import { bootstrapApp, loginUser, registerUser } from './lib/appData';
 import type { SessionUser } from './types/app';
@@ -219,7 +220,7 @@ function App() {
               subtitle={headerCopy.subtitle}
               canAccessOscars={canAccessOscars}
               onToggleSidebar={() => setSidebarOpen(true)}
-              rightSlot={<CineMatchModal currentUserId={session.id} users={users} />}
+              rightSlot={<div className='flex items-center gap-2'><SuggestMovieModal currentUserId={session.id} users={users} /><CineMatchModal currentUserId={session.id} users={users} /></div>}
             />
 
             <ActivityFeed />
@@ -261,3 +262,4 @@ function App() {
 }
 
 export default App;
+

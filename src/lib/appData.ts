@@ -271,6 +271,15 @@ async function ensureUserMetadata(userId: string) {
   })) as unknown as AppwriteMetadataDoc;
 }
 
+async function getUsernameById(userId: string) {
+  try {
+    const doc = (await databases.getDocument(DATABASE_ID, COLLECTION_APP_USERS, userId)) as unknown as AppwriteUserDoc;
+    return doc.username;
+  } catch {
+    return 'Usuario';
+  }
+}
+
 async function addActivity(userId: string, message: string, mcoinsDelta: number) {
   await createDocument(COLLECTION_ATIVIDADES, {
     user_id: userId,
@@ -287,7 +296,8 @@ async function awardMCoins(userId: string, trigger: TriggerKey, message: string)
     mcoins: Math.max(0, (metadata.mcoins ?? 0) + delta),
   });
 
-  await addActivity(userId, `${message} (+${delta} MC)`, delta);
+  const username = await getUsernameById(userId);
+  await addActivity(userId, `${username} ${message} (+${delta} MC)`, delta);
 }
 
 async function upsertUserOscarMovie(userId: string, oscarMovieId: string, status: MovieStatus) {
@@ -679,6 +689,25 @@ export async function updateSeries(
   return mapSeries(data);
 }
 
+
+export async function updateOscarMoviePlatform(movieId: string, platformSlug: string) {
+  await updateDocument(COLLECTION_OSCAR_MOVIES, movieId, {
+    plataforma: platformSlug,
+  });
+}
+
+export async function suggestMovieToUser(
+  fromUserId: string,
+  toUserId: string,
+  movie: Omit<PersonalMovie, 'id' | 'user_id' | 'created_at'>,
+) {
+  await createDocument(COLLECTION_PERSONAL_MOVIES, {
+    ...movie,
+    user_id: toUserId,
+  });
+
+  await awardMCoins(fromUserId, 'INDICOU_FILME', `indicou o filme ${movie.titulo}.`);
+}
 export async function deleteSeries(seriesId: string) {
   await deleteDocument(COLLECTION_PERSONAL_SERIES, seriesId);
 }
@@ -742,3 +771,14 @@ export async function getCineMatchSuggestion(
 export function getSeriesStatus(episodiosVistos: number, totalEpisodios: number): SeriesStatus {
   return totalEpisodios > 0 && episodiosVistos >= totalEpisodios ? 'watched' : 'watching';
 }
+
+
+
+
+
+
+
+
+
+
+

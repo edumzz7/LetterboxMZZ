@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { addOscarMovie, getOscarMoviesForUser, setOscarMovieStatus } from '../lib/appData';
+import { addOscarMovie, getOscarMoviesForUser, setOscarMovieStatus, updateOscarMoviePlatform } from '../lib/appData';
 import type { OscarMovie, OscarMovieWithStatus, MovieStatus } from '../types/app';
 
 export function useOscarMovies(userId: string | null) {
@@ -35,7 +35,15 @@ export function useOscarMovies(userId: string | null) {
     },
   });
 
-  return { moviesQuery, addMovieMutation, updateStatusMutation };
+  const updatePlatformMutation = useMutation({
+    mutationFn: ({ movieId, platform }: { movieId: string; platform: string }) =>
+      updateOscarMoviePlatform(movieId, platform),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['oscar-movies', userId] });
+    },
+  });
+
+  return { moviesQuery, addMovieMutation, updateStatusMutation, updatePlatformMutation };
 }
 
 export type { OscarMovieWithStatus };

@@ -16,7 +16,7 @@ export default function MoviesSection({
   canEdit,
   canAddOscarMovie,
 }: MoviesSectionProps) {
-  const { moviesQuery, addMovieMutation, updateStatusMutation } = useOscarMovies(userId);
+  const { moviesQuery, addMovieMutation, updateStatusMutation, updatePlatformMutation } = useOscarMovies(userId);
   const [emblaRef] = useEmblaCarousel({
     align: 'start',
     containScroll: 'trimSnaps',
@@ -49,12 +49,15 @@ export default function MoviesSection({
                   key={movie.id}
                   movie={movie}
                   canEdit={canEdit}
-                  showPlatformSelector={false}
+                  showPlatformSelector
                   onToggleStatus={(selectedMovie, nextStatus) => {
                     if ('ano_oscar' in selectedMovie) {
                       handleToggleStatus(selectedMovie, nextStatus);
                     }
                   }}
+                  onPlatformChange={(selectedMovie, platformId) =>
+                    updatePlatformMutation.mutate({ movieId: selectedMovie.id, platform: platformId })
+                  }
                 />
               ))}
               {canAddOscarMovie ? (

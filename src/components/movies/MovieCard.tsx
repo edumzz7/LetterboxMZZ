@@ -13,7 +13,7 @@ interface MovieCardProps {
   showPlatformSelector?: boolean;
   onToggleStatus?: (movie: CardMovie, nextStatus: MovieStatus) => void;
   onDelete?: (movie: PersonalMovie) => void;
-  onPlatformChange?: (movie: PersonalMovie, platformId: string) => void;
+  onPlatformChange?: (movie: CardMovie, platformId: string) => void;
 }
 
 function isPersonalMovie(movie: CardMovie): movie is PersonalMovie {
@@ -121,7 +121,7 @@ export default function MovieCard({
           {movie.titulo}
         </h3>
 
-        {showPlatformSelector && isPersonalMovie(movie) ? (
+        {showPlatformSelector ? (
           <PlatformSelect
             value={movie.plataforma_slug}
             onChange={(platformId) => onPlatformChange?.(movie, platformId)}
@@ -136,3 +136,4 @@ export default function MovieCard({
     </div>
   );
 }
+

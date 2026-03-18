@@ -50,6 +50,7 @@ type AppwriteSeriesDoc = Models.Document & {
   plataforma: string | null;
   totalEpisodios: number;
   episodiosVistos: number;
+  status: SeriesStatus;
 };
 
 const BOOTSTRAP_KEY = 'letterboxmzz_bootstrap_v1';
@@ -67,6 +68,27 @@ const COLLECTION_PERSONAL_SERIES =
   import.meta.env.VITE_APPWRITE_COLLECTION_PERSONAL_SERIES ?? 'series_pessoais';
 const SEED_USERNAME = import.meta.env.VITE_SEED_USERNAME?.trim();
 const SEED_PASSWORD = import.meta.env.VITE_SEED_PASSWORD?.trim();
+const PUBLIC_APP_URL = (import.meta.env.VITE_PUBLIC_APP_URL ?? 'https://letterbox-mzz.vercel.app').replace(
+  /\/$/,
+  '',
+);
+const FALLBACK_POSTER_URL = 'https://placehold.co/600x900/png';
+
+function ensureValidUrl(value: string | null | undefined): string {
+  const trimmed = value?.trim();
+  if (!trimmed) return FALLBACK_POSTER_URL;
+
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+
+  if (trimmed.startsWith('/')) {
+    if (typeof window !== 'undefined') {
+      return `${window.location.origin}${trimmed}`;
+    }
+    return `${PUBLIC_APP_URL}${trimmed}`;
+  }
+
+  return `https://${trimmed}`;
+}
 
 function titleKey(title: string) {
   return title.trim().toLowerCase();
@@ -115,7 +137,7 @@ function mapSeries(doc: AppwriteSeriesDoc): SeriesEntry {
     user_id: '',
     titulo: doc.titulo,
     capa_url: doc.capaUrl ?? null,
-    status: getSeriesStatus(episodiosVistos, totalEpisodios),
+    status: doc.status ?? getSeriesStatus(episodiosVistos, totalEpisodios),
     temporada: 1,
     total_episodios: totalEpisodios,
     episodios_vistos: episodiosVistos,
@@ -209,9 +231,9 @@ export async function bootstrapApp() {
       DEFAULT_OSCAR_MOVIES.map((movie) =>
         databases.createDocument(DATABASE_ID, COLLECTION_OSCAR_MOVIES, ID.unique(), {
           titulo: movie.titulo,
-          capaUrl: movie.capa_url,
-          plataforma: movie.plataforma_slug,
-          categoria: movie.categoria_principal,
+          capaUrl: ensureValidUrl(movie.capa_url),
+          plataforma: movie.plataforma_slug ?? 'stremio',
+          categoria: movie.categoria_principal ?? 'Melhor Filme',
           ano: movie.ano_oscar,
         }),
       ),
@@ -270,10 +292,11 @@ export async function bootstrapApp() {
       legacySeries.map((series) =>
         databases.createDocument(DATABASE_ID, COLLECTION_PERSONAL_SERIES, ID.unique(), {
           titulo: series.titulo,
-          capaUrl: series.capa_url,
-          plataforma: series.plataforma_slug,
-          episodiosVistos: series.episodios_vistos,
-          totalEpisodios: series.total_episodios,
+          capaUrl: ensureValidUrl(series.capa_url),
+          plataforma: series.plataforma_slug ?? 'stremio',
+          episodiosVistos: Math.max(0, series.episodios_vistos),
+          totalEpisodios: Math.max(1, series.total_episodios),
+          status: series.status,
         }),
       ),
     );
@@ -366,9 +389,9 @@ export async function getOscarMoviesForUser(userId: string) {
 export async function addOscarMovie(movie: Omit<OscarMovie, 'id'>) {
   const data = await databases.createDocument(DATABASE_ID, COLLECTION_OSCAR_MOVIES, ID.unique(), {
     titulo: movie.titulo,
-    capaUrl: movie.capa_url,
-    plataforma: movie.plataforma_slug,
-    categoria: movie.categoria_principal,
+    capaUrl: ensureValidUrl(movie.capa_url),
+    plataforma: movie.plataforma_slug ?? 'stremio',
+    categoria: movie.categoria_principal ?? 'Melhor Filme',
     ano: movie.ano_oscar,
   });
   return mapOscarMovie(data as unknown as AppwriteOscarMovieDoc);
@@ -428,10 +451,11 @@ export async function addSeries(
 ) {
   const data = await databases.createDocument(DATABASE_ID, COLLECTION_PERSONAL_SERIES, ID.unique(), {
     titulo: series.titulo,
-    capaUrl: series.capa_url,
-    plataforma: series.plataforma_slug,
-    episodiosVistos: series.episodios_vistos,
-    totalEpisodios: series.total_episodios,
+    capaUrl: ensureValidUrl(series.capa_url),
+    plataforma: series.plataforma_slug ?? 'stremio',
+    episodiosVistos: Math.max(0, series.episodios_vistos),
+    totalEpisodios: Math.max(1, series.total_episodios),
+    status: series.status,
   });
   return { ...mapSeries(data as unknown as AppwriteSeriesDoc), user_id: userId };
 }
@@ -449,6 +473,7 @@ export async function updateSeries(
   if (updates.episodios_vistos !== undefined) mappedUpdates.episodiosVistos = updates.episodios_vistos;
   if (updates.total_episodios !== undefined) mappedUpdates.totalEpisodios = updates.total_episodios;
   if (updates.plataforma_slug !== undefined) mappedUpdates.plataforma = updates.plataforma_slug;
+  if (updates.status !== undefined) mappedUpdates.status = updates.status;
 
   const data = await databases.updateDocument(
     DATABASE_ID,

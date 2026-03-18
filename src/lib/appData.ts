@@ -46,8 +46,6 @@ type AppwritePersonalMovieDoc = Models.Document & {
   status: MovieStatus;
   source: 'manual' | 'oscar';
   source_movie_id: string | null;
-  indicado_por_user_id?: string | null;
-  avaliacao?: number | null;
 };
 
 type AppwriteSeriesDoc = Models.Document & {
@@ -57,8 +55,6 @@ type AppwriteSeriesDoc = Models.Document & {
   totalEpisodios: number;
   episodiosVistos: number;
   status: SeriesStatus;
-  indicado_por_user_id?: string | null;
-  avaliacao?: number | null;
 };
 
 type AppwriteMetadataDoc = Models.Document & {
@@ -195,8 +191,6 @@ function mapPersonalMovie(doc: AppwritePersonalMovieDoc): PersonalMovie {
     status: doc.status,
     source: doc.source,
     source_movie_id: doc.source_movie_id ?? null,
-    indicado_por_user_id: doc.indicado_por_user_id ?? null,
-    avaliacao: doc.avaliacao ?? null,
     created_at: doc.$createdAt,
   };
 }
@@ -214,10 +208,15 @@ function mapSeries(doc: AppwriteSeriesDoc): SeriesEntry {
     total_episodios: totalEpisodios,
     episodios_vistos: episodiosVistos,
     plataforma_slug: doc.plataforma ?? null,
-    indicado_por_user_id: doc.indicado_por_user_id ?? null,
-    avaliacao: doc.avaliacao ?? null,
     created_at: doc.$createdAt,
   };
+}
+
+function parseRecommendedSource(sourceMovieId: string | null | undefined) {
+  if (!sourceMovieId) return null;
+  const match = sourceMovieId.match(/^tmdb:(\d+)\|rec:([A-Za-z0-9_-]+)$/);
+  if (!match) return null;
+  return { tmdbId: match[1], recommenderId: match[2] };
 }
 
 function mapActivity(doc: AppwriteActivityDoc): ActivityEntry {
@@ -595,7 +594,7 @@ export async function addPersonalMovie(
 
 export async function updatePersonalMovie(
   movieId: string,
-  updates: Partial<Pick<PersonalMovie, 'status' | 'plataforma_slug' | 'avaliacao'>>,
+  updates: Partial<Pick<PersonalMovie, 'status' | 'plataforma_slug'>>,
 ) {
   const current = await databases.getDocument(DATABASE_ID, COLLECTION_PERSONAL_MOVIES, movieId);
 
@@ -609,11 +608,14 @@ export async function updatePersonalMovie(
   const nextDoc = data as unknown as AppwritePersonalMovieDoc;
 
   if (currentDoc.status !== 'watched' && nextDoc.status === 'watched') {
-    if (nextDoc.indicado_por_user_id) {
+    const recommendation = parseRecommendedSource(nextDoc.source_movie_id);
+    if (recommendation) {
       await awardMCoins(nextDoc.user_id, 'FILME_INDICADO_ASSISTIDO', `Assistiu ao filme indicado: ${nextDoc.titulo}.`);
-      if ((nextDoc.avaliacao ?? 0) >= 4) {
-        await awardMCoins(nextDoc.indicado_por_user_id, 'BONUS_CURADOR', `Seu filme indicado (${nextDoc.titulo}) recebeu 4+ estrelas.`);
-      }
+      await awardMCoins(
+        recommendation.recommenderId,
+        'BONUS_CURADOR',
+        `Seu filme indicado (${nextDoc.titulo}) foi assistido.`,
+      );
     } else {
       await awardMCoins(nextDoc.user_id, 'ASSISTIU_FILME', `Assistiu ao filme ${nextDoc.titulo}.`);
     }
@@ -644,8 +646,6 @@ export async function addSeries(
     episodiosVistos: Math.max(0, series.episodios_vistos),
     totalEpisodios: Math.max(1, series.total_episodios),
     status: series.status,
-    indicado_por_user_id: series.indicado_por_user_id ?? null,
-    avaliacao: series.avaliacao ?? null,
   });
 
   await awardMCoins(userId, 'INICIOU_SERIE', `Iniciou a serie ${series.titulo}.`);
@@ -657,7 +657,7 @@ export async function updateSeries(
   updates: Partial<
     Pick<
       SeriesEntry,
-      'status' | 'temporada' | 'total_episodios' | 'episodios_vistos' | 'plataforma_slug' | 'avaliacao'
+      'status' | 'temporada' | 'total_episodios' | 'episodios_vistos' | 'plataforma_slug'
     >
   >,
 ) {
@@ -668,21 +668,13 @@ export async function updateSeries(
   if (updates.total_episodios !== undefined) mappedUpdates.totalEpisodios = updates.total_episodios;
   if (updates.plataforma_slug !== undefined) mappedUpdates.plataforma = updates.plataforma_slug;
   if (updates.status !== undefined) mappedUpdates.status = updates.status;
-  if (updates.avaliacao !== undefined) mappedUpdates.avaliacao = updates.avaliacao;
 
   const data = (await updateDocument(COLLECTION_PERSONAL_SERIES, seriesId, mappedUpdates)) as unknown as AppwriteSeriesDoc;
 
   if (current.status !== 'watched' && data.status === 'watched') {
     const viewerId = (current as { user_id?: string }).user_id ?? '';
     if (viewerId) {
-      if (data.indicado_por_user_id) {
-        await awardMCoins(viewerId, 'SERIE_INDICADA_100', `Finalizou a serie indicada ${data.titulo}.`);
-        if ((data.avaliacao ?? 0) >= 4) {
-          await awardMCoins(data.indicado_por_user_id, 'BONUS_CURADOR', `Sua serie indicada (${data.titulo}) recebeu 4+ estrelas.`);
-        }
-      } else {
-        await awardMCoins(viewerId, 'SERIE_100', `Finalizou 100% da serie ${data.titulo}.`);
-      }
+      await awardMCoins(viewerId, 'SERIE_100', `Finalizou 100% da serie ${data.titulo}.`);
     }
   }
 
@@ -703,6 +695,9 @@ export async function suggestMovieToUser(
 ) {
   await createDocument(COLLECTION_PERSONAL_MOVIES, {
     ...movie,
+    source_movie_id: movie.source_movie_id
+      ? `tmdb:${movie.source_movie_id}|rec:${fromUserId}`
+      : null,
     user_id: toUserId,
   });
 

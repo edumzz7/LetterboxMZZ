@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { Film, Loader2 } from 'lucide-react';
 import AppHeader from './components/layout/Header';
 import UserSidebar from './components/layout/UserSidebar';
@@ -9,7 +9,8 @@ import SeriesSection from './components/series/SeriesSection';
 import ActivityFeed from './components/layout/ActivityFeed';
 import CineMatchModal from './components/layout/CineMatchModal';
 import SuggestMovieModal from './components/layout/SuggestMovieModal';
-import { useUsers } from './hooks/useUsers';
+import ProfileAvatarModal from './components/layout/ProfileAvatarModal';
+import { useAvatarMutation, useUsers } from './hooks/useUsers';
 import { bootstrapApp, loginUser, registerUser } from './lib/appData';
 import type { SessionUser } from './types/app';
 
@@ -38,6 +39,7 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const usersQuery = useUsers();
+  const avatarMutation = useAvatarMutation();
   const { refetch: refetchUsers } = usersQuery;
 
   useEffect(() => {
@@ -80,6 +82,7 @@ function App() {
   const users = usersQuery.data || [];
   const viewedUser = users.find((user) => user.id === selectedUserId) || null;
   const currentUser = users.find((user) => user.id === session?.id) || session || null;
+  const currentRankedUser = users.find((user) => user.id === session?.id);
   const isOwnDashboard = Boolean(session?.id && viewedUser?.id === session.id);
   const canAccessOscars = isOwnDashboard;
   const canAddOscarMovie =
@@ -220,7 +223,19 @@ function App() {
               subtitle={headerCopy.subtitle}
               canAccessOscars={canAccessOscars}
               onToggleSidebar={() => setSidebarOpen(true)}
-              rightSlot={<div className='flex items-center gap-2'><SuggestMovieModal currentUserId={session.id} users={users} /><CineMatchModal currentUserId={session.id} users={users} /></div>}
+              rightSlot={(
+                <div className="flex items-center gap-2">
+                  <ProfileAvatarModal
+                    currentAvatarId={currentRankedUser?.avatar_id ?? 'avatar_clapper'}
+                    isSaving={avatarMutation.isPending}
+                    onSave={async (avatarId) =>
+                      avatarMutation.mutateAsync({ userId: session.id, avatarId })
+                    }
+                  />
+                  <SuggestMovieModal currentUserId={session.id} users={users} />
+                  <CineMatchModal currentUserId={session.id} users={users} />
+                </div>
+              )}
             />
 
             <ActivityFeed />
@@ -241,7 +256,11 @@ function App() {
                   </div>
                 ) : (
                   <div className="animate-in fade-in duration-500 flex flex-col gap-16">
-                    <PersonalMoviesSection userId={viewedUser.id} canEdit={isOwnDashboard} />
+                    <PersonalMoviesSection
+                      userId={viewedUser.id}
+                      canEdit={isOwnDashboard}
+                      currentUserId={session.id}
+                    />
                     <SeriesSection userId={viewedUser.id} canEdit={isOwnDashboard} />
                   </div>
                 )}
@@ -253,7 +272,7 @@ function App() {
         <footer className="mt-auto py-8 text-center text-sm text-brand-text-muted border-t border-[#111] border-opacity-50">
           <p className="flex items-center justify-center gap-2">
             <Film size={16} className="text-brand-gold-alt" />
-            LetterboxZZO � {currentUser?.username || 'Sessao ativa'}
+            LetterboxZZO • {currentUser?.username || 'Sessao ativa'}
           </p>
         </footer>
       </div>
@@ -262,4 +281,5 @@ function App() {
 }
 
 export default App;
+
 

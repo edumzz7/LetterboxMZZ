@@ -1,23 +1,41 @@
-import { Film, Eye, EyeOff, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Film, Eye, EyeOff, Trash2, Loader2 } from 'lucide-react';
 import clsx from 'clsx';
 import { generateImagePath } from '../../lib/imageUtils';
-import { PlatformSelect } from '../ui/PlatformSelect';
+import { findMovieIdByTitle, getMovieWatchProviders, type TMDBWatchProvider } from '../../lib/tmdb';
 import type { MovieStatus, OscarMovieWithStatus, PersonalMovie } from '../../types/app';
 
 type CardMovie = OscarMovieWithStatus | PersonalMovie;
+type ReactionEmoji = '❤️' | '🔥' | '😂' | '👎';
 
 interface MovieCardProps {
   movie: CardMovie;
   layout?: 'carousel' | 'grid';
   canEdit?: boolean;
   showPlatformSelector?: boolean;
+  currentUserId?: string;
+  isPending?: boolean;
   onToggleStatus?: (movie: CardMovie, nextStatus: MovieStatus) => void;
   onDelete?: (movie: PersonalMovie) => void;
   onPlatformChange?: (movie: CardMovie, platformId: string) => void;
+  onRate?: (movie: PersonalMovie, stars: number) => Promise<unknown> | unknown;
+  onReact?: (movie: PersonalMovie, reaction: ReactionEmoji) => Promise<unknown> | unknown;
 }
+
+const providerCache = new Map<string, TMDBWatchProvider[]>();
 
 function isPersonalMovie(movie: CardMovie): movie is PersonalMovie {
   return 'user_id' in movie;
+}
+
+function parseTmdbFromSource(sourceMovieId: string | null | undefined) {
+  if (!sourceMovieId) return null;
+  const directNumeric = sourceMovieId.match(/^\d+$/);
+  if (directNumeric) return parseInt(sourceMovieId, 10);
+
+  const prefixed = sourceMovieId.match(/^tmdb:(\d+)/);
+  if (prefixed) return parseInt(prefixed[1], 10);
+  return null;
 }
 
 export default function MovieCard({
@@ -25,13 +43,67 @@ export default function MovieCard({
   layout = 'carousel',
   canEdit = false,
   showPlatformSelector = true,
+  currentUserId,
+  isPending = false,
   onToggleStatus,
   onDelete,
-  onPlatformChange,
+  onRate,
+  onReact,
 }: MovieCardProps) {
   const imageSrc = generateImagePath(movie.titulo, movie.capa_url);
   const isWatched = movie.status === 'watched';
   const isOscarMovie = !isPersonalMovie(movie);
+  const isFriendCard = isPersonalMovie(movie) && Boolean(currentUserId) && movie.user_id !== currentUserId;
+  const canRate = isPersonalMovie(movie) && !isFriendCard && isWatched && Boolean(onRate);
+
+  const [providers, setProviders] = useState<TMDBWatchProvider[]>([]);
+  const [reactionPending, setReactionPending] = useState<ReactionEmoji | null>(null);
+  const [ratingPending, setRatingPending] = useState<number | null>(null);
+  const [localRating, setLocalRating] = useState<number>(isPersonalMovie(movie) ? (movie.avaliacao ?? 0) : 0);
+
+  useEffect(() => {
+    if (isPersonalMovie(movie)) {
+      setLocalRating(movie.avaliacao ?? 0);
+    }
+  }, [movie]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadProviders() {
+      if (!showPlatformSelector) return;
+      const cacheKey = `${movie.titulo}|${'ano_lancamento' in movie ? movie.ano_lancamento ?? '' : movie.ano_oscar ?? ''}`;
+      const cached = providerCache.get(cacheKey);
+      if (cached) {
+        if (active) setProviders(cached);
+        return;
+      }
+
+      const tmdbId = isPersonalMovie(movie)
+        ? parseTmdbFromSource(movie.source_movie_id)
+        : null;
+      const resolvedId =
+        tmdbId ??
+        (await findMovieIdByTitle(
+          movie.titulo,
+          'ano_lancamento' in movie ? movie.ano_lancamento : movie.ano_oscar,
+        ));
+      if (!resolvedId) return;
+
+      const nextProviders = await getMovieWatchProviders(resolvedId, 'BR');
+      providerCache.set(cacheKey, nextProviders);
+      if (active) setProviders(nextProviders);
+    }
+
+    void loadProviders();
+    return () => {
+      active = false;
+    };
+  }, [movie, showPlatformSelector]);
+
+  const suggestionBadge = useMemo(() => {
+    if (!isPersonalMovie(movie)) return false;
+    return (movie.source_movie_id ?? '').includes('|rec:');
+  }, [movie]);
 
   const handleToggleStatus = (event: React.MouseEvent) => {
     event.preventDefault();
@@ -55,11 +127,33 @@ export default function MovieCard({
     }
   };
 
+  const handleReaction = async (reaction: ReactionEmoji) => {
+    if (!isPersonalMovie(movie) || !onReact) return;
+    setReactionPending(reaction);
+    try {
+      await onReact(movie, reaction);
+    } finally {
+      setReactionPending(null);
+    }
+  };
+
+  const handleRate = async (stars: number) => {
+    if (!isPersonalMovie(movie) || !onRate) return;
+    setLocalRating(stars);
+    setRatingPending(stars);
+    try {
+      await onRate(movie, stars);
+    } finally {
+      setRatingPending(null);
+    }
+  };
+
   return (
     <div
       className={clsx(
         'flex flex-col gap-3',
         layout === 'carousel' ? 'min-w-[160px] md:min-w-[200px] snap-center' : 'w-full',
+        isPending && 'opacity-90',
       )}
     >
       <div className="relative aspect-[2/3] w-full rounded-md overflow-hidden bg-brand-card border border-[#222] transition-all hover:border-brand-gold-alt hover:shadow-[0_0_15px_rgba(212,175,55,0.15)] group cursor-pointer">
@@ -114,6 +208,18 @@ export default function MovieCard({
             Via Oscar
           </div>
         ) : null}
+
+        {suggestionBadge ? (
+          <div className="absolute right-2 bottom-10 bg-brand-bg/85 border border-emerald-500/40 px-2 py-1 rounded text-[10px] uppercase tracking-[0.12em] text-emerald-300">
+            Via Sugestao
+          </div>
+        ) : null}
+
+        {isPending ? (
+          <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+            <Loader2 size={20} className="animate-spin text-brand-gold" />
+          </div>
+        ) : null}
       </div>
 
       <div className="flex flex-col gap-2">
@@ -122,18 +228,66 @@ export default function MovieCard({
         </h3>
 
         {showPlatformSelector ? (
-          <PlatformSelect
-            value={movie.plataforma_slug}
-            onChange={(platformId) => onPlatformChange?.(movie, platformId)}
-            disabled={!canEdit}
-          />
-        ) : (
-          <div className="text-xs uppercase tracking-[0.18em] text-brand-text-muted border border-[#1f1f1f] rounded-md px-3 py-2">
-            {movie.plataforma_slug || 'Sem plataforma'}
+          <div className="min-h-[36px] border border-[#1f1f1f] rounded-md px-2 py-1.5 flex items-center gap-1.5 flex-wrap">
+            {providers.length > 0 ? (
+              providers.map((provider) =>
+                provider.logo_path ? (
+                  <img
+                    key={provider.provider_id}
+                    src={`https://image.tmdb.org/t/p/w92${provider.logo_path}`}
+                    title={provider.provider_name}
+                    alt={provider.provider_name}
+                    className="w-5 h-5 rounded"
+                  />
+                ) : null,
+              )
+            ) : (
+              <span className="text-[10px] text-brand-text-muted uppercase tracking-[0.12em]">
+                Sem stream BR
+              </span>
+            )}
           </div>
-        )}
+        ) : null}
+
+        {canRate ? (
+          <div className="flex items-center gap-1 text-lg">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <button
+                key={star}
+                type="button"
+                onClick={() => void handleRate(star)}
+                className={clsx(
+                  'leading-none transition',
+                  localRating >= star ? 'text-yellow-400' : 'text-[#444] hover:text-yellow-300',
+                )}
+                title={`${star} estrela(s)`}
+              >
+                ★
+              </button>
+            ))}
+            {ratingPending ? <Loader2 size={12} className="animate-spin text-brand-gold ml-1" /> : null}
+          </div>
+        ) : null}
+
+        {isFriendCard ? (
+          <div className="flex items-center gap-1">
+            {(['❤️', '🔥', '😂', '👎'] as ReactionEmoji[]).map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => void handleReaction(emoji)}
+                className={clsx(
+                  'w-7 h-7 rounded border border-[#222] text-sm hover:border-brand-gold/40',
+                  reactionPending === emoji && 'opacity-60',
+                )}
+              >
+                {emoji}
+              </button>
+            ))}
+            {reactionPending ? <Loader2 size={12} className="animate-spin text-brand-gold ml-1" /> : null}
+          </div>
+        ) : null}
       </div>
     </div>
   );
 }
-

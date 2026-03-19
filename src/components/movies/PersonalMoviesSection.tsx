@@ -2,6 +2,7 @@ import { useState } from 'react';
 import clsx from 'clsx';
 import { Loader2 } from 'lucide-react';
 import { usePersonalMovies } from '../../hooks/usePersonalMovies';
+import { useSocialActions } from '../../hooks/useSocialActions';
 import type { PersonalMovie } from '../../types/app';
 import AddMovieDialog from './AddMovieDialog';
 import MovieCard from './MovieCard';
@@ -9,20 +10,42 @@ import MovieCard from './MovieCard';
 interface PersonalMoviesSectionProps {
   userId: string;
   canEdit: boolean;
+  currentUserId: string;
 }
 
 export default function PersonalMoviesSection({
   userId,
   canEdit,
+  currentUserId,
 }: PersonalMoviesSectionProps) {
   const { moviesQuery, addMovieMutation, updatePlatformMutation, updateStatusMutation, deleteMovieMutation } =
     usePersonalMovies(userId);
+  const { rateMutation, reactMutation } = useSocialActions();
   const [filter, setFilter] = useState<'watchlist' | 'watched'>('watchlist');
+  const [optimisticMovies, setOptimisticMovies] = useState<PersonalMovie[]>([]);
 
-  const filteredMovies = (moviesQuery.data || []).filter((movie) => movie.status === filter);
+  const mergedMovies = [...optimisticMovies, ...(moviesQuery.data || [])];
+  const filteredMovies = mergedMovies.filter((movie) => movie.status === filter);
 
   const handleToggleStatus = (movie: PersonalMovie, nextStatus: 'watchlist' | 'watched') => {
     updateStatusMutation.mutate({ id: movie.id, status: nextStatus });
+  };
+
+  const handleAddMovie = async (movie: Omit<PersonalMovie, 'id' | 'user_id' | 'created_at'>) => {
+    const optimisticId = `optimistic-${Date.now()}`;
+    const optimisticMovie: PersonalMovie = {
+      id: optimisticId,
+      user_id: userId,
+      created_at: new Date().toISOString(),
+      ...movie,
+    };
+
+    setOptimisticMovies((prev) => [optimisticMovie, ...prev]);
+    try {
+      await addMovieMutation.mutateAsync(movie);
+    } finally {
+      setOptimisticMovies((prev) => prev.filter((item) => item.id !== optimisticId));
+    }
   };
 
   return (
@@ -70,6 +93,7 @@ export default function PersonalMoviesSection({
                 layout="grid"
                 canEdit={canEdit}
                 showPlatformSelector
+                currentUserId={currentUserId}
                 onToggleStatus={(selectedMovie, nextStatus) => {
                   if ('user_id' in selectedMovie) {
                     handleToggleStatus(selectedMovie, nextStatus);
@@ -79,6 +103,23 @@ export default function PersonalMoviesSection({
                 onPlatformChange={(selectedMovie, platformId) =>
                   updatePlatformMutation.mutate({ id: selectedMovie.id, platform: platformId })
                 }
+                onRate={async (selectedMovie, stars) => {
+                  await rateMutation.mutateAsync({
+                    actorUserId: currentUserId,
+                    movieId: selectedMovie.id,
+                    movieTitle: selectedMovie.titulo,
+                    stars,
+                  });
+                }}
+                onReact={async (selectedMovie, reaction) => {
+                  await reactMutation.mutateAsync({
+                    actorUserId: currentUserId,
+                    targetUserId: selectedMovie.user_id,
+                    movieTitle: selectedMovie.titulo,
+                    reaction,
+                  });
+                }}
+                isPending={movie.id.startsWith('optimistic-')}
               />
             </div>
           ))}
@@ -89,7 +130,7 @@ export default function PersonalMoviesSection({
                 mode="personal"
                 layout="grid"
                 isPending={addMovieMutation.isPending}
-                onSubmit={(movie) => addMovieMutation.mutateAsync(movie)}
+                onSubmit={handleAddMovie}
               />
             </div>
           ) : null}

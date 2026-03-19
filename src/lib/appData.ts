@@ -46,6 +46,7 @@ type AppwritePersonalMovieDoc = Models.Document & {
   status: MovieStatus;
   source: 'manual' | 'oscar';
   source_movie_id: string | null;
+  avaliacao?: number | null;
 };
 
 type AppwriteSeriesDoc = Models.Document & {
@@ -207,6 +208,7 @@ function mapPersonalMovie(doc: AppwritePersonalMovieDoc): PersonalMovie {
     status: doc.status,
     source: doc.source,
     source_movie_id: doc.source_movie_id ?? null,
+    avaliacao: doc.avaliacao ?? null,
     created_at: doc.$createdAt,
   };
 }
@@ -557,6 +559,13 @@ export async function listActivities(limit = 30) {
   return data.map(mapActivity);
 }
 
+export async function updateUserAvatar(userId: string, avatarId: string) {
+  const metadata = await ensureUserMetadata(userId);
+  await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, {
+    avatar_id: avatarId,
+  });
+}
+
 export async function getOscarMoviesForUser(userId: string) {
   const [moviesResult, statusesResult] = await Promise.all([
     listDocuments<AppwriteOscarMovieDoc>(COLLECTION_OSCAR_MOVIES, [
@@ -640,7 +649,7 @@ export async function addPersonalMovie(
 
 export async function updatePersonalMovie(
   movieId: string,
-  updates: Partial<Pick<PersonalMovie, 'status' | 'plataforma_slug'>>,
+  updates: Partial<Pick<PersonalMovie, 'status' | 'plataforma_slug' | 'avaliacao'>>,
 ) {
   const current = await databases.getDocument(DATABASE_ID, COLLECTION_PERSONAL_MOVIES, movieId);
 
@@ -776,6 +785,41 @@ export async function suggestMovieToUser(
 
   await awardMCoins(fromUserId, 'INDICOU_FILME', `indicou o filme ${movie.titulo}.`);
 }
+
+export async function reactToMovie(
+  actorUserId: string,
+  targetUserId: string,
+  movieTitle: string,
+  reaction: string,
+) {
+  const [actorName, targetName] = await Promise.all([
+    getUsernameById(actorUserId),
+    getUsernameById(targetUserId),
+  ]);
+  await addActivity(actorUserId, `${actorName} reagiu com ${reaction} ao filme de ${targetName} (${movieTitle}).`, 0);
+}
+
+export async function rateMovie(
+  actorUserId: string,
+  movieId: string,
+  movieTitle: string,
+  stars: number,
+) {
+  try {
+    await updateDocument(COLLECTION_PERSONAL_MOVIES, movieId, {
+      avaliacao: stars,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    if (!message.includes('Unknown attribute')) {
+      throw error;
+    }
+  }
+
+  const actorName = await getUsernameById(actorUserId);
+  await addActivity(actorUserId, `${actorName} avaliou ${movieTitle} com ${stars} estrelas.`, 0);
+}
+
 export async function deleteSeries(seriesId: string) {
   await deleteDocument(COLLECTION_PERSONAL_SERIES, seriesId);
 }

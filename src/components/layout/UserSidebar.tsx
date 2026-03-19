@@ -70,7 +70,7 @@ export default function UserSidebar({
                 className={clsx(
                   'w-full rounded-xl border px-2.5 py-1.5 text-left transition',
                   isLeader
-                    ? 'border-yellow-500 animate-pulse'
+                    ? 'border-2 border-yellow-600'
                     : 'border-slate-400/40',
                   isSelected
                     ? 'bg-brand-gold/10'
@@ -78,7 +78,7 @@ export default function UserSidebar({
                 )}
               >
                 <div className="flex items-center justify-between gap-2 text-xs uppercase tracking-[0.12em]">
-                  <span className="text-brand-gold-alt">{user.rank}o</span>
+                  <span className="text-brand-gold-alt">{user.rank}º</span>
                   <span className="text-brand-gold">{user.mcoins} MC</span>
                 </div>
 
@@ -92,7 +92,7 @@ export default function UserSidebar({
                     <span className="text-lg leading-none">{avatarEmoji(user.avatar_id)}</span>
                   </div>
                   <p className="text-sm uppercase tracking-[0.14em] text-brand-text truncate">
-                    {user.username} {isCurrent ? '• MC' : ''}
+                    {user.username} {isCurrent ? '(Voce)' : ''}
                   </p>
                 </div>
               </button>

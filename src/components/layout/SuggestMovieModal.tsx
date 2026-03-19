@@ -3,7 +3,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { Loader2, Plus, X } from 'lucide-react';
 import type { AppUser, PersonalMovie } from '../../types/app';
 import { useSuggestMovie } from '../../hooks/useSuggestMovie';
-import { searchMovies, type TMDBMovie } from '../../lib/tmdb';
+import { searchMulti, type TMDBMultiResult } from '../../lib/tmdb';
 
 interface SuggestMovieModalProps {
   currentUserId: string;
@@ -14,8 +14,8 @@ export default function SuggestMovieModal({ currentUserId, users }: SuggestMovie
   const [open, setOpen] = useState(false);
   const [friendId, setFriendId] = useState('');
   const [query, setQuery] = useState('');
-  const [selectedMovie, setSelectedMovie] = useState<TMDBMovie | null>(null);
-  const [searchResults, setSearchResults] = useState<TMDBMovie[]>([]);
+  const [selected, setSelected] = useState<TMDBMultiResult | null>(null);
+  const [searchResults, setSearchResults] = useState<TMDBMultiResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [capaUrl, setCapaUrl] = useState('');
@@ -40,7 +40,7 @@ export default function SuggestMovieModal({ currentUserId, users }: SuggestMovie
   const reset = () => {
     setFriendId('');
     setQuery('');
-    setSelectedMovie(null);
+    setSelected(null);
     setSearchResults([]);
     setIsSearching(false);
     setShowDropdown(false);
@@ -49,10 +49,9 @@ export default function SuggestMovieModal({ currentUserId, users }: SuggestMovie
     setOpen(false);
   };
 
-  const handleTitleChange = (value: string) => {
+  const handleSearch = (value: string) => {
     setQuery(value);
-    setSelectedMovie(null);
-
+    setSelected(null);
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
 
     if (!value.trim()) {
@@ -65,17 +64,17 @@ export default function SuggestMovieModal({ currentUserId, users }: SuggestMovie
     setIsSearching(true);
     setShowDropdown(true);
     searchTimeout.current = window.setTimeout(async () => {
-      const results = await searchMovies(value);
+      const results = await searchMulti(value);
       setSearchResults(results);
       setIsSearching(false);
     }, 400);
   };
 
-  const selectMovie = (movie: TMDBMovie) => {
-    setSelectedMovie(movie);
-    setQuery(movie.title);
-    if (movie.poster_path) {
-      setCapaUrl(`https://image.tmdb.org/t/p/w500${movie.poster_path}`);
+  const pick = (item: TMDBMultiResult) => {
+    setSelected(item);
+    setQuery(item.title ?? item.name ?? '');
+    if (item.poster_path) {
+      setCapaUrl(`https://image.tmdb.org/t/p/w500${item.poster_path}`);
     } else {
       setCapaUrl('');
     }
@@ -85,22 +84,23 @@ export default function SuggestMovieModal({ currentUserId, users }: SuggestMovie
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!friendId || !selectedMovie) {
-      setError('Selecione um filme da busca TMDB para indicar.');
+    if (!friendId || !selected) {
+      setError('Selecione uma midia da busca TMDB para indicar.');
       return;
     }
     setError(null);
 
+    const title = selected.title ?? selected.name ?? '';
+    const release = selected.release_date ?? selected.first_air_date ?? '';
+    const year = release ? parseInt(release.split('-')[0], 10) || null : null;
     const payload: Omit<PersonalMovie, 'id' | 'user_id' | 'created_at'> = {
-      titulo: selectedMovie.title.trim(),
-      ano_lancamento: selectedMovie.release_date
-        ? parseInt(selectedMovie.release_date.split('-')[0], 10) || null
-        : null,
+      titulo: title.trim(),
+      ano_lancamento: year,
       capa_url: capaUrl.trim() || null,
       plataforma_slug: 'stremio',
       status: 'watchlist',
       source: 'manual',
-      source_movie_id: String(selectedMovie.id),
+      source_movie_id: String(selected.id),
     };
 
     try {
@@ -108,10 +108,11 @@ export default function SuggestMovieModal({ currentUserId, users }: SuggestMovie
         fromUserId: currentUserId,
         toUserId: friendId,
         movie: payload,
+        mediaType: selected.media_type,
       });
       reset();
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : 'Falha ao indicar filme.');
+      setError(submitError instanceof Error ? submitError.message : 'Falha ao indicar.');
     }
   };
 
@@ -119,16 +120,16 @@ export default function SuggestMovieModal({ currentUserId, users }: SuggestMovie
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger asChild>
         <button className="inline-flex items-center gap-2 px-3 py-2 border border-brand-gold/40 rounded-lg text-xs uppercase tracking-[0.14em] text-brand-gold hover:bg-brand-gold/10 transition">
-          <Plus size={14} /> Indicar Filme
+          <Plus size={14} /> Indicar
         </button>
       </Dialog.Trigger>
 
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40" />
         <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-[92vw] max-w-lg translate-x-[-50%] translate-y-[-50%] border border-[#222] bg-brand-bg p-6 shadow-lg rounded-xl">
-          <Dialog.Title className="text-lg text-brand-gold tracking-widest uppercase">Indicar Filme</Dialog.Title>
+          <Dialog.Title className="text-lg text-brand-gold tracking-widest uppercase">Indicar Midia</Dialog.Title>
           <Dialog.Description className="text-sm text-brand-text-muted mt-2">
-            Escolha um amigo e envie um filme para a watchlist dele.
+            Indique filme ou serie para a watchlist de um amigo.
           </Dialog.Description>
 
           <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-3">
@@ -147,11 +148,11 @@ export default function SuggestMovieModal({ currentUserId, users }: SuggestMovie
             <div className="relative" ref={dropdownRef}>
               <input
                 value={query}
-                onChange={(event) => handleTitleChange(event.target.value)}
+                onChange={(event) => handleSearch(event.target.value)}
                 onFocus={() => {
                   if (query.trim() && searchResults.length > 0) setShowDropdown(true);
                 }}
-                placeholder="Buscar filme no TMDB"
+                placeholder="Buscar filme ou serie no TMDB"
                 className="w-full bg-[#0a0f1e] border border-[#222] text-brand-text p-2.5 rounded pr-10"
                 required
               />
@@ -165,16 +166,16 @@ export default function SuggestMovieModal({ currentUserId, users }: SuggestMovie
                 <div className="absolute top-[100%] left-0 w-full mt-1 bg-[#0a0f1e] border border-[#222] rounded-md shadow-[0_10px_30px_rgba(0,0,0,0.8)] z-50 max-h-60 overflow-y-auto">
                   {searchResults.length > 0 ? (
                     <ul className="flex flex-col">
-                      {searchResults.map((movie) => (
+                      {searchResults.map((item) => (
                         <li
-                          key={movie.id}
-                          onClick={() => selectMovie(movie)}
+                          key={`${item.media_type}-${item.id}`}
+                          onClick={() => pick(item)}
                           className="flex items-center gap-3 p-2 hover:bg-[#1a2235] cursor-pointer transition-colors border-b border-[#222] last:border-none"
                         >
-                          {movie.poster_path ? (
+                          {item.poster_path ? (
                             <img
-                              src={`https://image.tmdb.org/t/p/w92${movie.poster_path}`}
-                              alt={movie.title}
+                              src={`https://image.tmdb.org/t/p/w92${item.poster_path}`}
+                              alt={item.title ?? item.name ?? 'item'}
                               className="w-8 h-12 object-cover rounded shadow-sm"
                             />
                           ) : (
@@ -183,9 +184,11 @@ export default function SuggestMovieModal({ currentUserId, users }: SuggestMovie
                             </div>
                           )}
                           <div className="flex flex-col">
-                            <span className="text-sm text-brand-text line-clamp-1">{movie.title}</span>
-                            <span className="text-xs text-brand-gold-alt">
-                              {movie.release_date ? movie.release_date.split('-')[0] : 'N/D'}
+                            <span className="text-sm text-brand-text line-clamp-1">
+                              {item.title ?? item.name}
+                            </span>
+                            <span className="text-xs text-brand-gold-alt uppercase">
+                              {item.media_type === 'movie' ? 'Filme' : 'Serie'}
                             </span>
                           </div>
                         </li>
@@ -193,7 +196,7 @@ export default function SuggestMovieModal({ currentUserId, users }: SuggestMovie
                     </ul>
                   ) : query.trim() !== '' && !isSearching ? (
                     <div className="p-4 text-center text-sm text-brand-text-muted font-light">
-                      Nenhum filme encontrado no TMDB.
+                      Nenhum resultado no TMDB.
                     </div>
                   ) : null}
                 </div>
@@ -201,19 +204,17 @@ export default function SuggestMovieModal({ currentUserId, users }: SuggestMovie
             </div>
 
             <input
-                value={capaUrl}
-                onChange={(event) => setCapaUrl(event.target.value)}
-                placeholder="URL da capa (opcional)"
-                className="w-full bg-[#0a0f1e] border border-[#222] text-brand-text p-2.5 rounded"
-              />
+              value={capaUrl}
+              onChange={(event) => setCapaUrl(event.target.value)}
+              placeholder="URL da capa (opcional)"
+              className="w-full bg-[#0a0f1e] border border-[#222] text-brand-text p-2.5 rounded"
+            />
 
-            {selectedMovie ? (
+            {selected ? (
               <p className="text-[11px] text-brand-gold-alt">
-                Selecionado: {selectedMovie.title}
-                {selectedMovie.release_date ? ` (${selectedMovie.release_date.split('-')[0]})` : ''}
+                Selecionado: {selected.title ?? selected.name} ({selected.media_type === 'movie' ? 'Filme' : 'Serie'})
               </p>
             ) : null}
-
             {error ? <p className="text-xs text-red-300">{error}</p> : null}
 
             <button

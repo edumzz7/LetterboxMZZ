@@ -21,6 +21,16 @@ export interface TMDBWatchProvider {
     logo_path: string | null;
 }
 
+export interface TMDBMultiResult {
+    id: number;
+    media_type: 'movie' | 'tv';
+    title?: string;
+    name?: string;
+    release_date?: string;
+    first_air_date?: string;
+    poster_path: string | null;
+}
+
 export async function searchMovies(query: string): Promise<TMDBMovie[]> {
     if (!query || !query.trim()) return [];
 
@@ -108,6 +118,26 @@ export async function getMovieWatchProviders(
         return Array.from(unique.values()).slice(0, 5);
     } catch (error) {
         console.error('Error fetching watch providers:', error);
+        return [];
+    }
+}
+
+export async function searchMulti(query: string): Promise<TMDBMultiResult[]> {
+    if (!query || !query.trim()) return [];
+    if (!TMDB_API_KEY) return [];
+
+    try {
+        const response = await fetch(
+            `${TMDB_BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}&language=pt-BR&page=1`
+        );
+        if (!response.ok) throw new Error('TMDB Multi Fetch Error');
+
+        const data = await response.json();
+        return (data.results || []).filter(
+            (item: TMDBMultiResult) => item.media_type === 'movie' || item.media_type === 'tv'
+        );
+    } catch (error) {
+        console.error('Error searching TMDB multi:', error);
         return [];
     }
 }

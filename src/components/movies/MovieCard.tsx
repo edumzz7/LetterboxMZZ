@@ -57,6 +57,8 @@ export default function MovieCard({
   const canRate = isPersonalMovie(movie) && !isFriendCard && isWatched && Boolean(onRate);
 
   const [providers, setProviders] = useState<TMDBWatchProvider[]>([]);
+  const [showProviders, setShowProviders] = useState(false);
+  const [providersLoading, setProvidersLoading] = useState(false);
   const [reactionPending, setReactionPending] = useState<ReactionEmoji | null>(null);
   const [ratingPending, setRatingPending] = useState<number | null>(null);
   const [localRating, setLocalRating] = useState<number>(isPersonalMovie(movie) ? (movie.avaliacao ?? 0) : 0);
@@ -67,38 +69,7 @@ export default function MovieCard({
     }
   }, [movie]);
 
-  useEffect(() => {
-    let active = true;
-    async function loadProviders() {
-      if (!showPlatformSelector) return;
-      const cacheKey = `${movie.titulo}|${'ano_lancamento' in movie ? movie.ano_lancamento ?? '' : movie.ano_oscar ?? ''}`;
-      const cached = providerCache.get(cacheKey);
-      if (cached) {
-        if (active) setProviders(cached);
-        return;
-      }
-
-      const tmdbId = isPersonalMovie(movie)
-        ? parseTmdbFromSource(movie.source_movie_id)
-        : null;
-      const resolvedId =
-        tmdbId ??
-        (await findMovieIdByTitle(
-          movie.titulo,
-          'ano_lancamento' in movie ? movie.ano_lancamento : movie.ano_oscar,
-        ));
-      if (!resolvedId) return;
-
-      const nextProviders = await getMovieWatchProviders(resolvedId, 'BR');
-      providerCache.set(cacheKey, nextProviders);
-      if (active) setProviders(nextProviders);
-    }
-
-    void loadProviders();
-    return () => {
-      active = false;
-    };
-  }, [movie, showPlatformSelector]);
+  const cacheKey = `${movie.titulo}|${'ano_lancamento' in movie ? movie.ano_lancamento ?? '' : movie.ano_oscar ?? ''}`;
 
   const suggestionBadge = useMemo(() => {
     if (!isPersonalMovie(movie)) return false;
@@ -137,6 +108,40 @@ export default function MovieCard({
     }
   };
 
+  const toggleProviders = async () => {
+    const next = !showProviders;
+    setShowProviders(next);
+    if (!next || providers.length > 0 || providersLoading) return;
+
+    const cached = providerCache.get(cacheKey);
+    if (cached) {
+      setProviders(cached);
+      return;
+    }
+
+    setProvidersLoading(true);
+    try {
+      const tmdbId = isPersonalMovie(movie)
+        ? parseTmdbFromSource(movie.source_movie_id)
+        : null;
+      const resolvedId =
+        tmdbId ??
+        (await findMovieIdByTitle(
+          movie.titulo,
+          'ano_lancamento' in movie ? movie.ano_lancamento : movie.ano_oscar,
+        ));
+      if (!resolvedId) {
+        setProviders([]);
+        return;
+      }
+      const nextProviders = await getMovieWatchProviders(resolvedId, 'BR');
+      providerCache.set(cacheKey, nextProviders);
+      setProviders(nextProviders);
+    } finally {
+      setProvidersLoading(false);
+    }
+  };
+
   const handleRate = async (stars: number) => {
     if (!isPersonalMovie(movie) || !onRate) return;
     setLocalRating(stars);
@@ -151,7 +156,7 @@ export default function MovieCard({
   return (
     <div
       className={clsx(
-        'flex flex-col gap-3',
+        'flex flex-col gap-3 group/card',
         layout === 'carousel' ? 'min-w-[160px] md:min-w-[200px] snap-center' : 'w-full',
         isPending && 'opacity-90',
       )}
@@ -228,24 +233,42 @@ export default function MovieCard({
         </h3>
 
         {showPlatformSelector ? (
-          <div className="min-h-[36px] border border-[#1f1f1f] rounded-md px-2 py-1.5 flex items-center gap-1.5 flex-wrap">
-            {providers.length > 0 ? (
-              providers.map((provider) =>
-                provider.logo_path ? (
-                  <img
-                    key={provider.provider_id}
-                    src={`https://image.tmdb.org/t/p/w92${provider.logo_path}`}
-                    title={provider.provider_name}
-                    alt={provider.provider_name}
-                    className="w-5 h-5 rounded"
-                  />
-                ) : null,
-              )
-            ) : (
-              <span className="text-[10px] text-brand-text-muted uppercase tracking-[0.12em]">
-                Sem stream BR
-              </span>
-            )}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => void toggleProviders()}
+              className="text-[11px] uppercase tracking-[0.12em] text-brand-gold-alt hover:text-brand-gold"
+            >
+              Onde assistir?
+            </button>
+            {showProviders ? (
+              <div className="absolute left-0 top-[110%] z-20 min-w-[180px] border border-[#222] rounded-md bg-[#0a0f1e] p-2">
+                {providersLoading ? (
+                  <div className="flex items-center gap-2 text-xs text-brand-text-muted">
+                    <Loader2 size={12} className="animate-spin" /> Carregando...
+                  </div>
+                ) : providers.length > 0 ? (
+                  <ul className="flex flex-col gap-1">
+                    {providers.map((provider) => (
+                      <li key={provider.provider_id} className="text-xs text-brand-text flex items-center gap-2">
+                        {provider.logo_path ? (
+                          <img
+                            src={`https://image.tmdb.org/t/p/w92${provider.logo_path}`}
+                            alt={provider.provider_name}
+                            className="w-5 h-5 rounded"
+                          />
+                        ) : null}
+                        <span>{provider.provider_name}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <span className="text-[10px] text-brand-text-muted uppercase tracking-[0.12em]">
+                    Sem stream BR
+                  </span>
+                )}
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -270,7 +293,8 @@ export default function MovieCard({
         ) : null}
 
         {isFriendCard ? (
-          <div className="flex items-center gap-1">
+          <div className="relative min-h-[28px]">
+            <div className="absolute left-0 top-0 opacity-0 pointer-events-none group-hover/card:opacity-100 group-hover/card:pointer-events-auto transition-opacity duration-300 delay-500 flex items-center gap-1">
             {(['❤️', '🔥', '😂', '👎'] as ReactionEmoji[]).map((emoji) => (
               <button
                 key={emoji}
@@ -285,6 +309,7 @@ export default function MovieCard({
               </button>
             ))}
             {reactionPending ? <Loader2 size={12} className="animate-spin text-brand-gold ml-1" /> : null}
+            </div>
           </div>
         ) : null}
       </div>

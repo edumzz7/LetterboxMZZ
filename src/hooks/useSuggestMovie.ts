@@ -10,11 +10,13 @@ export function useSuggestMovie() {
       fromUserId,
       toUserId,
       movie,
+      mediaType,
     }: {
       fromUserId: string;
       toUserId: string;
       movie: Omit<PersonalMovie, 'id' | 'user_id' | 'created_at'>;
-    }) => suggestMovieToUser(fromUserId, toUserId, movie),
+      mediaType: 'movie' | 'tv';
+    }) => suggestMovieToUser(fromUserId, toUserId, movie, mediaType),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['users'] });
       void queryClient.invalidateQueries({ queryKey: ['activities'] });

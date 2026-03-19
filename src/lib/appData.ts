@@ -100,6 +100,7 @@ const TRIGGER_POINTS = {
   ASSISTIU_FILME: 30,
   INICIOU_SERIE: 20,
   SERIE_100: 50,
+  BONUS_EPISODIOS_COMPLETOS: 30,
   INDICOU_FILME: 5,
   FILME_INDICADO_ASSISTIDO: 40,
   SERIE_INDICADA_100: 60,
@@ -305,19 +306,21 @@ async function addActivity(userId: string, message: string, mcoinsDelta: number)
   });
 }
 
-async function awardMCoins(userId: string, trigger: TriggerKey, message: string) {
+async function grantMCoins(userId: string, trigger: TriggerKey) {
   const delta = TRIGGER_POINTS[trigger];
-  const [metadata, username] = await Promise.all([
-    ensureUserMetadata(userId),
+  const metadata = await ensureUserMetadata(userId);
+  await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, {
+    mcoins: Math.max(0, (metadata.mcoins ?? 0) + delta),
+  });
+  return delta;
+}
+
+async function awardMCoins(userId: string, trigger: TriggerKey, message: string) {
+  const [delta, username] = await Promise.all([
+    grantMCoins(userId, trigger),
     getUsernameById(userId),
   ]);
-
-  await Promise.all([
-    updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, {
-      mcoins: Math.max(0, (metadata.mcoins ?? 0) + delta),
-    }),
-    addActivity(userId, `${username} ${message} (+${delta} MC)`, delta),
-  ]);
+  await addActivity(userId, `${username} ${message} (+${delta} MC)`, delta);
 }
 
 async function upsertUserOscarMovie(userId: string, oscarMovieId: string, status: MovieStatus) {
@@ -745,6 +748,21 @@ export async function updateSeries(
 
   const data = (await updateDocument(COLLECTION_PERSONAL_SERIES, seriesId, mappedUpdates)) as unknown as AppwriteSeriesDoc;
 
+  const crossedCompletion =
+    (current.episodiosVistos ?? 0) < (current.totalEpisodios ?? 1) &&
+    (data.episodiosVistos ?? 0) >= (data.totalEpisodios ?? 1);
+
+  if (crossedCompletion) {
+    const viewerId = (current as { user_id?: string }).user_id ?? '';
+    if (viewerId) {
+      await awardMCoins(
+        viewerId,
+        'BONUS_EPISODIOS_COMPLETOS',
+        `bateu 100% dos episodios de ${data.titulo}.`,
+      );
+    }
+  }
+
   if (fromAppwriteSeriesStatus(current.status) !== 'watched' && fromAppwriteSeriesStatus(data.status) === 'watched') {
     const viewerId = (current as { user_id?: string }).user_id ?? '';
     if (viewerId) {
@@ -766,24 +784,46 @@ export async function suggestMovieToUser(
   fromUserId: string,
   toUserId: string,
   movie: Omit<PersonalMovie, 'id' | 'user_id' | 'created_at'>,
+  mediaType: 'movie' | 'tv' = 'movie',
 ) {
-  const existingByTitle = await firstDocument<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
-    Query.equal('user_id', [toUserId]),
-    Query.equal('titulo', [movie.titulo]),
-  ]);
-  if (existingByTitle) {
-    throw new Error('Esse filme ja esta na lista do amigo.');
+  if (mediaType === 'movie') {
+    const existingByTitle = await firstDocument<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
+      Query.equal('user_id', [toUserId]),
+      Query.equal('titulo', [movie.titulo]),
+    ]);
+    if (existingByTitle) {
+      throw new Error('Esse filme ja esta na lista do amigo.');
+    }
+
+    await createDocument(COLLECTION_PERSONAL_MOVIES, {
+      ...movie,
+      source_movie_id: movie.source_movie_id
+        ? `tmdb:${movie.source_movie_id}|rec:${fromUserId}`
+        : null,
+      user_id: toUserId,
+    });
+  } else {
+    await createDocument(COLLECTION_PERSONAL_SERIES, {
+      titulo: movie.titulo,
+      capaUrl: ensureValidUrl(movie.capa_url),
+      plataforma: 'stremio',
+      totalEpisodios: 1,
+      episodiosVistos: 0,
+      status: 'naoIniciado',
+    });
   }
 
-  await createDocument(COLLECTION_PERSONAL_MOVIES, {
-    ...movie,
-    source_movie_id: movie.source_movie_id
-      ? `tmdb:${movie.source_movie_id}|rec:${fromUserId}`
-      : null,
-    user_id: toUserId,
-  });
-
-  await awardMCoins(fromUserId, 'INDICOU_FILME', `indicou o filme ${movie.titulo}.`);
+  const [fromName, toName, delta] = await Promise.all([
+    getUsernameById(fromUserId),
+    getUsernameById(toUserId),
+    grantMCoins(fromUserId, 'INDICOU_FILME'),
+  ]);
+  const label = mediaType === 'movie' ? 'filme' : 'serie';
+  await addActivity(
+    fromUserId,
+    `@${fromName} indicou ${label} ${movie.titulo} para @${toName}. (+${delta} MC)`,
+    delta,
+  );
 }
 
 export async function reactToMovie(
@@ -800,9 +840,9 @@ export async function reactToMovie(
 }
 
 export async function rateMovie(
-  actorUserId: string,
+  _actorUserId: string,
   movieId: string,
-  movieTitle: string,
+  _movieTitle: string,
   stars: number,
 ) {
   try {
@@ -816,8 +856,6 @@ export async function rateMovie(
     }
   }
 
-  const actorName = await getUsernameById(actorUserId);
-  await addActivity(actorUserId, `${actorName} avaliou ${movieTitle} com ${stars} estrelas.`, 0);
 }
 
 export async function deleteSeries(seriesId: string) {

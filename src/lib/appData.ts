@@ -824,6 +824,24 @@ export async function updateOscarMoviePlatform(movieId: string, platformSlug: st
   });
 }
 
+export async function updateOscarMovieStreaming(movieId: string, streamingData: string) {
+  await updateDocument(COLLECTION_OSCAR_MOVIES, movieId, {
+    streamingData,
+  });
+}
+
+export async function updatePersonalMovieStreaming(movieId: string, streamingData: string) {
+  await updateDocument(COLLECTION_PERSONAL_MOVIES, movieId, {
+    streamingData,
+  });
+}
+
+export async function updateSeriesStreaming(seriesId: string, streamingData: string) {
+  await updateDocument(COLLECTION_PERSONAL_SERIES, seriesId, {
+    streamingData,
+  });
+}
+
 export async function suggestMovieToUser(
   fromUserId: string,
   toUserId: string,

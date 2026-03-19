@@ -2,11 +2,20 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Film, Eye, EyeOff, Trash2, Loader2 } from 'lucide-react';
 import clsx from 'clsx';
 import { generateImagePath } from '../../lib/imageUtils';
+import {
+  findMovieIdByTitle,
+  getMovieWatchProviders,
+  type TMDBWatchProvider,
+} from '../../lib/tmdb';
+import {
+  updateOscarMovieStreaming,
+  updatePersonalMovieStreaming,
+} from '../../lib/appData';
 import type { MovieStatus, OscarMovieWithStatus, PersonalMovie } from '../../types/app';
 
 type CardMovie = OscarMovieWithStatus | PersonalMovie;
 type ReactionEmoji = '❤️' | '🔥' | '😂' | '👎';
-type ProviderItem = { provider_id?: number; provider_name?: string; logo_path?: string | null };
+type ProviderItem = TMDBWatchProvider;
 
 interface MovieCardProps {
   movie: CardMovie;
@@ -36,6 +45,15 @@ function parseProviders(streamingData: string | null | undefined): ProviderItem[
   }
 }
 
+function parseTmdbFromSource(sourceMovieId: string | null | undefined) {
+  if (!sourceMovieId) return null;
+  const directNumeric = sourceMovieId.match(/^\d+$/);
+  if (directNumeric) return parseInt(sourceMovieId, 10);
+  const prefixed = sourceMovieId.match(/^tmdb:(\d+)/);
+  if (prefixed) return parseInt(prefixed[1], 10);
+  return null;
+}
+
 export default function MovieCard({
   movie,
   layout = 'carousel',
@@ -60,6 +78,7 @@ export default function MovieCard({
 
   const [providers, setProviders] = useState<ProviderItem[]>([]);
   const [showProviders, setShowProviders] = useState(false);
+  const [providersLoading, setProvidersLoading] = useState(false);
   const [reactionPending, setReactionPending] = useState<ReactionEmoji | null>(null);
   const [ratingPending, setRatingPending] = useState<number | null>(null);
   const [localRating, setLocalRating] = useState<number>(isPersonalMovie(movie) ? (movie.avaliacao ?? 0) : 0);
@@ -125,6 +144,35 @@ export default function MovieCard({
       await onRate(movie, stars);
     } finally {
       setRatingPending(null);
+    }
+  };
+
+  const resolveProviders = async () => {
+    if (providers.length > 0 || providersLoading) return;
+    setProvidersLoading(true);
+    try {
+      const tmdbId = isPersonalMovie(movie) ? parseTmdbFromSource(movie.source_movie_id) : null;
+      const resolvedId =
+        tmdbId ??
+        (await findMovieIdByTitle(
+          movie.titulo,
+          'ano_lancamento' in movie ? movie.ano_lancamento : movie.ano_oscar,
+        ));
+      if (!resolvedId) {
+        setProviders([]);
+        return;
+      }
+
+      const nextProviders = await getMovieWatchProviders(resolvedId, 'BR');
+      setProviders(nextProviders);
+      const serialized = JSON.stringify(nextProviders);
+      if (isPersonalMovie(movie)) {
+        await updatePersonalMovieStreaming(movie.id, serialized);
+      } else {
+        await updateOscarMovieStreaming(movie.id, serialized);
+      }
+    } finally {
+      setProvidersLoading(false);
     }
   };
 
@@ -232,14 +280,22 @@ export default function MovieCard({
           <div className="relative" ref={providersRef}>
             <button
               type="button"
-              onClick={() => setShowProviders((value) => !value)}
+              onClick={() => {
+                const next = !showProviders;
+                setShowProviders(next);
+                if (next) void resolveProviders();
+              }}
               className="text-[11px] uppercase tracking-[0.12em] text-brand-gold-alt hover:text-brand-gold"
             >
               Onde assistir?
             </button>
             {showProviders ? (
               <div className="absolute left-0 top-[110%] z-20 min-w-[180px] border border-[#222] rounded-md bg-[#0a0f1e] p-2">
-                {providers.length > 0 ? (
+                {providersLoading ? (
+                  <div className="flex items-center gap-2 text-xs text-brand-text-muted">
+                    <Loader2 size={12} className="animate-spin" /> Carregando...
+                  </div>
+                ) : providers.length > 0 ? (
                   <ul className="flex flex-col gap-1">
                     {providers.map((provider) => (
                       <li key={provider.provider_id ?? provider.provider_name} className="text-xs text-brand-text flex items-center gap-2">

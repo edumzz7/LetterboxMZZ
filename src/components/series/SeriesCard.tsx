@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Eye, EyeOff, Trash2, Tv, X } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Trash2, Tv, X } from 'lucide-react';
 import clsx from 'clsx';
 import { generateImagePath } from '../../lib/imageUtils';
 import type { Series } from '../../hooks/useSeries';
 import { PlatformSelect } from '../ui/PlatformSelect';
+import { getTvWatchProviders, searchSeries } from '../../lib/tmdb';
+import { updateSeriesStreaming } from '../../lib/appData';
 
 interface SeriesCardProps {
   series: Series;
@@ -30,6 +32,10 @@ export default function SeriesCard({
   const [localEps, setLocalEps] = useState(series.episodios_vistos.toString());
   const [localTemporada, setLocalTemporada] = useState((series.temporada || 1).toString());
   const [localTotalEps, setLocalTotalEps] = useState((series.total_episodios || 0).toString());
+  const [showProviders, setShowProviders] = useState(false);
+  const [providersLoading, setProvidersLoading] = useState(false);
+  const [providers, setProviders] = useState<Array<{ provider_id?: number; provider_name?: string; logo_path?: string | null }>>([]);
+  const providersRef = useRef<HTMLDivElement | null>(null);
 
   const syncLocalState = () => {
     setLocalEps(series.episodios_vistos.toString());
@@ -79,6 +85,47 @@ export default function SeriesCard({
 
   const imageSrc = generateImagePath(series.titulo, series.capa_url);
   const isWatched = series.status === 'watched';
+
+  useEffect(() => {
+    if (!series.streaming_data) {
+      setProviders([]);
+      return;
+    }
+    try {
+      const parsed = JSON.parse(series.streaming_data);
+      setProviders(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      setProviders([]);
+    }
+  }, [series.streaming_data]);
+
+  useEffect(() => {
+    const onClickOutside = (event: MouseEvent) => {
+      if (providersRef.current && !providersRef.current.contains(event.target as Node)) {
+        setShowProviders(false);
+      }
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, []);
+
+  const resolveProviders = async () => {
+    if (providers.length > 0 || providersLoading) return;
+    setProvidersLoading(true);
+    try {
+      const candidates = await searchSeries(series.titulo);
+      const picked = candidates[0];
+      if (!picked) {
+        setProviders([]);
+        return;
+      }
+      const nextProviders = await getTvWatchProviders(picked.id, 'BR');
+      setProviders(nextProviders);
+      await updateSeriesStreaming(series.id, JSON.stringify(nextProviders));
+    } finally {
+      setProvidersLoading(false);
+    }
+  };
 
   return (
     <Dialog.Root
@@ -161,6 +208,48 @@ export default function SeriesCard({
               }
               disabled={!canEdit}
             />
+
+            <div className="relative" ref={providersRef}>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !showProviders;
+                  setShowProviders(next);
+                  if (next) void resolveProviders();
+                }}
+                className="text-[11px] uppercase tracking-[0.12em] text-brand-gold-alt hover:text-brand-gold"
+              >
+                Onde assistir?
+              </button>
+              {showProviders ? (
+                <div className="absolute left-0 top-[110%] z-20 min-w-[180px] border border-[#222] rounded-md bg-[#0a0f1e] p-2">
+                  {providersLoading ? (
+                    <div className="flex items-center gap-2 text-xs text-brand-text-muted">
+                      <Loader2 size={12} className="animate-spin" /> Carregando...
+                    </div>
+                  ) : providers.length > 0 ? (
+                    <ul className="flex flex-col gap-1">
+                      {providers.map((provider) => (
+                        <li key={provider.provider_id ?? provider.provider_name} className="text-xs text-brand-text flex items-center gap-2">
+                          {provider.logo_path ? (
+                            <img
+                              src={`https://image.tmdb.org/t/p/w92${provider.logo_path}`}
+                              alt={provider.provider_name ?? 'provider'}
+                              className="w-5 h-5 rounded"
+                            />
+                          ) : null}
+                          <span>{provider.provider_name}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <span className="text-[10px] text-brand-text-muted uppercase tracking-[0.12em]">
+                      Sem stream BR
+                    </span>
+                  )}
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       </Dialog.Trigger>

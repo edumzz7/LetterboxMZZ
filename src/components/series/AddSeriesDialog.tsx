@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Loader2, Plus, X } from 'lucide-react';
 import clsx from 'clsx';
-import { searchSeries, type TMDBSeries } from '../../lib/tmdb';
+import { getTvWatchProviders, searchSeries, type TMDBSeries } from '../../lib/tmdb';
 import type { SeriesEntry } from '../../types/app';
 
 interface AddSeriesDialogProps {
@@ -20,6 +20,8 @@ export default function AddSeriesDialog({ onSubmit, isPending }: AddSeriesDialog
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [selectedSeries, setSelectedSeries] = useState<TMDBSeries | null>(null);
+  const [streamingData, setStreamingData] = useState<string | null>(null);
   const searchTimeout = useRef<number | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -43,6 +45,8 @@ export default function AddSeriesDialog({ onSubmit, isPending }: AddSeriesDialog
     setSearchResults([]);
     setShowDropdown(false);
     setSubmitError(null);
+    setSelectedSeries(null);
+    setStreamingData(null);
   };
 
   const handleTitleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -69,11 +73,16 @@ export default function AddSeriesDialog({ onSubmit, isPending }: AddSeriesDialog
   };
 
   const handleSelectSeries = (series: TMDBSeries) => {
+    setSelectedSeries(series);
     setTitulo(series.name);
     if (series.poster_path) {
       setCapaUrl(`https://image.tmdb.org/t/p/w500${series.poster_path}`);
     }
     setShowDropdown(false);
+    void (async () => {
+      const providers = await getTvWatchProviders(series.id, 'BR');
+      setStreamingData(JSON.stringify(providers));
+    })();
   };
 
   const handleSave = async (event: React.FormEvent) => {
@@ -92,6 +101,8 @@ export default function AddSeriesDialog({ onSubmit, isPending }: AddSeriesDialog
         episodios_vistos: 0,
         status: 'watching',
         plataforma_slug: 'stremio',
+        rating: selectedSeries?.vote_average ?? null,
+        streaming_data: streamingData,
       });
 
       resetForm();

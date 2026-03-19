@@ -3,7 +3,12 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { Loader2, Plus, X } from 'lucide-react';
 import type { AppUser, PersonalMovie } from '../../types/app';
 import { useSuggestMovie } from '../../hooks/useSuggestMovie';
-import { searchMulti, type TMDBMultiResult } from '../../lib/tmdb';
+import {
+  getMovieWatchProviders,
+  getTvWatchProviders,
+  searchMulti,
+  type TMDBMultiResult,
+} from '../../lib/tmdb';
 
 interface SuggestMovieModalProps {
   currentUserId: string;
@@ -19,6 +24,7 @@ export default function SuggestMovieModal({ currentUserId, users }: SuggestMovie
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [capaUrl, setCapaUrl] = useState('');
+  const [streamingData, setStreamingData] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const searchTimeout = useRef<number | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -45,6 +51,7 @@ export default function SuggestMovieModal({ currentUserId, users }: SuggestMovie
     setIsSearching(false);
     setShowDropdown(false);
     setCapaUrl('');
+    setStreamingData(null);
     setError(null);
     setOpen(false);
   };
@@ -67,7 +74,7 @@ export default function SuggestMovieModal({ currentUserId, users }: SuggestMovie
       const results = await searchMulti(value);
       setSearchResults(results);
       setIsSearching(false);
-    }, 400);
+    }, 500);
   };
 
   const pick = (item: TMDBMultiResult) => {
@@ -78,6 +85,13 @@ export default function SuggestMovieModal({ currentUserId, users }: SuggestMovie
     } else {
       setCapaUrl('');
     }
+    void (async () => {
+      const providers =
+        item.media_type === 'movie'
+          ? await getMovieWatchProviders(item.id, 'BR')
+          : await getTvWatchProviders(item.id, 'BR');
+      setStreamingData(JSON.stringify(providers));
+    })();
     setShowDropdown(false);
     setError(null);
   };
@@ -101,6 +115,8 @@ export default function SuggestMovieModal({ currentUserId, users }: SuggestMovie
       status: 'watchlist',
       source: 'manual',
       source_movie_id: String(selected.id),
+      rating: selected.vote_average ?? null,
+      streaming_data: streamingData,
     };
 
     try {

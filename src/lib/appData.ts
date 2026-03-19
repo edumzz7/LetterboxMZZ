@@ -29,6 +29,8 @@ type AppwriteOscarMovieDoc = Models.Document & {
   categoria: string | null;
   capaUrl: string | null;
   plataforma: string | null;
+  rating?: number | null;
+  streamingData?: string | null;
 };
 
 type AppwriteUserOscarMovieDoc = Models.Document & {
@@ -47,6 +49,8 @@ type AppwritePersonalMovieDoc = Models.Document & {
   source: 'manual' | 'oscar';
   source_movie_id: string | null;
   avaliacao?: number | null;
+  rating?: number | null;
+  streamingData?: string | null;
 };
 
 type AppwriteSeriesDoc = Models.Document & {
@@ -56,6 +60,8 @@ type AppwriteSeriesDoc = Models.Document & {
   totalEpisodios: number;
   episodiosVistos: number;
   status: AppwriteSeriesStatus;
+  rating?: number | null;
+  streamingData?: string | null;
 };
 
 type AppwriteMetadataDoc = Models.Document & {
@@ -155,19 +161,41 @@ function wrapPermissionError(error: unknown, collectionId: string) {
 }
 
 async function createDocument<T extends Record<string, unknown>>(collectionId: string, data: T) {
-  try {
-    return await databases.createDocument(DATABASE_ID, collectionId, ID.unique(), data);
-  } catch (error) {
-    throw wrapPermissionError(error, collectionId);
+  let payload: Record<string, unknown> = { ...data };
+
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    try {
+      return await databases.createDocument(DATABASE_ID, collectionId, ID.unique(), payload);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      const unknownAttribute = message.match(/Unknown attribute: \"([^\"]+)\"/);
+      if (unknownAttribute) {
+        delete payload[unknownAttribute[1]];
+        continue;
+      }
+      throw wrapPermissionError(error, collectionId);
+    }
   }
+  throw new Error('Nao foi possivel criar documento com os atributos atuais.');
 }
 
 async function updateDocument<T extends Record<string, unknown>>(collectionId: string, documentId: string, data: T) {
-  try {
-    return await databases.updateDocument(DATABASE_ID, collectionId, documentId, data);
-  } catch (error) {
-    throw wrapPermissionError(error, collectionId);
+  let payload: Record<string, unknown> = { ...data };
+
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    try {
+      return await databases.updateDocument(DATABASE_ID, collectionId, documentId, payload);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      const unknownAttribute = message.match(/Unknown attribute: \"([^\"]+)\"/);
+      if (unknownAttribute) {
+        delete payload[unknownAttribute[1]];
+        continue;
+      }
+      throw wrapPermissionError(error, collectionId);
+    }
   }
+  throw new Error('Nao foi possivel atualizar documento com os atributos atuais.');
 }
 
 async function deleteDocument(collectionId: string, documentId: string) {
@@ -195,6 +223,8 @@ function mapOscarMovie(doc: AppwriteOscarMovieDoc): OscarMovie {
     categoria_principal: doc.categoria ?? null,
     capa_url: doc.capaUrl ?? null,
     plataforma_slug: doc.plataforma ?? null,
+    rating: doc.rating ?? null,
+    streaming_data: doc.streamingData ?? null,
   };
 }
 
@@ -210,6 +240,8 @@ function mapPersonalMovie(doc: AppwritePersonalMovieDoc): PersonalMovie {
     source: doc.source,
     source_movie_id: doc.source_movie_id ?? null,
     avaliacao: doc.avaliacao ?? null,
+    rating: doc.rating ?? null,
+    streaming_data: doc.streamingData ?? null,
     created_at: doc.$createdAt,
   };
 }
@@ -227,6 +259,8 @@ function mapSeries(doc: AppwriteSeriesDoc): SeriesEntry {
     total_episodios: totalEpisodios,
     episodios_vistos: episodiosVistos,
     plataforma_slug: doc.plataforma ?? null,
+    rating: doc.rating ?? null,
+    streaming_data: doc.streamingData ?? null,
     created_at: doc.$createdAt,
   };
 }
@@ -364,6 +398,8 @@ async function upsertPersonalOscarMovie(userId: string, movie: OscarMovie, statu
     status,
     source: 'oscar' as const,
     source_movie_id: movie.id,
+    rating: movie.rating ?? null,
+    streamingData: movie.streaming_data ?? null,
   };
 
   if (existing) {
@@ -391,6 +427,8 @@ export async function bootstrapApp() {
           plataforma: movie.plataforma_slug ?? 'stremio',
           categoria: movie.categoria_principal ?? 'Melhor Filme',
           ano: movie.ano_oscar,
+          rating: movie.rating ?? null,
+          streamingData: movie.streaming_data ?? null,
         }),
       ),
     );
@@ -597,6 +635,8 @@ export async function addOscarMovie(userId: string, movie: Omit<OscarMovie, 'id'
     plataforma: movie.plataforma_slug ?? 'stremio',
     categoria: movie.categoria_principal ?? 'Melhor Filme',
     ano: movie.ano_oscar,
+    rating: movie.rating ?? null,
+    streamingData: movie.streaming_data ?? null,
   });
 
   await awardMCoins(userId, 'INDICOU_FILME', `${movie.titulo} foi indicado para a lista.`);
@@ -644,6 +684,8 @@ export async function addPersonalMovie(
 
   const data = await createDocument(COLLECTION_PERSONAL_MOVIES, {
     ...movie,
+    rating: movie.rating ?? null,
+    streamingData: movie.streaming_data ?? null,
     user_id: userId,
   });
 
@@ -713,6 +755,8 @@ export async function addSeries(
     episodiosVistos,
     totalEpisodios,
     status: toAppwriteSeriesStatus(series.status, episodiosVistos, totalEpisodios),
+    rating: series.rating ?? null,
+    streamingData: series.streaming_data ?? null,
   });
 
   await awardMCoins(userId, 'INICIOU_SERIE', `Iniciou a serie ${series.titulo}.`);
@@ -800,6 +844,8 @@ export async function suggestMovieToUser(
       source_movie_id: movie.source_movie_id
         ? `tmdb:${movie.source_movie_id}|rec:${fromUserId}`
         : null,
+      rating: movie.rating ?? null,
+      streamingData: movie.streaming_data ?? null,
       user_id: toUserId,
     });
   } else {
@@ -810,6 +856,8 @@ export async function suggestMovieToUser(
       totalEpisodios: 1,
       episodiosVistos: 0,
       status: 'naoIniciado',
+      rating: movie.rating ?? null,
+      streamingData: movie.streaming_data ?? null,
     });
   }
 

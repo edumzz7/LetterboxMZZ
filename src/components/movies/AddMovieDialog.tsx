@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Edit3, Loader2, Plus, X } from 'lucide-react';
 import clsx from 'clsx';
-import { searchMovies, type TMDBMovie } from '../../lib/tmdb';
+import { getMovieWatchProviders, searchMovies, type TMDBMovie } from '../../lib/tmdb';
 import type { OscarMovie, PersonalMovie } from '../../types/app';
 
 type AddMovieDialogProps =
@@ -36,6 +36,8 @@ export default function AddMovieDialog({
   const [showDropdown, setShowDropdown] = useState(false);
   const [isPosterReadOnly, setIsPosterReadOnly] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [selectedMovie, setSelectedMovie] = useState<TMDBMovie | null>(null);
+  const [streamingData, setStreamingData] = useState<string | null>(null);
   const searchTimeout = useRef<number | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -60,6 +62,8 @@ export default function AddMovieDialog({
     setShowDropdown(false);
     setIsPosterReadOnly(false);
     setSubmitError(null);
+    setSelectedMovie(null);
+    setStreamingData(null);
   };
 
   const handleTitleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -86,6 +90,7 @@ export default function AddMovieDialog({
   };
 
   const handleSelectMovie = (movie: TMDBMovie) => {
+    setSelectedMovie(movie);
     setTitulo(movie.title);
     if (movie.release_date) {
       setAno(movie.release_date.split('-')[0]);
@@ -95,6 +100,10 @@ export default function AddMovieDialog({
       setIsPosterReadOnly(true);
     }
     setShowDropdown(false);
+    void (async () => {
+      const providers = await getMovieWatchProviders(movie.id, 'BR');
+      setStreamingData(JSON.stringify(providers));
+    })();
   };
 
   const handleSave = async (event: React.FormEvent) => {
@@ -111,7 +120,9 @@ export default function AddMovieDialog({
           plataforma_slug: 'stremio',
           status: 'watchlist',
           source: 'manual',
-          source_movie_id: null,
+          source_movie_id: selectedMovie ? String(selectedMovie.id) : null,
+          rating: selectedMovie?.vote_average ?? null,
+          streaming_data: streamingData,
         });
         resetForm();
         return;
@@ -123,6 +134,8 @@ export default function AddMovieDialog({
         categoria_principal: categoria.trim() || 'Melhor Filme',
         capa_url: capaUrl.trim() || null,
         plataforma_slug: 'stremio',
+        rating: selectedMovie?.vote_average ?? null,
+        streaming_data: streamingData,
       });
       resetForm();
     } catch (error) {

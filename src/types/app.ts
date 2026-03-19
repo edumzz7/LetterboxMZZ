@@ -1,4 +1,4 @@
-export type MovieStatus = 'watchlist' | 'watched';
+﻿export type MovieStatus = 'watchlist' | 'watched';
 export type SeriesStatus = 'watching' | 'watched';
 
 export interface AppUser {
@@ -24,6 +24,8 @@ export interface OscarMovie {
   categoria_principal: string | null;
   capa_url: string | null;
   plataforma_slug: string | null;
+  rating?: number | null;
+  streaming_data?: string | null;
 }
 
 export interface OscarMovieWithStatus extends OscarMovie {
@@ -42,6 +44,8 @@ export interface PersonalMovie {
   source_movie_id: string | null;
   indicado_por_user_id?: string | null;
   avaliacao?: number | null;
+  rating?: number | null;
+  streaming_data?: string | null;
   created_at: string;
 }
 
@@ -57,6 +61,8 @@ export interface SeriesEntry {
   plataforma_slug: string | null;
   indicado_por_user_id?: string | null;
   avaliacao?: number | null;
+  rating?: number | null;
+  streaming_data?: string | null;
   created_at: string;
 }
 
@@ -81,3 +87,4 @@ export interface CineMatchSuggestion {
   origem: CineMatchMode;
   reason: string;
 }
+

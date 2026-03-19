@@ -6,6 +6,7 @@ export interface TMDBMovie {
     title: string;
     release_date: string;
     poster_path: string | null;
+    vote_average?: number;
 }
 
 export interface TMDBSeries {
@@ -13,6 +14,7 @@ export interface TMDBSeries {
     name: string;
     first_air_date: string;
     poster_path: string | null;
+    vote_average?: number;
 }
 
 export interface TMDBWatchProvider {
@@ -29,6 +31,7 @@ export interface TMDBMultiResult {
     release_date?: string;
     first_air_date?: string;
     poster_path: string | null;
+    vote_average?: number;
 }
 
 export async function searchMovies(query: string): Promise<TMDBMovie[]> {
@@ -118,6 +121,38 @@ export async function getMovieWatchProviders(
         return Array.from(unique.values()).slice(0, 5);
     } catch (error) {
         console.error('Error fetching watch providers:', error);
+        return [];
+    }
+}
+
+export async function getTvWatchProviders(
+    tvId: number,
+    region = 'BR'
+): Promise<TMDBWatchProvider[]> {
+    if (!TMDB_API_KEY || !tvId) return [];
+
+    try {
+        const response = await fetch(
+            `${TMDB_BASE_URL}/tv/${tvId}/watch/providers?api_key=${TMDB_API_KEY}`
+        );
+        if (!response.ok) throw new Error('TMDB TV Providers Fetch Error');
+        const data = await response.json();
+        const byRegion = data?.results?.[region];
+        if (!byRegion) return [];
+
+        const buckets = [
+            ...(byRegion.flatrate || []),
+            ...(byRegion.rent || []),
+            ...(byRegion.buy || []),
+        ] as TMDBWatchProvider[];
+
+        const unique = new Map<number, TMDBWatchProvider>();
+        for (const provider of buckets) {
+            if (!unique.has(provider.provider_id)) unique.set(provider.provider_id, provider);
+        }
+        return Array.from(unique.values()).slice(0, 5);
+    } catch (error) {
+        console.error('Error fetching TV watch providers:', error);
         return [];
     }
 }

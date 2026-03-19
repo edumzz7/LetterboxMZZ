@@ -54,7 +54,7 @@ type AppwriteSeriesDoc = Models.Document & {
   plataforma: string | null;
   totalEpisodios: number;
   episodiosVistos: number;
-  status: SeriesStatus;
+  status: AppwriteSeriesStatus;
 };
 
 type AppwriteMetadataDoc = Models.Document & {
@@ -106,6 +106,7 @@ const TRIGGER_POINTS = {
 } as const;
 
 type TriggerKey = keyof typeof TRIGGER_POINTS;
+type AppwriteSeriesStatus = 'naoIniciado' | 'emProgresso' | 'concluido' | 'abandonado';
 
 function ensureValidUrl(value: string | null | undefined): string {
   const trimmed = value?.trim();
@@ -125,6 +126,21 @@ function ensureValidUrl(value: string | null | undefined): string {
 
 function titleKey(title: string) {
   return title.trim().toLowerCase();
+}
+
+function toAppwriteSeriesStatus(
+  status: SeriesStatus | undefined,
+  episodiosVistos: number,
+  totalEpisodios: number,
+): AppwriteSeriesStatus {
+  if (status === 'watched' || (totalEpisodios > 0 && episodiosVistos >= totalEpisodios)) {
+    return 'concluido';
+  }
+  return 'emProgresso';
+}
+
+function fromAppwriteSeriesStatus(status: AppwriteSeriesStatus | string | null | undefined): SeriesStatus {
+  return status === 'concluido' ? 'watched' : 'watching';
 }
 
 function wrapPermissionError(error: unknown, collectionId: string) {
@@ -203,7 +219,7 @@ function mapSeries(doc: AppwriteSeriesDoc): SeriesEntry {
     user_id: '',
     titulo: doc.titulo,
     capa_url: doc.capaUrl ?? null,
-    status: doc.status ?? getSeriesStatus(episodiosVistos, totalEpisodios),
+    status: fromAppwriteSeriesStatus(doc.status) ?? getSeriesStatus(episodiosVistos, totalEpisodios),
     temporada: 1,
     total_episodios: totalEpisodios,
     episodios_vistos: episodiosVistos,
@@ -321,10 +337,15 @@ async function upsertUserOscarMovie(userId: string, oscarMovieId: string, status
 }
 
 async function upsertPersonalOscarMovie(userId: string, movie: OscarMovie, status: MovieStatus) {
-  const existing = await firstDocument<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
+  const existingBySource = await firstDocument<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
     Query.equal('user_id', [userId]),
     Query.equal('source_movie_id', [movie.id]),
   ]);
+  const existingByTitle = await firstDocument<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
+    Query.equal('user_id', [userId]),
+    Query.equal('titulo', [movie.titulo]),
+  ]);
+  const existing = existingBySource ?? existingByTitle;
 
   const payload = {
     user_id: userId,
@@ -424,7 +445,11 @@ export async function bootstrapApp() {
           plataforma: series.plataforma_slug ?? 'stremio',
           episodiosVistos: Math.max(0, series.episodios_vistos),
           totalEpisodios: Math.max(1, series.total_episodios),
-          status: series.status,
+          status: toAppwriteSeriesStatus(
+            series.status,
+            Math.max(0, series.episodios_vistos),
+            Math.max(1, series.total_episodios),
+          ),
         }),
       ),
     );
@@ -584,6 +609,24 @@ export async function addPersonalMovie(
   userId: string,
   movie: Omit<PersonalMovie, 'id' | 'user_id' | 'created_at'>,
 ) {
+  const existingByTitle = await firstDocument<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
+    Query.equal('user_id', [userId]),
+    Query.equal('titulo', [movie.titulo]),
+  ]);
+  if (existingByTitle) {
+    throw new Error('Esse filme ja esta na sua lista.');
+  }
+
+  if (movie.source_movie_id) {
+    const existingBySource = await firstDocument<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
+      Query.equal('user_id', [userId]),
+      Query.equal('source_movie_id', [movie.source_movie_id]),
+    ]);
+    if (existingBySource) {
+      throw new Error('Esse filme ja esta na sua lista.');
+    }
+  }
+
   const data = await createDocument(COLLECTION_PERSONAL_MOVIES, {
     ...movie,
     user_id: userId,
@@ -639,13 +682,22 @@ export async function addSeries(
   userId: string,
   series: Omit<SeriesEntry, 'id' | 'user_id' | 'created_at'>,
 ) {
+  const existing = await firstDocument<AppwriteSeriesDoc>(COLLECTION_PERSONAL_SERIES, [
+    Query.equal('titulo', [series.titulo]),
+  ]);
+  if (existing) {
+    throw new Error('Essa serie ja esta cadastrada.');
+  }
+
+  const episodiosVistos = Math.max(0, series.episodios_vistos);
+  const totalEpisodios = Math.max(1, series.total_episodios);
   const data = await createDocument(COLLECTION_PERSONAL_SERIES, {
     titulo: series.titulo,
     capaUrl: ensureValidUrl(series.capa_url),
     plataforma: series.plataforma_slug ?? 'stremio',
-    episodiosVistos: Math.max(0, series.episodios_vistos),
-    totalEpisodios: Math.max(1, series.total_episodios),
-    status: series.status,
+    episodiosVistos,
+    totalEpisodios,
+    status: toAppwriteSeriesStatus(series.status, episodiosVistos, totalEpisodios),
   });
 
   await awardMCoins(userId, 'INICIOU_SERIE', `Iniciou a serie ${series.titulo}.`);
@@ -664,14 +716,24 @@ export async function updateSeries(
   const current = (await databases.getDocument(DATABASE_ID, COLLECTION_PERSONAL_SERIES, seriesId)) as unknown as AppwriteSeriesDoc;
 
   const mappedUpdates: Record<string, number | string | null> = {};
+  const nextEpisodiosVistos = updates.episodios_vistos ?? current.episodiosVistos;
+  const nextTotalEpisodios = updates.total_episodios ?? current.totalEpisodios;
+
   if (updates.episodios_vistos !== undefined) mappedUpdates.episodiosVistos = updates.episodios_vistos;
   if (updates.total_episodios !== undefined) mappedUpdates.totalEpisodios = updates.total_episodios;
   if (updates.plataforma_slug !== undefined) mappedUpdates.plataforma = updates.plataforma_slug;
-  if (updates.status !== undefined) mappedUpdates.status = updates.status;
+  if (updates.status !== undefined) {
+    mappedUpdates.status = toAppwriteSeriesStatus(updates.status, nextEpisodiosVistos, nextTotalEpisodios);
+  } else if (
+    updates.episodios_vistos !== undefined ||
+    updates.total_episodios !== undefined
+  ) {
+    mappedUpdates.status = toAppwriteSeriesStatus(undefined, nextEpisodiosVistos, nextTotalEpisodios);
+  }
 
   const data = (await updateDocument(COLLECTION_PERSONAL_SERIES, seriesId, mappedUpdates)) as unknown as AppwriteSeriesDoc;
 
-  if (current.status !== 'watched' && data.status === 'watched') {
+  if (fromAppwriteSeriesStatus(current.status) !== 'watched' && fromAppwriteSeriesStatus(data.status) === 'watched') {
     const viewerId = (current as { user_id?: string }).user_id ?? '';
     if (viewerId) {
       await awardMCoins(viewerId, 'SERIE_100', `Finalizou 100% da serie ${data.titulo}.`);
@@ -693,6 +755,14 @@ export async function suggestMovieToUser(
   toUserId: string,
   movie: Omit<PersonalMovie, 'id' | 'user_id' | 'created_at'>,
 ) {
+  const existingByTitle = await firstDocument<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
+    Query.equal('user_id', [toUserId]),
+    Query.equal('titulo', [movie.titulo]),
+  ]);
+  if (existingByTitle) {
+    throw new Error('Esse filme ja esta na lista do amigo.');
+  }
+
   await createDocument(COLLECTION_PERSONAL_MOVIES, {
     ...movie,
     source_movie_id: movie.source_movie_id

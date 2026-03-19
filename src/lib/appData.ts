@@ -305,14 +305,17 @@ async function addActivity(userId: string, message: string, mcoinsDelta: number)
 
 async function awardMCoins(userId: string, trigger: TriggerKey, message: string) {
   const delta = TRIGGER_POINTS[trigger];
-  const metadata = await ensureUserMetadata(userId);
+  const [metadata, username] = await Promise.all([
+    ensureUserMetadata(userId),
+    getUsernameById(userId),
+  ]);
 
-  await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, {
-    mcoins: Math.max(0, (metadata.mcoins ?? 0) + delta),
-  });
-
-  const username = await getUsernameById(userId);
-  await addActivity(userId, `${username} ${message} (+${delta} MC)`, delta);
+  await Promise.all([
+    updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, {
+      mcoins: Math.max(0, (metadata.mcoins ?? 0) + delta),
+    }),
+    addActivity(userId, `${username} ${message} (+${delta} MC)`, delta),
+  ]);
 }
 
 async function upsertUserOscarMovie(userId: string, oscarMovieId: string, status: MovieStatus) {

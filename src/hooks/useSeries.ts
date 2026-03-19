@@ -41,31 +41,27 @@ export function useSeries(userId: string | null) {
         plataforma_slug,
       });
     },
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['series', userId] }),
-        queryClient.invalidateQueries({ queryKey: ['users'] }),
-        queryClient.invalidateQueries({ queryKey: ['activities'] }),
-      ]);
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['series', userId] });
+      void queryClient.invalidateQueries({ queryKey: ['users'] });
+      void queryClient.invalidateQueries({ queryKey: ['activities'] });
     },
   });
 
   const addSeriesMutation = useMutation({
     mutationFn: (newSeries: Omit<SeriesEntry, 'id' | 'user_id' | 'created_at'>) =>
       addSeries(userId as string, newSeries),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['series', userId] }),
-        queryClient.invalidateQueries({ queryKey: ['users'] }),
-        queryClient.invalidateQueries({ queryKey: ['activities'] }),
-      ]);
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['series', userId] });
+      void queryClient.invalidateQueries({ queryKey: ['users'] });
+      void queryClient.invalidateQueries({ queryKey: ['activities'] });
     },
   });
 
   const deleteSeriesMutation = useMutation({
     mutationFn: deleteSeries,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['series', userId] });
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['series', userId] });
     },
   });
 

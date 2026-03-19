@@ -35,6 +35,7 @@ export default function AddMovieDialog({
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isPosterReadOnly, setIsPosterReadOnly] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const searchTimeout = useRef<number | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -58,6 +59,7 @@ export default function AddMovieDialog({
     setSearchResults([]);
     setShowDropdown(false);
     setIsPosterReadOnly(false);
+    setSubmitError(null);
   };
 
   const handleTitleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -98,29 +100,34 @@ export default function AddMovieDialog({
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!titulo.trim()) return;
+    setSubmitError(null);
 
-    if (isPersonal) {
+    try {
+      if (isPersonal) {
+        await onSubmit({
+          titulo,
+          ano_lancamento: parseInt(ano, 10) || new Date().getFullYear(),
+          capa_url: capaUrl.trim() || null,
+          plataforma_slug: 'stremio',
+          status: 'watchlist',
+          source: 'manual',
+          source_movie_id: null,
+        });
+        resetForm();
+        return;
+      }
+
       await onSubmit({
         titulo,
-        ano_lancamento: parseInt(ano, 10) || new Date().getFullYear(),
+        ano_oscar: parseInt(ano, 10) || new Date().getFullYear(),
+        categoria_principal: categoria.trim() || 'Melhor Filme',
         capa_url: capaUrl.trim() || null,
         plataforma_slug: 'stremio',
-        status: 'watchlist',
-        source: 'manual',
-        source_movie_id: null,
       });
       resetForm();
-      return;
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Falha ao adicionar filme.');
     }
-
-    await onSubmit({
-      titulo,
-      ano_oscar: parseInt(ano, 10) || new Date().getFullYear(),
-      categoria_principal: categoria.trim() || 'Melhor Filme',
-      capa_url: capaUrl.trim() || null,
-      plataforma_slug: 'stremio',
-    });
-    resetForm();
   };
 
   return (
@@ -288,6 +295,11 @@ export default function AddMovieDialog({
             </div>
 
             <div className="flex gap-3 justify-end mt-4">
+              {submitError ? (
+                <div className="text-xs text-red-300 border border-red-500/40 rounded p-2 bg-red-500/10 mr-auto">
+                  {submitError}
+                </div>
+              ) : null}
               <Dialog.Close asChild>
                 <button
                   type="button"

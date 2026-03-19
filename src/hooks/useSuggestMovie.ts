@@ -15,12 +15,10 @@ export function useSuggestMovie() {
       toUserId: string;
       movie: Omit<PersonalMovie, 'id' | 'user_id' | 'created_at'>;
     }) => suggestMovieToUser(fromUserId, toUserId, movie),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['users'] }),
-        queryClient.invalidateQueries({ queryKey: ['activities'] }),
-        queryClient.invalidateQueries({ queryKey: ['personal-movies'] }),
-      ]);
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['users'] });
+      void queryClient.invalidateQueries({ queryKey: ['activities'] });
+      void queryClient.invalidateQueries({ queryKey: ['personal-movies'] });
     },
   });
 }

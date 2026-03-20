@@ -11,7 +11,7 @@ import CineMatchModal from './components/layout/CineMatchModal';
 import SuggestMovieModal from './components/layout/SuggestMovieModal';
 import ProfileAvatarModal from './components/layout/ProfileAvatarModal';
 import { useAvatarMutation, useUsers } from './hooks/useUsers';
-import { bootstrapApp, loginUser, registerUser } from './lib/appData';
+import { bootstrapApp, getCurrentSessionUser, loginUser, logoutUser, registerUser } from './lib/appData';
 import type { SessionUser } from './types/app';
 
 const SESSION_KEY = 'letterboxmzz_session_v1';
@@ -48,6 +48,18 @@ function App() {
     async function runBootstrap() {
       try {
         await bootstrapApp();
+        const currentSession = await getCurrentSessionUser();
+        if (!isMounted) return;
+
+        if (currentSession) {
+          setSession(currentSession);
+          setSelectedUserId((current) => current ?? currentSession.id);
+          localStorage.setItem(SESSION_KEY, JSON.stringify(currentSession));
+        } else {
+          setSession(null);
+          setSelectedUserId(null);
+          localStorage.removeItem(SESSION_KEY);
+        }
       } catch (error) {
         if (isMounted) {
           const message =
@@ -160,6 +172,7 @@ function App() {
   };
 
   const handleLogout = () => {
+    void logoutUser();
     persistSession(null);
     setActiveTab('oscars');
     setAuthError(null);

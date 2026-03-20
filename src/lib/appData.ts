@@ -1,5 +1,5 @@
 import type { Models } from 'appwrite';
-import { databases, ID, Query } from './appwrite';
+import { account, databases, ID, Query } from './appwrite';
 import { hashPassword, normalizeUsername, verifyPassword } from './auth';
 import { DEFAULT_OSCAR_MOVIES, readLegacyMovieData, readLegacySeriesData } from './catalog';
 import type {
@@ -21,6 +21,13 @@ type UserRow = AppUser & { password_hash: string };
 type AppwriteUserDoc = Models.Document & {
   username: string;
   password_hash: string;
+};
+
+type AppwriteAccountDoc = Models.User<Models.Preferences> & {
+  prefs?: {
+    appUserId?: string;
+    username?: string;
+  };
 };
 
 type AppwriteOscarMovieDoc = Models.Document & {
@@ -93,6 +100,7 @@ const COLLECTION_PERSONAL_SERIES =
 const COLLECTION_USUARIOS_METADATA =
   import.meta.env.VITE_APPWRITE_COLLECTION_USUARIOS_METADATA ?? 'usuarios_metadata';
 const COLLECTION_ATIVIDADES = import.meta.env.VITE_APPWRITE_COLLECTION_ATIVIDADES ?? 'atividades';
+const MANAGED_PASSWORD_PLACEHOLDER = 'managed-by-appwrite';
 
 const SEED_USERNAME = import.meta.env.VITE_SEED_USERNAME?.trim();
 const SEED_PASSWORD = import.meta.env.VITE_SEED_PASSWORD?.trim();
@@ -167,6 +175,29 @@ async function createDocument<T extends Record<string, unknown>>(collectionId: s
   for (let attempt = 0; attempt < 6; attempt += 1) {
     try {
       return await databases.createDocument(DATABASE_ID, collectionId, ID.unique(), payload);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      const unknownAttribute = message.match(/Unknown attribute: \"([^\"]+)\"/);
+      if (unknownAttribute) {
+        delete payload[unknownAttribute[1]];
+        continue;
+      }
+      throw wrapPermissionError(error, collectionId);
+    }
+  }
+  throw new Error('Nao foi possivel criar documento com os atributos atuais.');
+}
+
+async function createDocumentWithId<T extends Record<string, unknown>>(
+  collectionId: string,
+  documentId: string,
+  data: T,
+) {
+  let payload: Record<string, unknown> = { ...data };
+
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    try {
+      return await databases.createDocument(DATABASE_ID, collectionId, documentId, payload);
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
       const unknownAttribute = message.match(/Unknown attribute: \"([^\"]+)\"/);
@@ -339,6 +370,107 @@ async function addActivity(userId: string, message: string, mcoinsDelta: number)
     message,
     mcoins_delta: mcoinsDelta,
   });
+}
+
+function createSessionEmail(username: string) {
+  return `${normalizeUsername(username)}@letterboxzzo.local`;
+}
+
+async function ensureAppwriteSession(username: string, password: string) {
+  const email = createSessionEmail(username);
+  await account.createEmailPasswordSession(email, password);
+  return (await account.get()) as unknown as AppwriteAccountDoc;
+}
+
+async function getCurrentAccount() {
+  try {
+    return (await account.get()) as unknown as AppwriteAccountDoc;
+  } catch {
+    return null;
+  }
+}
+
+async function createManagedAccount(username: string, password: string) {
+  const normalized = normalizeUsername(username);
+  const email = createSessionEmail(normalized);
+  try {
+    return await account.create(ID.unique(), email, password, normalized);
+  } catch (error) {
+    if (isConflictError(error)) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+async function migrateLegacyUserToManagedSession(user: AppwriteUserDoc, password: string) {
+  await createManagedAccount(user.username, password);
+  const managedAccount = await ensureAppwriteSession(user.username, password);
+  try {
+    await account.updatePrefs({
+      ...(managedAccount.prefs ?? {}),
+      appUserId: user.$id,
+      username: user.username,
+    });
+  } catch {
+    // Keep compatibility if prefs update is unavailable; username lookup still works.
+  }
+  return managedAccount;
+}
+
+async function getSessionProfile() {
+  const currentAccount = await getCurrentAccount();
+  if (!currentAccount) return null;
+
+  const prefs = currentAccount.prefs ?? {};
+  const profileId = typeof prefs.appUserId === 'string' ? prefs.appUserId : null;
+  const normalizedName = normalizeUsername(
+    typeof prefs.username === 'string' && prefs.username.trim()
+      ? prefs.username
+      : currentAccount.name ?? '',
+  );
+
+  let profile: AppwriteUserDoc | null = null;
+
+  if (profileId) {
+    try {
+      profile = (await databases.getDocument(
+        DATABASE_ID,
+        COLLECTION_APP_USERS,
+        profileId,
+      )) as unknown as AppwriteUserDoc;
+    } catch {
+      profile = null;
+    }
+  }
+
+  if (!profile && normalizedName) {
+    profile = await firstDocument<AppwriteUserDoc>(COLLECTION_APP_USERS, [
+      Query.equal('username', [normalizedName]),
+    ]);
+  }
+
+  if (!profile && normalizedName) {
+    profile = (await createDocument(COLLECTION_APP_USERS, {
+      username: normalizedName,
+      password_hash: MANAGED_PASSWORD_PLACEHOLDER,
+    })) as unknown as AppwriteUserDoc;
+  }
+
+  if (!profile) return null;
+
+  try {
+    await account.updatePrefs({
+      ...(currentAccount.prefs ?? {}),
+      appUserId: profile.$id,
+      username: profile.username,
+    });
+  } catch {
+    // Non-fatal; profile lookup can still fall back to username.
+  }
+
+  await ensureUserMetadata(profile.$id);
+  return { id: profile.$id, username: profile.username };
 }
 
 async function grantMCoins(userId: string, trigger: TriggerKey) {
@@ -523,21 +655,30 @@ export async function bootstrapApp() {
 export async function loginUser(username: string, password: string) {
   const normalized = normalizeUsername(username);
 
-  const data = await firstDocument<AppwriteUserDoc>(COLLECTION_APP_USERS, [
-    Query.equal('username', [normalized]),
-  ]);
+  try {
+    await ensureAppwriteSession(normalized, password);
+    const profile = await getSessionProfile();
+    if (!profile) {
+      throw new Error('Perfil do usuario nao encontrado.');
+    }
+    return profile;
+  } catch {
+    const legacyUser = await firstDocument<AppwriteUserDoc>(COLLECTION_APP_USERS, [
+      Query.equal('username', [normalized]),
+    ]);
 
-  if (!data || !(await verifyPassword(password, data.password_hash))) {
-    throw new Error('Usuario ou senha invalidos.');
+    if (!legacyUser || !(await verifyPassword(password, legacyUser.password_hash))) {
+      throw new Error('Usuario ou senha invalidos.');
+    }
+
+    await migrateLegacyUserToManagedSession(legacyUser, password);
+    await ensureUserMetadata(legacyUser.$id);
+    return { id: legacyUser.$id, username: legacyUser.username };
   }
-
-  await ensureUserMetadata(data.$id);
-  return { id: data.$id, username: data.username };
 }
 
 export async function registerUser(username: string, password: string) {
   const normalized = normalizeUsername(username);
-  const passwordHash = await hashPassword(password);
 
   const existing = await firstDocument<AppwriteUserDoc>(COLLECTION_APP_USERS, [
     Query.equal('username', [normalized]),
@@ -548,10 +689,27 @@ export async function registerUser(username: string, password: string) {
   }
 
   try {
-    const data = (await createDocument(COLLECTION_APP_USERS, {
+    const createdAccount = await account.create(
+      ID.unique(),
+      createSessionEmail(normalized),
+      password,
+      normalized,
+    );
+    await ensureAppwriteSession(normalized, password);
+
+    const data = (await createDocumentWithId(COLLECTION_APP_USERS, createdAccount.$id, {
       username: normalized,
-      password_hash: passwordHash,
+      password_hash: MANAGED_PASSWORD_PLACEHOLDER,
     })) as unknown as AppwriteUserDoc;
+
+    try {
+      await account.updatePrefs({
+        appUserId: data.$id,
+        username: data.username,
+      });
+    } catch {
+      // Non-fatal
+    }
 
     await ensureUserMetadata(data.$id);
     await addActivity(data.$id, `${data.username} entrou no LetterboxZZO.`, 0);
@@ -600,6 +758,18 @@ export async function listActivities(limit = 30) {
   ]);
 
   return data.map(mapActivity);
+}
+
+export async function getCurrentSessionUser() {
+  return getSessionProfile();
+}
+
+export async function logoutUser() {
+  try {
+    await account.deleteSession('current');
+  } catch {
+    // Ignore missing session and proceed with local cleanup.
+  }
 }
 
 export async function updateUserAvatar(userId: string, avatarId: string) {

@@ -1,5 +1,5 @@
 import type { Models } from 'appwrite';
-import { account, databases, ID, Query } from './appwrite';
+import { account, databases, ID, Permission, Query, Role } from './appwrite';
 import { hashPassword, normalizeUsername, verifyPassword } from './auth';
 import { DEFAULT_OSCAR_MOVIES, readLegacyMovieData, readLegacySeriesData } from './catalog';
 import type {
@@ -170,12 +170,25 @@ function wrapPermissionError(error: unknown, collectionId: string) {
   return error;
 }
 
-async function createDocument<T extends Record<string, unknown>>(collectionId: string, data: T) {
+async function createDocument<T extends Record<string, unknown>>(
+  collectionId: string,
+  data: T,
+  permissions?: string[],
+) {
+  return createDocumentInternal(collectionId, ID.unique(), data, permissions);
+}
+
+async function createDocumentInternal<T extends Record<string, unknown>>(
+  collectionId: string,
+  documentId: string,
+  data: T,
+  permissions?: string[],
+) {
   let payload: Record<string, unknown> = { ...data };
 
   for (let attempt = 0; attempt < 6; attempt += 1) {
     try {
-      return await databases.createDocument(DATABASE_ID, collectionId, ID.unique(), payload);
+      return await databases.createDocument(DATABASE_ID, collectionId, documentId, payload, permissions);
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
       const unknownAttribute = message.match(/Unknown attribute: \"([^\"]+)\"/);
@@ -193,23 +206,9 @@ async function createDocumentWithId<T extends Record<string, unknown>>(
   collectionId: string,
   documentId: string,
   data: T,
+  permissions?: string[],
 ) {
-  let payload: Record<string, unknown> = { ...data };
-
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    try {
-      return await databases.createDocument(DATABASE_ID, collectionId, documentId, payload);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '';
-      const unknownAttribute = message.match(/Unknown attribute: \"([^\"]+)\"/);
-      if (unknownAttribute) {
-        delete payload[unknownAttribute[1]];
-        continue;
-      }
-      throw wrapPermissionError(error, collectionId);
-    }
-  }
-  throw new Error('Nao foi possivel criar documento com os atributos atuais.');
+  return createDocumentInternal(collectionId, documentId, data, permissions);
 }
 
 async function updateDocument<T extends Record<string, unknown>>(collectionId: string, documentId: string, data: T) {
@@ -353,7 +352,7 @@ async function ensureUserMetadata(userId: string) {
     user_id: userId,
     mcoins: 0,
     avatar_id: fallbackAvatar(userId),
-  })) as unknown as AppwriteMetadataDoc;
+  }, ownerScopedPermissions(userId))) as unknown as AppwriteMetadataDoc;
 }
 
 async function getUsernameById(userId: string) {
@@ -370,7 +369,16 @@ async function addActivity(userId: string, message: string, mcoinsDelta: number)
     user_id: userId,
     message,
     mcoins_delta: mcoinsDelta,
-  });
+  }, ownerScopedPermissions(userId));
+}
+
+function ownerScopedPermissions(ownerUserId: string, readAny = true) {
+  const readRole = readAny ? Role.any() : Role.user(ownerUserId);
+  return [
+    Permission.read(readRole),
+    Permission.update(Role.user(ownerUserId)),
+    Permission.delete(Role.user(ownerUserId)),
+  ];
 }
 
 function createSessionEmail(username: string) {
@@ -419,6 +427,11 @@ async function migrateLegacyUserToManagedSession(user: AppwriteUserDoc, password
     });
   } catch {
     // Keep compatibility if prefs update is unavailable; username lookup still works.
+  }
+  if (user.password_hash !== MANAGED_PASSWORD_PLACEHOLDER) {
+    await updateDocument(COLLECTION_APP_USERS, user.$id, {
+      password_hash: MANAGED_PASSWORD_PLACEHOLDER,
+    });
   }
   return managedAccount;
 }
@@ -476,6 +489,14 @@ async function getSessionProfile() {
 
   await ensureUserMetadata(profile.$id);
   return { id: profile.$id, username: profile.username };
+}
+
+async function requireSessionUser(expectedUserId: string) {
+  const session = await getSessionProfile();
+  if (!session || session.id !== expectedUserId) {
+    throw new Error('Sessao invalida para esta operacao.');
+  }
+  return session;
 }
 
 async function grantMCoins(userId: string, trigger: TriggerKey) {
@@ -778,6 +799,7 @@ export async function logoutUser() {
 }
 
 export async function updateUserAvatar(userId: string, avatarId: string) {
+  await requireSessionUser(userId);
   const metadata = await ensureUserMetadata(userId);
   await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, {
     avatar_id: avatarId,
@@ -806,6 +828,7 @@ export async function getOscarMoviesForUser(userId: string) {
 }
 
 export async function addOscarMovie(userId: string, movie: Omit<OscarMovie, 'id'>) {
+  await requireSessionUser(userId);
   const data = await createDocument(COLLECTION_OSCAR_MOVIES, {
     titulo: movie.titulo,
     capaUrl: ensureValidUrl(movie.capa_url),
@@ -821,6 +844,7 @@ export async function addOscarMovie(userId: string, movie: Omit<OscarMovie, 'id'
 }
 
 export async function setOscarMovieStatus(userId: string, movie: OscarMovie, status: MovieStatus) {
+  await requireSessionUser(userId);
   const previous = await upsertUserOscarMovie(userId, movie.id, status);
   await upsertPersonalOscarMovie(userId, movie, status);
 
@@ -841,6 +865,7 @@ export async function addPersonalMovie(
   userId: string,
   movie: Omit<PersonalMovie, 'id' | 'user_id' | 'created_at'>,
 ) {
+  await requireSessionUser(userId);
   const existingByTitle = await firstDocument<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
     Query.equal('user_id', [userId]),
     Query.equal('titulo', [movie.titulo]),
@@ -864,7 +889,7 @@ export async function addPersonalMovie(
     rating: movie.rating ?? null,
     streamingData: movie.streaming_data ?? null,
     user_id: userId,
-  });
+  }, ownerScopedPermissions(userId));
 
   return mapPersonalMovie(data as unknown as AppwritePersonalMovieDoc);
 }
@@ -874,6 +899,8 @@ export async function updatePersonalMovie(
   updates: Partial<Pick<PersonalMovie, 'status' | 'plataforma_slug' | 'avaliacao'>>,
 ) {
   const current = await databases.getDocument(DATABASE_ID, COLLECTION_PERSONAL_MOVIES, movieId);
+  const currentDoc = current as unknown as AppwritePersonalMovieDoc;
+  await requireSessionUser(currentDoc.user_id);
 
   const data = await updateDocument(
     COLLECTION_PERSONAL_MOVIES,
@@ -881,7 +908,6 @@ export async function updatePersonalMovie(
     updates as Record<string, string | number | null>,
   );
 
-  const currentDoc = current as unknown as AppwritePersonalMovieDoc;
   const nextDoc = data as unknown as AppwritePersonalMovieDoc;
 
   if (currentDoc.status !== 'watched' && nextDoc.status === 'watched') {
@@ -902,6 +928,12 @@ export async function updatePersonalMovie(
 }
 
 export async function deletePersonalMovie(movieId: string) {
+  const current = (await databases.getDocument(
+    DATABASE_ID,
+    COLLECTION_PERSONAL_MOVIES,
+    movieId,
+  )) as unknown as AppwritePersonalMovieDoc;
+  await requireSessionUser(current.user_id);
   await deleteDocument(COLLECTION_PERSONAL_MOVIES, movieId);
 }
 
@@ -925,6 +957,7 @@ export async function addSeries(
   userId: string,
   series: Omit<SeriesEntry, 'id' | 'user_id' | 'created_at'>,
 ) {
+  await requireSessionUser(userId);
   const existing = await firstDocument<AppwriteSeriesDoc>(COLLECTION_PERSONAL_SERIES, [
     Query.equal('user_id', [userId]),
     Query.equal('titulo', [series.titulo]),
@@ -945,7 +978,7 @@ export async function addSeries(
     status: toAppwriteSeriesStatus(series.status, episodiosVistos, totalEpisodios),
     rating: series.rating ?? null,
     streamingData: series.streaming_data ?? null,
-  });
+  }, ownerScopedPermissions(userId));
 
   await awardMCoins(userId, 'INICIOU_SERIE', `Iniciou a serie ${series.titulo}.`);
   return mapSeries(data as unknown as AppwriteSeriesDoc);
@@ -961,6 +994,10 @@ export async function updateSeries(
   >,
 ) {
   const current = (await databases.getDocument(DATABASE_ID, COLLECTION_PERSONAL_SERIES, seriesId)) as unknown as AppwriteSeriesDoc;
+  if (!current.user_id) {
+    throw new Error("Serie sem user_id. Corrija o registro antigo antes de editar.");
+  }
+  await requireSessionUser(current.user_id);
 
   const mappedUpdates: Record<string, number | string | null> = {};
   const nextEpisodiosVistos = updates.episodios_vistos ?? current.episodiosVistos;
@@ -1007,24 +1044,43 @@ export async function updateSeries(
 
 
 export async function updateOscarMoviePlatform(movieId: string, platformSlug: string) {
+  const session = await getSessionProfile();
+  if (!session) throw new Error('Sessao invalida.');
   await updateDocument(COLLECTION_OSCAR_MOVIES, movieId, {
     plataforma: platformSlug,
   });
 }
 
 export async function updateOscarMovieStreaming(movieId: string, streamingData: string) {
+  const session = await getSessionProfile();
+  if (!session) throw new Error('Sessao invalida.');
   await updateDocument(COLLECTION_OSCAR_MOVIES, movieId, {
     streamingData,
   });
 }
 
 export async function updatePersonalMovieStreaming(movieId: string, streamingData: string) {
+  const current = (await databases.getDocument(
+    DATABASE_ID,
+    COLLECTION_PERSONAL_MOVIES,
+    movieId,
+  )) as unknown as AppwritePersonalMovieDoc;
+  await requireSessionUser(current.user_id);
   await updateDocument(COLLECTION_PERSONAL_MOVIES, movieId, {
     streamingData,
   });
 }
 
 export async function updateSeriesStreaming(seriesId: string, streamingData: string) {
+  const current = (await databases.getDocument(
+    DATABASE_ID,
+    COLLECTION_PERSONAL_SERIES,
+    seriesId,
+  )) as unknown as AppwriteSeriesDoc;
+  if (!current.user_id) {
+    throw new Error("Serie sem user_id. Corrija o registro antigo antes de editar.");
+  }
+  await requireSessionUser(current.user_id);
   await updateDocument(COLLECTION_PERSONAL_SERIES, seriesId, {
     streamingData,
   });
@@ -1036,6 +1092,7 @@ export async function suggestMovieToUser(
   movie: Omit<PersonalMovie, 'id' | 'user_id' | 'created_at'>,
   mediaType: 'movie' | 'tv' = 'movie',
 ) {
+  await requireSessionUser(fromUserId);
   if (mediaType === 'movie') {
     const existingByTitle = await firstDocument<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
       Query.equal('user_id', [toUserId]),
@@ -1053,9 +1110,10 @@ export async function suggestMovieToUser(
       rating: movie.rating ?? null,
       streamingData: movie.streaming_data ?? null,
       user_id: toUserId,
-    });
+    }, ownerScopedPermissions(toUserId));
   } else {
     await createDocument(COLLECTION_PERSONAL_SERIES, {
+      user_id: toUserId,
       titulo: movie.titulo,
       capaUrl: ensureValidUrl(movie.capa_url),
       plataforma: 'stremio',
@@ -1064,7 +1122,7 @@ export async function suggestMovieToUser(
       status: 'naoIniciado',
       rating: movie.rating ?? null,
       streamingData: movie.streaming_data ?? null,
-    });
+    }, ownerScopedPermissions(toUserId));
   }
 
   const [fromName, toName, delta] = await Promise.all([
@@ -1086,6 +1144,7 @@ export async function reactToMovie(
   movieTitle: string,
   reaction: string,
 ) {
+  await requireSessionUser(actorUserId);
   const [actorName, targetName] = await Promise.all([
     getUsernameById(actorUserId),
     getUsernameById(targetUserId),
@@ -1094,11 +1153,20 @@ export async function reactToMovie(
 }
 
 export async function rateMovie(
-  _actorUserId: string,
+  actorUserId: string,
   movieId: string,
   _movieTitle: string,
   stars: number,
 ) {
+  const current = (await databases.getDocument(
+    DATABASE_ID,
+    COLLECTION_PERSONAL_MOVIES,
+    movieId,
+  )) as unknown as AppwritePersonalMovieDoc;
+  await requireSessionUser(actorUserId);
+  if (current.user_id !== actorUserId) {
+    throw new Error('Avaliacao permitida apenas para o dono do filme.');
+  }
   try {
     await updateDocument(COLLECTION_PERSONAL_MOVIES, movieId, {
       avaliacao: stars,
@@ -1113,6 +1181,15 @@ export async function rateMovie(
 }
 
 export async function deleteSeries(seriesId: string) {
+  const current = (await databases.getDocument(
+    DATABASE_ID,
+    COLLECTION_PERSONAL_SERIES,
+    seriesId,
+  )) as unknown as AppwriteSeriesDoc;
+  if (!current.user_id) {
+    throw new Error("Serie sem user_id. Corrija o registro antigo antes de excluir.");
+  }
+  await requireSessionUser(current.user_id);
   await deleteDocument(COLLECTION_PERSONAL_SERIES, seriesId);
 }
 

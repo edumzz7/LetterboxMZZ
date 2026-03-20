@@ -491,18 +491,31 @@ async function getSessionProfile() {
   }
 
   if (!profile && normalizedName) {
-    profile = (await createDocument(COLLECTION_APP_USERS, {
-      username: normalizedName,
-      password_hash: MANAGED_PASSWORD_PLACEHOLDER,
-    }, await ownerScopedPermissions(currentAccount.$id))) as unknown as AppwriteUserDoc;
+    try {
+      profile = (await createDocument(COLLECTION_APP_USERS, {
+        username: normalizedName,
+        password_hash: MANAGED_PASSWORD_PLACEHOLDER,
+      }, await ownerScopedPermissions(currentAccount.$id))) as unknown as AppwriteUserDoc;
+    } catch {
+      profile = null;
+    }
   }
 
-  if (!profile) return null;
+  if (!profile) {
+    if (profileId && normalizedName) {
+      return { id: profileId, username: normalizedName };
+    }
+    return null;
+  }
 
   if (profile.password_hash && profile.password_hash !== MANAGED_PASSWORD_PLACEHOLDER) {
-    await updateDocument(COLLECTION_APP_USERS, profile.$id, {
-      password_hash: MANAGED_PASSWORD_PLACEHOLDER,
-    });
+    try {
+      await updateDocument(COLLECTION_APP_USERS, profile.$id, {
+        password_hash: MANAGED_PASSWORD_PLACEHOLDER,
+      });
+    } catch {
+      // Ignore legacy cleanup failure during session restore.
+    }
   }
 
   try {

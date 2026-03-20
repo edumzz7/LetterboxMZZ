@@ -101,6 +101,7 @@ const COLLECTION_USUARIOS_METADATA =
   import.meta.env.VITE_APPWRITE_COLLECTION_USUARIOS_METADATA ?? 'usuarios_metadata';
 const COLLECTION_ATIVIDADES = import.meta.env.VITE_APPWRITE_COLLECTION_ATIVIDADES ?? 'atividades';
 const MANAGED_PASSWORD_PLACEHOLDER = 'managed-by-appwrite';
+const MANAGED_PASSWORD_PREFIX = 'letterboxzzo::managed::';
 
 const SEED_USERNAME = import.meta.env.VITE_SEED_USERNAME?.trim();
 const SEED_PASSWORD = import.meta.env.VITE_SEED_PASSWORD?.trim();
@@ -376,9 +377,13 @@ function createSessionEmail(username: string) {
   return `${normalizeUsername(username)}@letterboxzzo.local`;
 }
 
+function createManagedPassword(password: string) {
+  return `${MANAGED_PASSWORD_PREFIX}${password}::v1`;
+}
+
 async function ensureAppwriteSession(username: string, password: string) {
   const email = createSessionEmail(username);
-  await account.createEmailPasswordSession(email, password);
+  await account.createEmailPasswordSession(email, createManagedPassword(password));
   return (await account.get()) as unknown as AppwriteAccountDoc;
 }
 
@@ -394,7 +399,7 @@ async function createManagedAccount(username: string, password: string) {
   const normalized = normalizeUsername(username);
   const email = createSessionEmail(normalized);
   try {
-    return await account.create(ID.unique(), email, password, normalized);
+    return await account.create(ID.unique(), email, createManagedPassword(password), normalized);
   } catch (error) {
     if (isConflictError(error)) {
       return null;
@@ -692,7 +697,7 @@ export async function registerUser(username: string, password: string) {
     const createdAccount = await account.create(
       ID.unique(),
       createSessionEmail(normalized),
-      password,
+      createManagedPassword(password),
       normalized,
     );
     await ensureAppwriteSession(normalized, password);

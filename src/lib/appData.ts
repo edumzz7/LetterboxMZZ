@@ -626,86 +626,99 @@ export async function bootstrapApp() {
     return;
   }
 
-  const normalized = normalizeUsername(SEED_USERNAME);
-  const existingUser = await firstDocument<AppwriteUserDoc>(COLLECTION_APP_USERS, [
-    Query.equal('username', [normalized]),
-  ]);
-
-  let userId = existingUser?.$id;
-
-  if (!userId) {
-    const managedSeedAccount = await createManagedAccount(normalized, SEED_PASSWORD);
-    const insertedUser = (await createDocumentWithId(
-      COLLECTION_APP_USERS,
-      managedSeedAccount?.$id ?? ID.unique(),
-      {
-        username: normalized,
-        password_hash: MANAGED_PASSWORD_PLACEHOLDER,
-      },
-      managedSeedAccount ? await ownerScopedPermissions(managedSeedAccount.$id) : undefined,
-    )) as unknown as AppwriteUserDoc;
-    userId = insertedUser.$id;
-    await ensureUserMetadata(userId);
+  const currentAccount = await getCurrentAccount();
+  if (!currentAccount) {
+    sessionStorage.setItem(BOOTSTRAP_KEY, '1');
+    return;
   }
 
-  const personalDocs = await listDocuments<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
-    Query.equal('user_id', [userId]),
-    Query.limit(1),
-  ]);
+  try {
+    const normalized = normalizeUsername(SEED_USERNAME);
+    const existingUser = await firstDocument<AppwriteUserDoc>(COLLECTION_APP_USERS, [
+      Query.equal('username', [normalized]),
+    ]);
 
-  const seriesDocs = await listDocuments<AppwriteSeriesDoc>(COLLECTION_PERSONAL_SERIES, [Query.limit(1)]);
+    let userId = existingUser?.$id;
 
-  const oscarMovies = await listDocuments<AppwriteOscarMovieDoc>(COLLECTION_OSCAR_MOVIES, [
-    Query.orderDesc('ano'),
-    Query.orderAsc('titulo'),
-  ]);
+    if (!userId) {
+      const managedSeedAccount = await createManagedAccount(normalized, SEED_PASSWORD);
+      const insertedUser = (await createDocumentWithId(
+        COLLECTION_APP_USERS,
+        managedSeedAccount?.$id ?? ID.unique(),
+        {
+          username: normalized,
+          password_hash: MANAGED_PASSWORD_PLACEHOLDER,
+        },
+        managedSeedAccount ? await ownerScopedPermissions(managedSeedAccount.$id) : undefined,
+      )) as unknown as AppwriteUserDoc;
+      userId = insertedUser.$id;
+      await ensureUserMetadata(userId);
+    }
 
-  const { personalMovies, oscarStatuses } = readLegacyMovieData();
-  const legacySeries = readLegacySeriesData();
+    const personalDocs = await listDocuments<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
+      Query.equal('user_id', [userId]),
+      Query.limit(1),
+    ]);
 
-  if (personalDocs.length === 0 && personalMovies.length > 0) {
-    await Promise.all(
-      personalMovies.map((movie) =>
-        createDocument(COLLECTION_PERSONAL_MOVIES, {
-          ...movie,
-          user_id: userId,
-        }),
-      ),
-    );
-  }
+    const seriesDocs = await listDocuments<AppwriteSeriesDoc>(COLLECTION_PERSONAL_SERIES, [
+      Query.equal('user_id', [userId]),
+      Query.limit(1),
+    ]);
 
-  if (seriesDocs.length === 0 && legacySeries.length > 0) {
-    await Promise.all(
-      legacySeries.map((series) =>
-        createDocument(COLLECTION_PERSONAL_SERIES, {
-          user_id: userId,
-          titulo: series.titulo,
-          capaUrl: ensureValidUrl(series.capa_url),
-          plataforma: series.plataforma_slug ?? 'stremio',
-          episodiosVistos: Math.max(0, series.episodios_vistos),
-          totalEpisodios: Math.max(1, series.total_episodios),
-          status: toAppwriteSeriesStatus(
-            series.status,
-            Math.max(0, series.episodios_vistos),
-            Math.max(1, series.total_episodios),
-          ),
-        }),
-      ),
-    );
-  }
+    const oscarMovies = await listDocuments<AppwriteOscarMovieDoc>(COLLECTION_OSCAR_MOVIES, [
+      Query.orderDesc('ano'),
+      Query.orderAsc('titulo'),
+    ]);
 
-  if (oscarStatuses.size > 0) {
-    const updates = oscarMovies
-      .map((movie) => {
-        const status = oscarStatuses.get(titleKey(movie.titulo));
-        if (!status) return null;
-        return { movie, status };
-      })
-      .filter(Boolean) as { movie: AppwriteOscarMovieDoc; status: MovieStatus }[];
+    const { personalMovies, oscarStatuses } = readLegacyMovieData();
+    const legacySeries = readLegacySeriesData();
 
-    await Promise.all(
-      updates.map(({ movie, status }) => upsertUserOscarMovie(userId, movie.$id, status)),
-    );
+    if (personalDocs.length === 0 && personalMovies.length > 0) {
+      await Promise.all(
+        personalMovies.map((movie) =>
+          createDocument(COLLECTION_PERSONAL_MOVIES, {
+            ...movie,
+            user_id: userId,
+          }),
+        ),
+      );
+    }
+
+    if (seriesDocs.length === 0 && legacySeries.length > 0) {
+      await Promise.all(
+        legacySeries.map((series) =>
+          createDocument(COLLECTION_PERSONAL_SERIES, {
+            user_id: userId,
+            titulo: series.titulo,
+            capaUrl: ensureValidUrl(series.capa_url),
+            plataforma: series.plataforma_slug ?? 'stremio',
+            episodiosVistos: Math.max(0, series.episodios_vistos),
+            totalEpisodios: Math.max(1, series.total_episodios),
+            status: toAppwriteSeriesStatus(
+              series.status,
+              Math.max(0, series.episodios_vistos),
+              Math.max(1, series.total_episodios),
+            ),
+          }),
+        ),
+      );
+    }
+
+    if (oscarStatuses.size > 0) {
+      const updates = oscarMovies
+        .map((movie) => {
+          const status = oscarStatuses.get(titleKey(movie.titulo));
+          if (!status) return null;
+          return { movie, status };
+        })
+        .filter(Boolean) as { movie: AppwriteOscarMovieDoc; status: MovieStatus }[];
+
+      await Promise.all(
+        updates.map(({ movie, status }) => upsertUserOscarMovie(userId, movie.$id, status)),
+      );
+    }
+  } catch (error) {
+    console.warn('Bootstrap parcial ignorado:', error);
   }
 
   sessionStorage.setItem(BOOTSTRAP_KEY, '1');

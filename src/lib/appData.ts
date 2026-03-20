@@ -343,17 +343,31 @@ function fallbackAvatar(userId: string) {
 }
 
 async function ensureUserMetadata(userId: string) {
-  const existing = await firstDocument<AppwriteMetadataDoc>(COLLECTION_USUARIOS_METADATA, [
+  const existingDocs = await listDocuments<AppwriteMetadataDoc>(COLLECTION_USUARIOS_METADATA, [
     Query.equal('user_id', [userId]),
+    Query.orderDesc('$updatedAt'),
   ]);
+  const permissions = await ownerScopedPermissions(userId);
+  const expectedUpdatePermission = permissions.find((entry) => entry.startsWith('update('));
+  const writable = existingDocs.find((doc) =>
+    expectedUpdatePermission ? ((doc as Models.Document).$permissions ?? []).includes(expectedUpdatePermission) : false,
+  );
 
-  if (existing) return existing;
+  if (writable) return writable;
+
+  if (existingDocs[0]) {
+    return (await createDocument(COLLECTION_USUARIOS_METADATA, {
+      user_id: userId,
+      mcoins: existingDocs[0].mcoins ?? 0,
+      avatar_id: existingDocs[0].avatar_id ?? fallbackAvatar(userId),
+    }, permissions)) as unknown as AppwriteMetadataDoc;
+  }
 
   return (await createDocument(COLLECTION_USUARIOS_METADATA, {
     user_id: userId,
     mcoins: 0,
     avatar_id: fallbackAvatar(userId),
-  }, ownerScopedPermissions(userId))) as unknown as AppwriteMetadataDoc;
+  }, permissions)) as unknown as AppwriteMetadataDoc;
 }
 
 async function getUsernameById(userId: string) {
@@ -366,19 +380,26 @@ async function getUsernameById(userId: string) {
 }
 
 async function addActivity(userId: string, message: string, mcoinsDelta: number) {
+  const permissions = await ownerScopedPermissions(userId);
   await createDocument(COLLECTION_ATIVIDADES, {
     user_id: userId,
     message,
     mcoins_delta: mcoinsDelta,
-  }, ownerScopedPermissions(userId));
+  }, permissions);
 }
 
-function ownerScopedPermissions(ownerUserId: string, readAny = true) {
+async function ownerScopedPermissions(ownerUserId: string, readAny = true) {
   const readRole = readAny ? Role.users() : Role.user(ownerUserId);
+  const currentAccount = await getCurrentAccount();
+  const currentAppUserId =
+    currentAccount && typeof currentAccount.prefs?.appUserId === 'string'
+      ? currentAccount.prefs.appUserId
+      : null;
+  const ownerPrincipalId = currentAppUserId === ownerUserId && currentAccount ? currentAccount.$id : ownerUserId;
   return [
     Permission.read(readRole),
-    Permission.update(Role.user(ownerUserId)),
-    Permission.delete(Role.user(ownerUserId)),
+    Permission.update(Role.user(ownerPrincipalId)),
+    Permission.delete(Role.user(ownerPrincipalId)),
   ];
 }
 
@@ -473,7 +494,7 @@ async function getSessionProfile() {
     profile = (await createDocument(COLLECTION_APP_USERS, {
       username: normalizedName,
       password_hash: MANAGED_PASSWORD_PLACEHOLDER,
-    }, ownerScopedPermissions(currentAccount.$id))) as unknown as AppwriteUserDoc;
+    }, await ownerScopedPermissions(currentAccount.$id))) as unknown as AppwriteUserDoc;
   }
 
   if (!profile) return null;
@@ -621,7 +642,7 @@ export async function bootstrapApp() {
         username: normalized,
         password_hash: MANAGED_PASSWORD_PLACEHOLDER,
       },
-      managedSeedAccount ? ownerScopedPermissions(managedSeedAccount.$id) : undefined,
+      managedSeedAccount ? await ownerScopedPermissions(managedSeedAccount.$id) : undefined,
     )) as unknown as AppwriteUserDoc;
     userId = insertedUser.$id;
     await ensureUserMetadata(userId);
@@ -738,7 +759,7 @@ export async function registerUser(username: string, password: string) {
     const data = (await createDocumentWithId(COLLECTION_APP_USERS, createdAccount.$id, {
       username: normalized,
       password_hash: MANAGED_PASSWORD_PLACEHOLDER,
-    })) as unknown as AppwriteUserDoc;
+    }, await ownerScopedPermissions(createdAccount.$id))) as unknown as AppwriteUserDoc;
 
     try {
       await account.updatePrefs({
@@ -772,7 +793,13 @@ export async function listRankedUsers() {
     listDocuments<AppwriteMetadataDoc>(COLLECTION_USUARIOS_METADATA),
   ]);
 
-  const metadataByUser = new Map(metadata.map((item) => [item.user_id, item]));
+  const metadataByUser = new Map<string, AppwriteMetadataDoc>();
+  for (const item of metadata) {
+    const current = metadataByUser.get(item.user_id);
+    if (!current || item.$updatedAt > current.$updatedAt) {
+      metadataByUser.set(item.user_id, item);
+    }
+  }
 
   const ranked = users
     .map((user) => {
@@ -901,7 +928,7 @@ export async function addPersonalMovie(
     rating: movie.rating ?? null,
     streamingData: movie.streaming_data ?? null,
     user_id: userId,
-  }, ownerScopedPermissions(userId));
+  }, await ownerScopedPermissions(userId));
 
   return mapPersonalMovie(data as unknown as AppwritePersonalMovieDoc);
 }
@@ -990,7 +1017,7 @@ export async function addSeries(
     status: toAppwriteSeriesStatus(series.status, episodiosVistos, totalEpisodios),
     rating: series.rating ?? null,
     streamingData: series.streaming_data ?? null,
-  }, ownerScopedPermissions(userId));
+  }, await ownerScopedPermissions(userId));
 
   await awardMCoins(userId, 'INICIOU_SERIE', `Iniciou a serie ${series.titulo}.`);
   return mapSeries(data as unknown as AppwriteSeriesDoc);
@@ -1122,7 +1149,7 @@ export async function suggestMovieToUser(
       rating: movie.rating ?? null,
       streamingData: movie.streaming_data ?? null,
       user_id: toUserId,
-    }, ownerScopedPermissions(toUserId));
+    }, await ownerScopedPermissions(toUserId));
   } else {
     await createDocument(COLLECTION_PERSONAL_SERIES, {
       user_id: toUserId,
@@ -1134,7 +1161,7 @@ export async function suggestMovieToUser(
       status: 'naoIniciado',
       rating: movie.rating ?? null,
       streamingData: movie.streaming_data ?? null,
-    }, ownerScopedPermissions(toUserId));
+    }, await ownerScopedPermissions(toUserId));
   }
 
   const [fromName, toName, delta] = await Promise.all([

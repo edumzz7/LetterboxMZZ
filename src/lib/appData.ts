@@ -1,6 +1,6 @@
 import type { Models } from 'appwrite';
 import { account, databases, ID, Permission, Query, Role } from './appwrite';
-import { hashPassword, normalizeUsername, verifyPassword } from './auth';
+import { normalizeUsername, verifyPassword } from './auth';
 import { DEFAULT_OSCAR_MOVIES, readLegacyMovieData, readLegacySeriesData } from './catalog';
 import type {
   ActivityEntry,
@@ -16,11 +16,9 @@ import type {
   SeriesStatus,
 } from '../types/app';
 
-type UserRow = AppUser & { password_hash: string };
-
 type AppwriteUserDoc = Models.Document & {
   username: string;
-  password_hash: string;
+  password_hash?: string;
 };
 
 type AppwriteAccountDoc = Models.User<Models.Preferences> & {
@@ -87,7 +85,7 @@ type AppwriteActivityDoc = Models.Document & {
 const BOOTSTRAP_KEY = 'letterboxmzz_bootstrap_v1';
 const QUERY_LIMIT = 5000;
 
-const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID ?? 'letterboxmzz';
+const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
 const COLLECTION_APP_USERS = import.meta.env.VITE_APPWRITE_COLLECTION_APP_USERS ?? 'app_users';
 const COLLECTION_OSCAR_MOVIES =
   import.meta.env.VITE_APPWRITE_COLLECTION_OSCAR_MOVIES ?? 'filmes_oscar';
@@ -111,6 +109,10 @@ const PUBLIC_APP_URL = (import.meta.env.VITE_PUBLIC_APP_URL ?? 'https://letterbo
 );
 const FALLBACK_POSTER_URL = 'https://placehold.co/600x900/png';
 const AVATAR_IDS = ['reel', 'clapper', 'popcorn', 'projector', 'ticket'];
+
+if (!DATABASE_ID) {
+  throw new Error('VITE_APPWRITE_DATABASE_ID nao configurado.');
+}
 
 const TRIGGER_POINTS = {
   ASSISTIU_FILME: 30,
@@ -164,7 +166,7 @@ function fromAppwriteSeriesStatus(status: AppwriteSeriesStatus | string | null |
 function wrapPermissionError(error: unknown, collectionId: string) {
   const code = typeof error === 'object' && error !== null && 'code' in error ? (error as { code?: number }).code : undefined;
   if (code === 401 || code === 403) {
-    return new Error(`Sem permissao de escrita em '${collectionId}'. Configure permissoes 'Any' (Create/Read/Update/Delete) no Appwrite.`);
+    return new Error(`Sem permissao de escrita em '${collectionId}'. Revise as permissoes autenticadas/documento no Appwrite.`);
   }
 
   return error;
@@ -238,11 +240,10 @@ async function deleteDocument(collectionId: string, documentId: string) {
   }
 }
 
-function mapUser(doc: AppwriteUserDoc): UserRow {
+function mapUser(doc: AppwriteUserDoc): AppUser {
   return {
     id: doc.$id,
     username: doc.username,
-    password_hash: doc.password_hash,
     created_at: doc.$createdAt,
   };
 }
@@ -373,7 +374,7 @@ async function addActivity(userId: string, message: string, mcoinsDelta: number)
 }
 
 function ownerScopedPermissions(ownerUserId: string, readAny = true) {
-  const readRole = readAny ? Role.any() : Role.user(ownerUserId);
+  const readRole = readAny ? Role.users() : Role.user(ownerUserId);
   return [
     Permission.read(readRole),
     Permission.update(Role.user(ownerUserId)),
@@ -472,10 +473,16 @@ async function getSessionProfile() {
     profile = (await createDocument(COLLECTION_APP_USERS, {
       username: normalizedName,
       password_hash: MANAGED_PASSWORD_PLACEHOLDER,
-    })) as unknown as AppwriteUserDoc;
+    }, ownerScopedPermissions(currentAccount.$id))) as unknown as AppwriteUserDoc;
   }
 
   if (!profile) return null;
+
+  if (profile.password_hash && profile.password_hash !== MANAGED_PASSWORD_PLACEHOLDER) {
+    await updateDocument(COLLECTION_APP_USERS, profile.$id, {
+      password_hash: MANAGED_PASSWORD_PLACEHOLDER,
+    });
+  }
 
   try {
     await account.updatePrefs({
@@ -606,11 +613,16 @@ export async function bootstrapApp() {
   let userId = existingUser?.$id;
 
   if (!userId) {
-    const passwordHash = await hashPassword(SEED_PASSWORD);
-    const insertedUser = (await createDocument(COLLECTION_APP_USERS, {
-      username: normalized,
-      password_hash: passwordHash,
-    })) as unknown as AppwriteUserDoc;
+    const managedSeedAccount = await createManagedAccount(normalized, SEED_PASSWORD);
+    const insertedUser = (await createDocumentWithId(
+      COLLECTION_APP_USERS,
+      managedSeedAccount?.$id ?? ID.unique(),
+      {
+        username: normalized,
+        password_hash: MANAGED_PASSWORD_PLACEHOLDER,
+      },
+      managedSeedAccount ? ownerScopedPermissions(managedSeedAccount.$id) : undefined,
+    )) as unknown as AppwriteUserDoc;
     userId = insertedUser.$id;
     await ensureUserMetadata(userId);
   }
@@ -693,7 +705,7 @@ export async function loginUser(username: string, password: string) {
       Query.equal('username', [normalized]),
     ]);
 
-    if (!legacyUser || !(await verifyPassword(password, legacyUser.password_hash))) {
+    if (!legacyUser?.password_hash || !(await verifyPassword(password, legacyUser.password_hash))) {
       throw new Error('Usuario ou senha invalidos.');
     }
 
@@ -751,7 +763,7 @@ export async function registerUser(username: string, password: string) {
 
 export async function listUsers() {
   const data = await listDocuments<AppwriteUserDoc>(COLLECTION_APP_USERS, [Query.orderAsc('username')]);
-  return data.map(mapUser) as AppUser[];
+  return data.map(mapUser);
 }
 
 export async function listRankedUsers() {

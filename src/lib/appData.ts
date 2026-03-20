@@ -1,6 +1,6 @@
 import type { Models } from 'appwrite';
 import { account, databases, ID, Permission, Query, Role } from './appwrite';
-import { normalizeUsername, verifyPassword } from './auth';
+import { normalizeUsername } from './auth';
 import { DEFAULT_OSCAR_MOVIES, readLegacyMovieData, readLegacySeriesData } from './catalog';
 import type {
   ActivityEntry,
@@ -214,11 +214,20 @@ async function createDocumentWithId<T extends Record<string, unknown>>(
 }
 
 async function updateDocument<T extends Record<string, unknown>>(collectionId: string, documentId: string, data: T) {
+  return updateDocumentWithPermissions(collectionId, documentId, data);
+}
+
+async function updateDocumentWithPermissions<T extends Record<string, unknown>>(
+  collectionId: string,
+  documentId: string,
+  data: T,
+  permissions?: string[],
+) {
   let payload: Record<string, unknown> = { ...data };
 
   for (let attempt = 0; attempt < 6; attempt += 1) {
     try {
-      return await databases.updateDocument(DATABASE_ID, collectionId, documentId, payload);
+      return await databases.updateDocument(DATABASE_ID, collectionId, documentId, payload, permissions);
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
       const unknownAttribute = message.match(/Unknown attribute: \"([^\"]+)\"/);
@@ -438,26 +447,6 @@ async function createManagedAccount(username: string, password: string) {
   }
 }
 
-async function migrateLegacyUserToManagedSession(user: AppwriteUserDoc, password: string) {
-  await createManagedAccount(user.username, password);
-  const managedAccount = await ensureAppwriteSession(user.username, password);
-  try {
-    await account.updatePrefs({
-      ...(managedAccount.prefs ?? {}),
-      appUserId: user.$id,
-      username: user.username,
-    });
-  } catch {
-    // Keep compatibility if prefs update is unavailable; username lookup still works.
-  }
-  if (user.password_hash !== MANAGED_PASSWORD_PLACEHOLDER) {
-    await updateDocument(COLLECTION_APP_USERS, user.$id, {
-      password_hash: MANAGED_PASSWORD_PLACEHOLDER,
-    });
-  }
-  return managedAccount;
-}
-
 async function getSessionProfile() {
   const currentAccount = await getCurrentAccount();
   if (!currentAccount) return null;
@@ -508,16 +497,6 @@ async function getSessionProfile() {
     return null;
   }
 
-  if (profile.password_hash && profile.password_hash !== MANAGED_PASSWORD_PLACEHOLDER) {
-    try {
-      await updateDocument(COLLECTION_APP_USERS, profile.$id, {
-        password_hash: MANAGED_PASSWORD_PLACEHOLDER,
-      });
-    } catch {
-      // Ignore legacy cleanup failure during session restore.
-    }
-  }
-
   try {
     await account.updatePrefs({
       ...(currentAccount.prefs ?? {}),
@@ -538,6 +517,65 @@ async function requireSessionUser(expectedUserId: string) {
     throw new Error('Sessao invalida para esta operacao.');
   }
   return session;
+}
+
+function hasUpdatePermission(doc: Models.Document, permissions: string[]) {
+  const expected = permissions.find((entry) => entry.startsWith('update('));
+  return expected ? (doc.$permissions ?? []).includes(expected) : false;
+}
+
+function movieIdentityKey(doc: Pick<AppwritePersonalMovieDoc, 'source_movie_id' | 'titulo' | 'source'>) {
+  if (doc.source_movie_id) return `source:${doc.source_movie_id}`;
+  return `title:${doc.source}:${titleKey(doc.titulo)}`;
+}
+
+function seriesIdentityKey(doc: Pick<AppwriteSeriesDoc, 'titulo'>) {
+  return titleKey(doc.titulo);
+}
+
+async function repairPersonalMovieDoc(doc: AppwritePersonalMovieDoc) {
+  const permissions = await ownerScopedPermissions(doc.user_id);
+  if (hasUpdatePermission(doc, permissions)) return doc;
+
+  try {
+    return (await createDocument(COLLECTION_PERSONAL_MOVIES, {
+      user_id: doc.user_id,
+      titulo: doc.titulo,
+      ano_lancamento: doc.ano_lancamento ?? null,
+      capa_url: doc.capa_url ?? null,
+      plataforma_slug: doc.plataforma_slug ?? null,
+      status: doc.status,
+      source: doc.source,
+      source_movie_id: doc.source_movie_id ?? null,
+      avaliacao: doc.avaliacao ?? null,
+      rating: doc.rating ?? null,
+      streamingData: doc.streamingData ?? null,
+    }, permissions)) as unknown as AppwritePersonalMovieDoc;
+  } catch {
+    return doc;
+  }
+}
+
+async function repairSeriesDoc(doc: AppwriteSeriesDoc) {
+  if (!doc.user_id) return doc;
+  const permissions = await ownerScopedPermissions(doc.user_id);
+  if (hasUpdatePermission(doc, permissions)) return doc;
+
+  try {
+    return (await createDocument(COLLECTION_PERSONAL_SERIES, {
+      user_id: doc.user_id,
+      titulo: doc.titulo,
+      capaUrl: doc.capaUrl ?? null,
+      plataforma: doc.plataforma ?? null,
+      totalEpisodios: doc.totalEpisodios,
+      episodiosVistos: doc.episodiosVistos,
+      status: doc.status,
+      rating: doc.rating ?? null,
+      streamingData: doc.streamingData ?? null,
+    }, permissions)) as unknown as AppwriteSeriesDoc;
+  } catch {
+    return doc;
+  }
 }
 
 async function grantMCoins(userId: string, trigger: TriggerKey) {
@@ -748,17 +786,7 @@ export async function loginUser(username: string, password: string) {
     }
     return profile;
   } catch {
-    const legacyUser = await firstDocument<AppwriteUserDoc>(COLLECTION_APP_USERS, [
-      Query.equal('username', [normalized]),
-    ]);
-
-    if (!legacyUser?.password_hash || !(await verifyPassword(password, legacyUser.password_hash))) {
-      throw new Error('Usuario ou senha invalidos.');
-    }
-
-    await migrateLegacyUserToManagedSession(legacyUser, password);
-    await ensureUserMetadata(legacyUser.$id);
-    return { id: legacyUser.$id, username: legacyUser.username };
+    throw new Error('Usuario ou senha invalidos.');
   }
 }
 
@@ -923,7 +951,16 @@ export async function listPersonalMovies(userId: string) {
     Query.equal('user_id', [userId]),
     Query.orderDesc('$createdAt'),
   ]);
-  return data.map(mapPersonalMovie) as PersonalMovie[];
+  const repaired = await Promise.all(data.map((doc) => repairPersonalMovieDoc(doc)));
+  const deduped = new Map<string, AppwritePersonalMovieDoc>();
+  for (const doc of repaired) {
+    const key = movieIdentityKey(doc);
+    const current = deduped.get(key);
+    if (!current || doc.$updatedAt > current.$updatedAt) {
+      deduped.set(key, doc);
+    }
+  }
+  return Array.from(deduped.values()).map(mapPersonalMovie) as PersonalMovie[];
 }
 
 export async function addPersonalMovie(
@@ -1008,7 +1045,16 @@ export async function listSeries(userId: string) {
       Query.equal('user_id', [userId]),
       Query.orderDesc('$createdAt'),
     ]);
-    return data.map(mapSeries) as SeriesEntry[];
+    const repaired = await Promise.all(data.map((doc) => repairSeriesDoc(doc)));
+    const deduped = new Map<string, AppwriteSeriesDoc>();
+    for (const doc of repaired) {
+      const key = seriesIdentityKey(doc);
+      const current = deduped.get(key);
+      if (!current || doc.$updatedAt > current.$updatedAt) {
+        deduped.set(key, doc);
+      }
+    }
+    return Array.from(deduped.values()).map(mapSeries) as SeriesEntry[];
   } catch (error) {
     const message = error instanceof Error ? error.message : '';
     if (message.includes('user_id')) {

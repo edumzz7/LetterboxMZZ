@@ -54,6 +54,7 @@ type AppwritePersonalMovieDoc = Models.Document & {
 };
 
 type AppwriteSeriesDoc = Models.Document & {
+  user_id?: string;
   titulo: string;
   capaUrl: string | null;
   plataforma: string | null;
@@ -251,7 +252,7 @@ function mapSeries(doc: AppwriteSeriesDoc): SeriesEntry {
   const episodiosVistos = doc.episodiosVistos ?? 0;
   return {
     id: doc.$id,
-    user_id: '',
+    user_id: doc.user_id ?? '',
     titulo: doc.titulo,
     capa_url: doc.capaUrl ?? null,
     status: fromAppwriteSeriesStatus(doc.status) ?? getSeriesStatus(episodiosVistos, totalEpisodios),
@@ -486,6 +487,7 @@ export async function bootstrapApp() {
     await Promise.all(
       legacySeries.map((series) =>
         createDocument(COLLECTION_PERSONAL_SERIES, {
+          user_id: userId,
           titulo: series.titulo,
           capaUrl: ensureValidUrl(series.capa_url),
           plataforma: series.plataforma_slug ?? 'stremio',
@@ -729,10 +731,19 @@ export async function deletePersonalMovie(movieId: string) {
 }
 
 export async function listSeries(userId: string) {
-  const data = await listDocuments<AppwriteSeriesDoc>(COLLECTION_PERSONAL_SERIES, [
-    Query.orderDesc('$createdAt'),
-  ]);
-  return data.map((doc) => ({ ...mapSeries(doc), user_id: userId })) as SeriesEntry[];
+  try {
+    const data = await listDocuments<AppwriteSeriesDoc>(COLLECTION_PERSONAL_SERIES, [
+      Query.equal('user_id', [userId]),
+      Query.orderDesc('$createdAt'),
+    ]);
+    return data.map(mapSeries) as SeriesEntry[];
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    if (message.includes('user_id')) {
+      throw new Error("A colecao 'series_pessoais' precisa da coluna 'user_id' para isolar as series por usuario.");
+    }
+    throw error;
+  }
 }
 
 export async function addSeries(
@@ -740,6 +751,7 @@ export async function addSeries(
   series: Omit<SeriesEntry, 'id' | 'user_id' | 'created_at'>,
 ) {
   const existing = await firstDocument<AppwriteSeriesDoc>(COLLECTION_PERSONAL_SERIES, [
+    Query.equal('user_id', [userId]),
     Query.equal('titulo', [series.titulo]),
   ]);
   if (existing) {
@@ -749,6 +761,7 @@ export async function addSeries(
   const episodiosVistos = Math.max(0, series.episodios_vistos);
   const totalEpisodios = Math.max(1, series.total_episodios);
   const data = await createDocument(COLLECTION_PERSONAL_SERIES, {
+    user_id: userId,
     titulo: series.titulo,
     capaUrl: ensureValidUrl(series.capa_url),
     plataforma: series.plataforma_slug ?? 'stremio',
@@ -760,7 +773,7 @@ export async function addSeries(
   });
 
   await awardMCoins(userId, 'INICIOU_SERIE', `Iniciou a serie ${series.titulo}.`);
-  return { ...mapSeries(data as unknown as AppwriteSeriesDoc), user_id: userId };
+  return mapSeries(data as unknown as AppwriteSeriesDoc);
 }
 
 export async function updateSeries(

@@ -82,6 +82,7 @@ export default function MovieCard({
   const [reactionPending, setReactionPending] = useState<ReactionEmoji | null>(null);
   const [ratingPending, setRatingPending] = useState<number | null>(null);
   const [localRating, setLocalRating] = useState<number>(isPersonalMovie(movie) ? (movie.avaliacao ?? 0) : 0);
+  const showReadOnlyRating = isPersonalMovie(movie) && isWatched && (canRate || localRating > 0);
   const providersRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -320,23 +321,28 @@ export default function MovieCard({
           </div>
         ) : null}
 
-        {canRate ? (
+        {showReadOnlyRating ? (
           <div className="flex items-center gap-1 text-lg">
             {[1, 2, 3, 4, 5].map((star) => (
               <button
                 key={star}
                 type="button"
-                onClick={() => void handleRate(star)}
+                onClick={() => {
+                  if (canRate) void handleRate(star);
+                }}
+                disabled={!canRate}
                 className={clsx(
                   'leading-none transition',
-                  localRating >= star ? 'text-yellow-400' : 'text-[#444] hover:text-yellow-300',
+                  localRating >= star ? 'text-yellow-400' : 'text-[#444]',
+                  canRate && 'hover:text-yellow-300',
+                  !canRate && 'cursor-default',
                 )}
                 title={`${star} estrela(s)`}
               >
                 ★
               </button>
             ))}
-            {ratingPending ? <Loader2 size={12} className="animate-spin text-brand-gold ml-1" /> : null}
+            {canRate && ratingPending ? <Loader2 size={12} className="animate-spin text-brand-gold ml-1" /> : null}
           </div>
         ) : null}
       </div>

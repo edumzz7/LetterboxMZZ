@@ -1204,13 +1204,11 @@ export async function updateUserProfile(
       const updates: Record<string, unknown> = {};
 
       let currentAvatarId = metadata.avatar_id || fallbackAvatar(userId);
-      let currentDisplayName: string | undefined = undefined;
 
       if (currentAvatarId.startsWith('{')) {
         try {
           const parsed = JSON.parse(currentAvatarId);
           currentAvatarId = parsed.avatarId || fallbackAvatar(userId);
-          currentDisplayName = parsed.displayName;
         } catch {}
       }
 

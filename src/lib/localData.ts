@@ -655,6 +655,7 @@ export async function rateMovie(
   movieId: string,
   _movieTitle: string,
   stars: number,
+  review?: string | null,
 ) {
   const items = readPersonalMovies();
   const current = items.find((item) => item.id === movieId);
@@ -663,13 +664,14 @@ export async function rateMovie(
   if (current.user_id !== actorUserId) {
     throw new Error('Avaliacao permitida apenas para o dono do filme.');
   }
-  writePersonalMovies(items.map((item) => (item.id === movieId ? { ...item, rating: stars } : item)));
+  writePersonalMovies(items.map((item) => (item.id === movieId ? { ...item, rating: stars, review: review ?? null } : item)));
 }
 
 export async function rateSeries(
   actorUserId: string,
   seriesId: string,
   stars: number,
+  review?: string | null,
 ) {
   const items = readSeries();
   const current = items.find((item) => item.id === seriesId);
@@ -678,7 +680,7 @@ export async function rateSeries(
   if (current.user_id !== actorUserId) {
     throw new Error('Avaliacao permitida apenas para o dono da serie.');
   }
-  writeSeries(items.map((item) => (item.id === seriesId ? { ...item, rating: stars } : item)));
+  writeSeries(items.map((item) => (item.id === seriesId ? { ...item, rating: stars, review: review ?? null } : item)));
 }
 
 export async function deleteSeries(seriesId: string) {

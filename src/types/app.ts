@@ -49,6 +49,7 @@ export interface PersonalMovie {
   indicado_por_user_id?: string | null;
   avaliacao?: number | null;
   rating?: number | null;
+  review?: string | null;
   streaming_data?: string | null;
   created_at: string;
 }
@@ -66,6 +67,7 @@ export interface SeriesEntry {
   indicado_por_user_id?: string | null;
   avaliacao?: number | null;
   rating?: number | null;
+  review?: string | null;
   streaming_data?: string | null;
   created_at: string;
 }

@@ -57,6 +57,7 @@ type AppwritePersonalMovieDoc = Models.Document & {
   source_movie_id: string | null;
   avaliacao?: number | null;
   rating?: number | null;
+  review?: string | null;
   streamingData?: string | null;
 };
 
@@ -72,6 +73,7 @@ type AppwriteSeriesDoc = Models.Document & {
   status: AppwriteSeriesStatus;
   avaliacao?: number | null;
   rating?: number | null;
+  review?: string | null;
   streamingData?: string | null;
 };
 
@@ -343,6 +345,7 @@ function mapPersonalMovie(doc: AppwritePersonalMovieDoc): PersonalMovie {
     source_movie_id: doc.source_movie_id ?? null,
     avaliacao: doc.avaliacao ?? null,
     rating: doc.rating ?? null,
+    review: doc.review ?? null,
     streaming_data: doc.streamingData ?? null,
     created_at: doc.$createdAt,
   };
@@ -365,6 +368,7 @@ function mapSeries(doc: AppwriteSeriesDoc): SeriesEntry {
     plataforma_slug: doc.plataforma ?? null,
     avaliacao: doc.avaliacao ?? null,
     rating: doc.rating ?? null,
+    review: doc.review ?? null,
     streaming_data: doc.streamingData ?? null,
     created_at: doc.$createdAt,
   };
@@ -651,6 +655,7 @@ async function repairPersonalMovieDoc(doc: AppwritePersonalMovieDoc) {
       source_movie_id: doc.source_movie_id ?? null,
       avaliacao: doc.avaliacao ?? null,
       rating: doc.rating ?? null,
+      review: doc.review ?? null,
       streamingData: doc.streamingData ?? null,
     }, permissions)) as unknown as AppwritePersonalMovieDoc;
     try {
@@ -680,6 +685,7 @@ async function repairSeriesDoc(doc: AppwriteSeriesDoc) {
       status: doc.status,
       avaliacao: doc.avaliacao ?? null,
       rating: doc.rating ?? null,
+      review: doc.review ?? null,
       streamingData: doc.streamingData ?? null,
     }, permissions)) as unknown as AppwriteSeriesDoc;
     try {
@@ -1620,6 +1626,7 @@ export async function rateMovie(
   movieId: string,
   _movieTitle: string,
   stars: number,
+  review?: string | null,
 ) {
   return withFallback(
     async () => {
@@ -1636,6 +1643,7 @@ export async function rateMovie(
       try {
         const updated = (await updateDocument(COLLECTION_PERSONAL_MOVIES, writableDoc.$id, {
           rating: stars,
+          review: review !== undefined ? review : undefined,
         })) as unknown as AppwritePersonalMovieDoc;
         if ((updated.rating ?? updated.avaliacao ?? null) !== stars) {
           throw new Error("A coluna 'rating' (Double) precisa ser criada em 'personal_movies' para salvar avaliações com decimais.");
@@ -1648,7 +1656,7 @@ export async function rateMovie(
         throw error;
       }
     },
-    () => localData.rateMovie(actorUserId, movieId, _movieTitle, stars),
+    () => localData.rateMovie(actorUserId, movieId, _movieTitle, stars, review),
   );
 }
 
@@ -1656,6 +1664,7 @@ export async function rateSeries(
   actorUserId: string,
   seriesId: string,
   stars: number,
+  review?: string | null,
 ) {
   return withFallback(
     async () => {
@@ -1675,6 +1684,7 @@ export async function rateSeries(
       try {
         const updated = (await updateDocument(COLLECTION_PERSONAL_SERIES, writableDoc.$id, {
           rating: stars,
+          review: review !== undefined ? review : undefined,
         })) as unknown as AppwriteSeriesDoc;
         if ((updated.rating ?? updated.avaliacao ?? null) !== stars) {
           throw new Error("A coluna 'rating' (Double) precisa ser criada em 'personal_series' para salvar avaliações com decimais.");
@@ -1687,7 +1697,7 @@ export async function rateSeries(
         throw error;
       }
     },
-    () => localData.rateSeries(actorUserId, seriesId, stars),
+    () => localData.rateSeries(actorUserId, seriesId, stars, review),
   );
 }
 

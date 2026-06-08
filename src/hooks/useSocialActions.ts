@@ -11,19 +11,28 @@ export function useSocialActions() {
       movieId,
       movieTitle,
       stars,
+      review,
     }: {
       actorUserId: string;
       movieId: string;
       movieTitle: string;
       stars: number;
-    }) => rateMovie(actorUserId, movieId, movieTitle, stars),
+      review?: string | null;
+    }) => rateMovie(actorUserId, movieId, movieTitle, stars, review),
     onSuccess: (_data, variables) => {
       queryClient.setQueriesData<PersonalMovie[]>(
         { queryKey: ['personal-movies'] },
         (current) =>
           Array.isArray(current)
             ? current.map((movie) =>
-                movie.id === variables.movieId ? { ...movie, avaliacao: variables.stars, rating: variables.stars } : movie,
+                movie.id === variables.movieId
+                  ? {
+                      ...movie,
+                      avaliacao: variables.stars,
+                      rating: variables.stars,
+                      review: variables.review !== undefined ? variables.review : movie.review,
+                    }
+                  : movie,
               )
             : current,
       );

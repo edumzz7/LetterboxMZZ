@@ -103,12 +103,13 @@ export default function PersonalMoviesSection({
                 onPlatformChange={(selectedMovie, platformId) =>
                   updatePlatformMutation.mutate({ id: selectedMovie.id, platform: platformId })
                 }
-                onRate={async (selectedMovie, stars) => {
+                onRate={async (selectedMovie, stars, review) => {
                   await rateMutation.mutateAsync({
                     actorUserId: currentUserId,
                     movieId: selectedMovie.id,
                     movieTitle: selectedMovie.titulo,
                     stars,
+                    review,
                   });
                 }}
                 onReact={async (selectedMovie, reaction) => {

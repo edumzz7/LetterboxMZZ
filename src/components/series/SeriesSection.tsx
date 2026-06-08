@@ -77,11 +77,12 @@ export default function SeriesSection({ userId, canEdit, currentUserId }: Series
               currentUserId={currentUserId}
               onSaveProgress={(payload) => updateProgressMutation.mutateAsync(payload)}
               onDelete={(seriesId) => deleteSeriesMutation.mutate(seriesId)}
-              onRate={(seriesId, stars) =>
+              onRate={(seriesId, stars, review) =>
                 rateSeriesMutation.mutateAsync({
                   actorUserId: currentUserId,
                   seriesId,
                   stars,
+                  review,
                 })
               }
             />

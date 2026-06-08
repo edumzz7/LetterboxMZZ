@@ -12,6 +12,7 @@ import {
   updatePersonalMovieStreaming,
 } from '../../lib/appData';
 import StarRatingInput from '../ui/StarRatingInput';
+import ReviewModal from '../ui/ReviewModal';
 import type { MovieStatus, OscarMovieWithStatus, PersonalMovie } from '../../types/app';
 
 type CardMovie = OscarMovieWithStatus | PersonalMovie;
@@ -35,7 +36,7 @@ interface MovieCardProps {
   onToggleStatus?: (movie: CardMovie, nextStatus: MovieStatus) => void;
   onDelete?: (movie: PersonalMovie) => void;
   onPlatformChange?: (movie: CardMovie, platformId: string) => void;
-  onRate?: (movie: PersonalMovie, stars: number) => Promise<unknown> | unknown;
+  onRate?: (movie: PersonalMovie, stars: number, review?: string | null) => Promise<unknown> | unknown;
   onReact?: (movie: PersonalMovie, reaction: ReactionEmoji) => Promise<unknown> | unknown;
 }
 
@@ -92,6 +93,8 @@ export default function MovieCard({
   const [ratingPending, setRatingPending] = useState<number | null>(null);
   const [ratingError, setRatingError] = useState<string | null>(null);
   const [localRating, setLocalRating] = useState<number>(isPersonalMovie(movie) ? (movie.rating ?? movie.avaliacao ?? 0) : 0);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [pendingRating, setPendingRating] = useState<number>(localRating);
   const showReadOnlyRating = isPersonalMovie(movie) && isWatched && (canRate || localRating > 0);
   const providersRef = useRef<HTMLDivElement | null>(null);
 
@@ -147,14 +150,14 @@ export default function MovieCard({
     }
   };
 
-  const handleRate = async (stars: number) => {
+  const handleRate = async (stars: number, review?: string | null) => {
     if (!isPersonalMovie(movie) || !onRate) return;
     const previousRating = localRating;
     setRatingError(null);
     setLocalRating(stars);
     setRatingPending(stars);
     try {
-      await onRate(movie, stars);
+      await onRate(movie, stars, review);
     } catch (error) {
       setLocalRating(previousRating);
       setRatingError(error instanceof Error ? error.message : 'Falha ao salvar avaliacao.');
@@ -353,20 +356,56 @@ export default function MovieCard({
 
         {showReadOnlyRating ? (
           <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-1">
-            <StarRatingInput
-              value={localRating}
-              onChange={(stars) => {
-                if (canRate) void handleRate(stars);
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                setPendingRating(localRating);
+                setIsReviewModalOpen(true);
               }}
-              disabled={!canRate}
-            />
-            {canRate && ratingPending ? <Loader2 size={12} className="animate-spin text-brand-gold ml-1" /> : null}
-          </div>
-          {ratingError ? <p className="text-[10px] leading-relaxed text-red-300">{ratingError}</p> : null}
+              className={clsx(
+                "flex items-center gap-2 group/stars",
+                canRate ? "cursor-pointer" : "cursor-pointer hover:opacity-80"
+              )}
+            >
+              <StarRatingInput
+                value={localRating}
+                onChange={(stars) => {
+                  if (canRate) {
+                    setPendingRating(stars);
+                    setIsReviewModalOpen(true);
+                  }
+                }}
+                disabled={!canRate}
+              />
+              {isPersonalMovie(movie) && movie.review && (
+                <span className="text-[9px] font-medium tracking-wider text-brand-gold-alt bg-brand-gold/10 px-1.5 py-0.5 rounded uppercase leading-none hover:bg-brand-gold/20 transition-colors">
+                  Resenha
+                </span>
+              )}
+              {canRate && ratingPending ? <Loader2 size={12} className="animate-spin text-brand-gold ml-1" /> : null}
+            </div>
+            {ratingError ? <p className="text-[10px] leading-relaxed text-red-300">{ratingError}</p> : null}
           </div>
         ) : null}
       </div>
+
+      {isReviewModalOpen && isPersonalMovie(movie) && (
+        <ReviewModal
+          isOpen={isReviewModalOpen}
+          onOpenChange={setIsReviewModalOpen}
+          title={movie.titulo}
+          coverUrl={movie.capa_url}
+          initialRating={pendingRating}
+          initialReview={movie.review || ''}
+          isReadOnly={!canRate}
+          onSave={async (stars, text) => {
+            await handleRate(stars, text);
+          }}
+          onSkip={async (stars) => {
+            await handleRate(stars, movie.review);
+          }}
+        />
+      )}
     </div>
   );
 }

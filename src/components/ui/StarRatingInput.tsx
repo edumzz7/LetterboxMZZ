@@ -48,7 +48,7 @@ export default function StarRatingInput({ value, onChange, disabled }: StarRatin
   };
 
   return (
-    <div className="flex items-center gap-1 text-lg" onMouseLeave={handleMouseLeave}>
+    <div className="flex items-center gap-1 text-lg p-1 -m-1" onMouseLeave={handleMouseLeave}>
       {[1, 2, 3, 4, 5].map((star) => {
         const isFull = displayValue >= star;
         const isHalf = !isFull && displayValue >= star - 0.5;

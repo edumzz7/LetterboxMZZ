@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Eye, EyeOff, Loader2, Trash2, Tv, X } from 'lucide-react';
+import ReviewModal from '../ui/ReviewModal';
 import clsx from 'clsx';
 import { generateImagePath } from '../../lib/imageUtils';
 import type { Series } from '../../hooks/useSeries';
@@ -28,7 +29,7 @@ interface SeriesCardProps {
     plataforma_slug?: string;
   }) => Promise<unknown>;
   onDelete: (id: string) => void;
-  onRate: (seriesId: string, stars: number) => Promise<unknown>;
+  onRate: (seriesId: string, stars: number, review?: string | null) => Promise<unknown>;
 }
 
 export default function SeriesCard({
@@ -56,6 +57,8 @@ export default function SeriesCard({
   const [ratingPending, setRatingPending] = useState<number | null>(null);
   const [ratingError, setRatingError] = useState<string | null>(null);
   const [localRating, setLocalRating] = useState(series.rating ?? series.avaliacao ?? 0);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [pendingRating, setPendingRating] = useState<number>(localRating);
   const [reactionsOpen, setReactionsOpen] = useState(false);
   const providersRef = useRef<HTMLDivElement | null>(null);
 
@@ -224,13 +227,13 @@ export default function SeriesCard({
     Math.max(parseInt(localTotalEps, 10) || 0, 0),
   );
 
-  const handleRate = async (stars: number) => {
+  const handleRate = async (stars: number, review?: string | null) => {
     const previousRating = localRating;
     setRatingError(null);
     setLocalRating(stars);
     setRatingPending(stars);
     try {
-      await onRate(series.id, stars);
+      await onRate(series.id, stars, review);
     } catch (error) {
       setLocalRating(previousRating);
       setRatingError(error instanceof Error ? error.message : 'Falha ao salvar avaliacao.');
@@ -240,7 +243,8 @@ export default function SeriesCard({
   };
 
   return (
-    <Dialog.Root
+    <>
+      <Dialog.Root
       open={open}
       onOpenChange={(nextOpen) => {
         if (nextOpen) {
@@ -349,14 +353,32 @@ export default function SeriesCard({
 
             {showRating ? (
               <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-1">
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPendingRating(localRating);
+                    setIsReviewModalOpen(true);
+                  }}
+                  className={clsx(
+                    "flex items-center gap-2 group/stars",
+                    canRate ? "cursor-pointer" : "cursor-pointer hover:opacity-80"
+                  )}
+                >
                   <StarRatingInput
                     value={localRating}
                     onChange={(stars) => {
-                      if (canRate) void handleRate(stars);
+                      if (canRate) {
+                        setPendingRating(stars);
+                        setIsReviewModalOpen(true);
+                      }
                     }}
                     disabled={!canRate}
                   />
+                  {series.review && (
+                    <span className="text-[9px] font-medium tracking-wider text-brand-gold-alt bg-brand-gold/10 px-1.5 py-0.5 rounded uppercase leading-none hover:bg-brand-gold/20 transition-colors">
+                      Resenha
+                    </span>
+                  )}
                   {canRate && ratingPending ? <Loader2 size={12} className="animate-spin text-brand-gold ml-1" /> : null}
                 </div>
                 {ratingError ? <p className="text-[10px] leading-relaxed text-red-300">{ratingError}</p> : null}
@@ -536,6 +558,25 @@ export default function SeriesCard({
           </Dialog.Content>
         </Dialog.Portal>
       ) : null}
-    </Dialog.Root>
+      </Dialog.Root>
+
+      {isReviewModalOpen && (
+        <ReviewModal
+          isOpen={isReviewModalOpen}
+          onOpenChange={setIsReviewModalOpen}
+          title={series.titulo}
+          coverUrl={series.capa_url}
+          initialRating={pendingRating}
+          initialReview={series.review || ''}
+          isReadOnly={!canRate}
+          onSave={async (stars, text) => {
+            await handleRate(stars, text);
+          }}
+          onSkip={async (stars) => {
+            await handleRate(stars, series.review);
+          }}
+        />
+      )}
+    </>
   );
 }

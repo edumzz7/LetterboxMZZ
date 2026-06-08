@@ -69,15 +69,31 @@ export function useSeries(userId: string | null) {
   });
 
   const rateSeriesMutation = useMutation({
-    mutationFn: ({ actorUserId, seriesId, stars }: { actorUserId: string; seriesId: string; stars: number }) =>
-      rateSeries(actorUserId, seriesId, stars),
+    mutationFn: ({
+      actorUserId,
+      seriesId,
+      stars,
+      review,
+    }: {
+      actorUserId: string;
+      seriesId: string;
+      stars: number;
+      review?: string | null;
+    }) => rateSeries(actorUserId, seriesId, stars, review),
     onSuccess: (_data, variables) => {
       queryClient.setQueriesData<SeriesEntry[]>(
         { queryKey: ['series'] },
         (current) =>
           Array.isArray(current)
             ? current.map((series) =>
-                series.id === variables.seriesId ? { ...series, avaliacao: variables.stars, rating: variables.stars } : series,
+                series.id === variables.seriesId
+                  ? {
+                      ...series,
+                      avaliacao: variables.stars,
+                      rating: variables.stars,
+                      review: variables.review !== undefined ? variables.review : series.review,
+                    }
+                  : series,
               )
             : current,
       );

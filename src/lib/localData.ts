@@ -14,6 +14,8 @@ import type {
   SeriesStatus,
   SessionUser,
   UserOscarPrediction,
+  AnticipatedMovie,
+  UserFavorite,
 } from '../types/app';
 
 const KEYS = {
@@ -25,6 +27,7 @@ const KEYS = {
   series: 'letterboxmzz_local_series_v1',
   activities: 'letterboxmzz_local_activities_v1',
   oscarPredictions: 'letterboxmzz_local_oscar_predictions_v1',
+  favorites: 'letterboxmzz_local_favorites_v1',
 };
 const LEGACY_IMPORT_PREFIX = 'letterboxmzz_legacy_imported_v1_';
 
@@ -198,6 +201,33 @@ function getCurrentSessionUserSync(): SessionUser | null {
 export async function bootstrapApp() {
   localStorage.removeItem(KEYS.oscarMovies);
   localStorage.removeItem(KEYS.oscarStatuses);
+
+  try {
+    const rawUsers = localStorage.getItem(KEYS.users);
+    if (rawUsers) {
+      const users = JSON.parse(rawUsers);
+      if (Array.isArray(users)) {
+        const filtered = users.filter(
+          (u) =>
+            u.username.toLowerCase() !== 'testoscar' &&
+            u.username.toLowerCase() !== 'testeoscar'
+        );
+        localStorage.setItem(KEYS.users, JSON.stringify(filtered));
+      }
+    }
+    const session = localStorage.getItem(KEYS.session);
+    if (session) {
+      const sess = JSON.parse(session);
+      if (
+        sess.username.toLowerCase() === 'testoscar' ||
+        sess.username.toLowerCase() === 'testeoscar'
+      ) {
+        localStorage.removeItem(KEYS.session);
+      }
+    }
+  } catch (e) {
+    console.error(e);
+  }
 }
 
 export async function importLegacyDataForUser(userId: string) {
@@ -833,3 +863,68 @@ export async function saveOscarPrediction(
   writeOscarPredictions(filtered);
   return newPrediction;
 }
+
+export async function getAnticipatedMovies(): Promise<AnticipatedMovie[]> {
+  const allMovies = readPersonalMovies();
+  const watchlistMovies = allMovies.filter((m) => m.status === 'watchlist');
+
+  const watcherSets = new Map<string, { title: string; coverUrl: string | null; watchers: Set<string> }>();
+
+  for (const m of watchlistMovies) {
+    const key = m.source_movie_id || m.titulo.toLowerCase().trim();
+    let group = watcherSets.get(key);
+    if (!group) {
+      group = {
+        title: m.titulo,
+        coverUrl: m.capa_url,
+        watchers: new Set<string>(),
+      };
+      watcherSets.set(key, group);
+    }
+    group.watchers.add(m.user_id);
+  }
+
+  const grouped = Array.from(watcherSets.values()).map((g) => ({
+    title: g.title,
+    coverUrl: g.coverUrl,
+    userCount: g.watchers.size,
+  }));
+
+  grouped.sort((a, b) => b.userCount - a.userCount);
+
+  return grouped.slice(0, 5);
+}
+
+function readFavorites() {
+  return readJson<UserFavorite[]>(KEYS.favorites, []);
+}
+
+function writeFavorites(items: UserFavorite[]) {
+  writeJson(KEYS.favorites, items);
+}
+
+export async function listFavorites(ownerUserId: string): Promise<UserFavorite[]> {
+  return readFavorites().filter((f) => f.owner_user_id === ownerUserId);
+}
+
+export async function addFavorite(ownerUserId: string, favoriteUserId: string): Promise<UserFavorite> {
+  const items = readFavorites();
+  const existing = items.find((f) => f.owner_user_id === ownerUserId && f.favorite_user_id === favoriteUserId);
+  if (existing) return existing;
+
+  const newFav: UserFavorite = {
+    id: randomId(),
+    owner_user_id: ownerUserId,
+    favorite_user_id: favoriteUserId,
+    created_at: nowIso(),
+  };
+  items.push(newFav);
+  writeFavorites(items);
+  return newFav;
+}
+
+export async function removeFavorite(documentId: string): Promise<void> {
+  const items = readFavorites();
+  writeFavorites(items.filter((f) => f.id !== documentId));
+}
+

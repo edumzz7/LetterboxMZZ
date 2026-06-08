@@ -116,3 +116,9 @@ export interface TrendingMovie {
   poster_path: string;
   created_at: string;
 }
+
+export interface AnticipatedMovie {
+  title: string;
+  coverUrl: string | null;
+  userCount: number;
+}

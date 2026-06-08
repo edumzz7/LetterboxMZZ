@@ -79,7 +79,7 @@ export default function ReviewModal({
     <Dialog.Root open={isOpen} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40" />
-        <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-full max-w-md translate-x-[-50%] translate-y-[-50%] border border-brand-gold/10 bg-[#050811] p-6 shadow-2xl rounded-2xl focus:outline-none">
+        <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-[92vw] max-w-md translate-x-[-50%] translate-y-[-50%] border border-brand-gold/10 bg-[#050811] p-6 shadow-2xl rounded-2xl focus:outline-none">
           <div className="flex gap-4">
             {/* Media Cover */}
             <div className="w-24 aspect-[2/3] rounded-lg overflow-hidden border border-[#222] shrink-0 bg-brand-card">

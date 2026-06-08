@@ -18,6 +18,7 @@ import type {
   UserFavorite,
   TrendingMovie,
   UserOscarPrediction,
+  AnticipatedMovie,
 } from '../types/app';
 
 type AppwriteUserDoc = Models.Document & {
@@ -535,46 +536,76 @@ async function getCurrentAccount() {
 // ==========================================
 
 export async function listFavorites(ownerUserId: string): Promise<UserFavorite[]> {
-  try {
-    const response = await databases.listDocuments(DATABASE_ID, COLLECTION_USER_FAVORITES, [
-      Query.equal('owner_user_id', ownerUserId),
-      Query.limit(100),
-    ]);
-    return response.documents.map((doc) => ({
-      id: doc.$id,
-      owner_user_id: doc.owner_user_id,
-      favorite_user_id: doc.favorite_user_id,
-      created_at: doc.$createdAt,
-    }));
-  } catch (error) {
-    console.error('Error fetching user favorites:', error);
-    return [];
-  }
+  return withFallback(
+    async () => {
+      const response = await databases.listDocuments(DATABASE_ID, COLLECTION_USER_FAVORITES, [
+        Query.equal('owner_user_id', ownerUserId),
+        Query.limit(100),
+      ]);
+      return response.documents.map((doc) => ({
+        id: doc.$id,
+        owner_user_id: doc.owner_user_id,
+        favorite_user_id: doc.favorite_user_id,
+        created_at: doc.$createdAt,
+      }));
+    },
+    () => localData.listFavorites(ownerUserId),
+  );
 }
 
 export async function addFavorite(ownerUserId: string, favoriteUserId: string): Promise<UserFavorite> {
-  const permissions = await ownerScopedPermissions(ownerUserId, false);
-  const response = await databases.createDocument(
-    DATABASE_ID,
-    COLLECTION_USER_FAVORITES,
-    ID.unique(),
-    {
-      owner_user_id: ownerUserId,
-      favorite_user_id: favoriteUserId,
-    },
-    permissions
-  );
+  return withFallback(
+    async () => {
+      // Evitar duplicações
+      try {
+        const existing = await databases.listDocuments(DATABASE_ID, COLLECTION_USER_FAVORITES, [
+          Query.equal('owner_user_id', ownerUserId),
+          Query.equal('favorite_user_id', favoriteUserId),
+          Query.limit(1),
+        ]);
+        if (existing.documents.length > 0) {
+          const doc = existing.documents[0];
+          return {
+            id: doc.$id,
+            owner_user_id: doc.owner_user_id as string,
+            favorite_user_id: doc.favorite_user_id as string,
+            created_at: doc.$createdAt,
+          };
+        }
+      } catch (err) {
+        console.warn('Erro ao verificar favoritos existentes:', err);
+      }
 
-  return {
-    id: response.$id,
-    owner_user_id: response.owner_user_id,
-    favorite_user_id: response.favorite_user_id,
-    created_at: response.$createdAt,
-  };
+      const permissions = await ownerScopedPermissions(ownerUserId, false);
+      const response = await databases.createDocument(
+        DATABASE_ID,
+        COLLECTION_USER_FAVORITES,
+        ID.unique(),
+        {
+          owner_user_id: ownerUserId,
+          favorite_user_id: favoriteUserId,
+        },
+        permissions
+      );
+
+      return {
+        id: response.$id,
+        owner_user_id: response.owner_user_id,
+        favorite_user_id: response.favorite_user_id,
+        created_at: response.$createdAt,
+      };
+    },
+    () => localData.addFavorite(ownerUserId, favoriteUserId),
+  );
 }
 
 export async function removeFavorite(documentId: string): Promise<void> {
-  await databases.deleteDocument(DATABASE_ID, COLLECTION_USER_FAVORITES, documentId);
+  return withFallback(
+    async () => {
+      await databases.deleteDocument(DATABASE_ID, COLLECTION_USER_FAVORITES, documentId);
+    },
+    () => localData.removeFavorite(documentId),
+  );
 }
 
 async function getSessionProfile() {
@@ -1132,10 +1163,23 @@ export async function updateUserProfile(
       await requireSessionUser(userId);
       const metadata = await ensureUserMetadata(userId);
       const updates: Partial<typeof data> = {};
-      if (data.display_name !== undefined) updates.display_name = data.display_name;
-      if (data.favorite_movie !== undefined) updates.favorite_movie = data.favorite_movie;
-      if (data.favorite_genre !== undefined) updates.favorite_genre = data.favorite_genre;
-      if (data.watch_preference !== undefined) updates.watch_preference = data.watch_preference;
+      
+      if (data.display_name !== undefined && data.display_name !== metadata.display_name) {
+        updates.display_name = data.display_name;
+      }
+      if (data.favorite_movie !== undefined && data.favorite_movie !== metadata.favorite_movie) {
+        updates.favorite_movie = data.favorite_movie;
+      }
+      if (data.favorite_genre !== undefined && data.favorite_genre !== metadata.favorite_genre) {
+        updates.favorite_genre = data.favorite_genre;
+      }
+      if (data.watch_preference !== undefined && data.watch_preference !== metadata.watch_preference) {
+        updates.watch_preference = data.watch_preference;
+      }
+
+      if (Object.keys(updates).length === 0) {
+        return;
+      }
 
       await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, updates);
     },
@@ -1927,6 +1971,43 @@ export async function saveOscarPrediction(
       return mapOscarPrediction(doc as unknown as AppwriteUserOscarPredictionDoc);
     },
     () => localData.saveOscarPrediction(userId, category, tmdbId, title, posterPath),
+  );
+}
+
+export async function getAnticipatedMovies(): Promise<AnticipatedMovie[]> {
+  return withFallback(
+    async () => {
+      const docs = await listDocuments<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
+        Query.equal('status', 'watchlist'),
+      ]);
+
+      const watcherSets = new Map<string, { title: string; coverUrl: string | null; watchers: Set<string> }>();
+
+      for (const doc of docs) {
+        const key = doc.source_movie_id || doc.titulo.toLowerCase().trim();
+        let group = watcherSets.get(key);
+        if (!group) {
+          group = {
+            title: doc.titulo,
+            coverUrl: doc.capa_url ?? null,
+            watchers: new Set<string>(),
+          };
+          watcherSets.set(key, group);
+        }
+        group.watchers.add(doc.user_id);
+      }
+
+      const grouped = Array.from(watcherSets.values()).map((g) => ({
+        title: g.title,
+        coverUrl: g.coverUrl,
+        userCount: g.watchers.size,
+      }));
+
+      grouped.sort((a, b) => b.userCount - a.userCount);
+
+      return grouped.slice(0, 5);
+    },
+    () => localData.getAnticipatedMovies(),
   );
 }
 

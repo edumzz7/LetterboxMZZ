@@ -449,7 +449,7 @@ export default function SeriesCard({
       {canEdit ? (
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40" />
-          <Dialog.Content className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-xs translate-x-[-50%] translate-y-[-50%] gap-4 border border-[#222] bg-brand-bg p-6 shadow-lg rounded-xl">
+          <Dialog.Content className="fixed left-[50%] top-[50%] z-50 grid w-[92vw] max-w-xs translate-x-[-50%] translate-y-[-50%] gap-4 border border-[#222] bg-brand-bg p-6 shadow-lg rounded-xl">
             <div className="flex flex-col space-y-1.5 text-center sm:text-left">
               <Dialog.Title className="text-lg font-light text-brand-gold tracking-wider">
                 EDITAR PROGRESSO

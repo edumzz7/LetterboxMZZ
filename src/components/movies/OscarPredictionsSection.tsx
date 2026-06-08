@@ -280,11 +280,7 @@ function CategoryCard({ config, prediction, canEdit, onSelect, isGlobalPending }
                 </div>
               )}
 
-              {query.trim() === '' && (
-                <div className="text-center py-6 text-brand-text-muted border border-dashed border-white/5 rounded-xl text-xs font-light">
-                  Comece a digitar para pesquisar e palpitar
-                </div>
-              )}
+
             </>
           ) : (
             /* Friend profile read-only placeholder */

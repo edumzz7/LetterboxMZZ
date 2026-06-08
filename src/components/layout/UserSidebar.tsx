@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { RankedUser } from '../../types/app';
 import AvatarDisplay from './AvatarDisplay';
 import { useFavorites } from '../../hooks/useFavorites';
-import { getTrendingMovies } from '../../lib/appData';
+import { getTrendingMovies, getAnticipatedMovies } from '../../lib/appData';
 import { generateImagePath } from '../../lib/imageUtils';
 
 interface UserSidebarProps {
@@ -30,11 +30,18 @@ export default function UserSidebar({
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const { isUserFavorited, toggleFavorite } = useFavorites(currentUserId);
   const [isTrendingOpen, setIsTrendingOpen] = useState(false);
+  const [isAnticipatedOpen, setIsAnticipatedOpen] = useState(false);
 
   const { data: trendingMovies, isLoading: trendingLoading, error: trendingError } = useQuery({
     queryKey: ['trending-movies'],
     queryFn: () => getTrendingMovies(),
     enabled: isTrendingOpen,
+  });
+
+  const { data: anticipatedMovies, isLoading: anticipatedLoading, error: anticipatedError } = useQuery({
+    queryKey: ['anticipated-movies'],
+    queryFn: () => getAnticipatedMovies(),
+    enabled: isAnticipatedOpen,
   });
 
   // Search logic
@@ -309,6 +316,80 @@ export default function UserSidebar({
               ) : (
                 <div className="text-[10px] text-brand-text-muted font-light text-center py-4">
                   Nenhum filme assistido nos últimos 30 dias.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Collapsible Mais Aguardados section */}
+        <div className="mt-4 pt-3 border-t border-[#171717]">
+          <button
+            type="button"
+            onClick={() => setIsAnticipatedOpen((prev) => !prev)}
+            className="w-full flex items-center justify-between text-left group px-2 py-1"
+          >
+            <div className="flex items-center gap-2">
+              <Star size={14} className="text-brand-gold animate-pulse" />
+              <span className="text-xs uppercase tracking-[0.2em] font-medium text-brand-text-muted group-hover:text-brand-text transition-colors">
+                Mais Aguardados
+              </span>
+            </div>
+            {isAnticipatedOpen ? (
+              <ChevronUp size={14} className="text-brand-text-muted group-hover:text-brand-text" />
+            ) : (
+              <ChevronDown size={14} className="text-brand-text-muted group-hover:text-brand-text" />
+            )}
+          </button>
+
+          {isAnticipatedOpen && (
+            <div className="mt-2.5 flex flex-col gap-2 transition-all">
+              {anticipatedLoading ? (
+                <div className="flex items-center justify-center py-4 text-xs text-brand-text-muted gap-2">
+                  <Loader2 size={12} className="animate-spin text-brand-gold" />
+                  Carregando...
+                </div>
+              ) : anticipatedError ? (
+                <div className="text-[10px] text-red-400 font-light text-center py-2">
+                  Erro ao carregar mais aguardados.
+                </div>
+              ) : anticipatedMovies && anticipatedMovies.length > 0 ? (
+                anticipatedMovies.map((movie, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-2.5 bg-black/15 border border-[#171717] hover:border-[#333] transition-all rounded-xl p-2"
+                  >
+                    {/* Tiny Cover */}
+                    <div className="w-8 aspect-[2/3] rounded-md overflow-hidden border border-[#222] shrink-0 bg-brand-card">
+                      {movie.coverUrl ? (
+                        <img
+                          src={generateImagePath(movie.title, movie.coverUrl)}
+                          alt={movie.title}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Film size={12} className="text-[#333]" />
+                        </div>
+                      )}
+                    </div>
+                    {/* Details */}
+                    <div className="flex flex-col min-w-0 flex-1">
+                      <span
+                        className="text-xs font-light text-brand-text truncate leading-tight"
+                        title={movie.title}
+                      >
+                        {movie.title}
+                      </span>
+                      <span className="text-[9px] uppercase tracking-wider text-brand-gold-alt mt-0.5 font-light">
+                        {movie.userCount} {movie.userCount === 1 ? 'interessado' : 'interessados'}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-[10px] text-brand-text-muted font-light text-center py-4">
+                  Nenhum filme nos mais aguardados.
                 </div>
               )}
             </div>

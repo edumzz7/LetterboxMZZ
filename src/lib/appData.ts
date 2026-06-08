@@ -640,7 +640,7 @@ async function repairPersonalMovieDoc(doc: AppwritePersonalMovieDoc) {
   if (hasUpdatePermission(doc, permissions)) return doc;
 
   try {
-    return (await createDocument(COLLECTION_PERSONAL_MOVIES, {
+    const newDoc = (await createDocument(COLLECTION_PERSONAL_MOVIES, {
       user_id: doc.user_id,
       titulo: doc.titulo,
       ano_lancamento: doc.ano_lancamento ?? null,
@@ -653,6 +653,10 @@ async function repairPersonalMovieDoc(doc: AppwritePersonalMovieDoc) {
       rating: doc.rating ?? null,
       streamingData: doc.streamingData ?? null,
     }, permissions)) as unknown as AppwritePersonalMovieDoc;
+    try {
+      await databases.deleteDocument(DATABASE_ID, COLLECTION_PERSONAL_MOVIES, doc.$id);
+    } catch {}
+    return newDoc;
   } catch {
     return doc;
   }
@@ -664,7 +668,7 @@ async function repairSeriesDoc(doc: AppwriteSeriesDoc) {
   if (hasUpdatePermission(doc, permissions)) return doc;
 
   try {
-    return (await createDocument(COLLECTION_PERSONAL_SERIES, {
+    const newDoc = (await createDocument(COLLECTION_PERSONAL_SERIES, {
       user_id: doc.user_id,
       titulo: doc.titulo,
       capaUrl: doc.capaUrl ?? null,
@@ -678,6 +682,10 @@ async function repairSeriesDoc(doc: AppwriteSeriesDoc) {
       rating: doc.rating ?? null,
       streamingData: doc.streamingData ?? null,
     }, permissions)) as unknown as AppwriteSeriesDoc;
+    try {
+      await databases.deleteDocument(DATABASE_ID, COLLECTION_PERSONAL_SERIES, doc.$id);
+    } catch {}
+    return newDoc;
   } catch {
     return doc;
   }
@@ -1634,8 +1642,8 @@ export async function rateMovie(
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : '';
-        if (message.includes('Unknown attribute')) {
-          throw new Error("A coluna 'rating' (Double) precisa ser criada em 'personal_movies' para salvar avaliações com decimais.");
+        if (message.includes('Unknown attribute') || message.includes('document data and permissions are missing')) {
+          throw new Error("A coluna 'rating' (Double) precisa ser criada no Appwrite em 'personal_movies' para salvar a nota.");
         }
         throw error;
       }
@@ -1673,8 +1681,8 @@ export async function rateSeries(
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : '';
-        if (message.includes('Unknown attribute')) {
-          throw new Error("A coluna 'rating' (Double) precisa ser criada em 'personal_series' para salvar avaliações com decimais.");
+        if (message.includes('Unknown attribute') || message.includes('document data and permissions are missing')) {
+          throw new Error("A coluna 'rating' (Double) precisa ser criada no Appwrite em 'personal_series' para salvar a nota.");
         }
         throw error;
       }

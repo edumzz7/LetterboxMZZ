@@ -101,3 +101,10 @@ export interface CineMatchSuggestion {
   reason: string;
 }
 
+export interface TrendingMovie {
+  title: string;
+  coverUrl: string | null;
+  userCount: number;
+  lastWatchedAt: string;
+}
+

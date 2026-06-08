@@ -16,6 +16,7 @@ import type {
   SeriesEntry,
   SeriesStatus,
   UserFavorite,
+  TrendingMovie,
 } from '../types/app';
 
 type AppwriteUserDoc = Models.Document & {
@@ -1784,6 +1785,57 @@ export async function getCineMatchSuggestion(
 export function getSeriesStatus(episodiosVistos: number, totalEpisodios: number): SeriesStatus {
   if (episodiosVistos <= 0) return 'watchlist';
   return totalEpisodios > 0 && episodiosVistos >= totalEpisodios ? 'watched' : 'watching';
+}
+
+export async function getTrendingMovies(): Promise<TrendingMovie[]> {
+  return withFallback(
+    async () => {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const docs = await listDocuments<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
+        Query.equal('status', 'watched'),
+        Query.greaterThanEqual('$createdAt', thirtyDaysAgo.toISOString()),
+      ]);
+
+      const watcherSets = new Map<string, { title: string; coverUrl: string | null; watchers: Set<string>; lastWatchedAt: string }>();
+
+      for (const doc of docs) {
+        const key = doc.source_movie_id || doc.titulo.toLowerCase().trim();
+        let group = watcherSets.get(key);
+        if (!group) {
+          group = {
+            title: doc.titulo,
+            coverUrl: doc.capa_url ?? null,
+            watchers: new Set<string>(),
+            lastWatchedAt: doc.$createdAt,
+          };
+          watcherSets.set(key, group);
+        }
+        group.watchers.add(doc.user_id);
+        if (doc.$createdAt > group.lastWatchedAt) {
+          group.lastWatchedAt = doc.$createdAt;
+        }
+      }
+
+      const grouped = Array.from(watcherSets.values()).map((g) => ({
+        title: g.title,
+        coverUrl: g.coverUrl,
+        userCount: g.watchers.size,
+        lastWatchedAt: g.lastWatchedAt,
+      }));
+
+      grouped.sort((a, b) => {
+        if (b.userCount !== a.userCount) {
+          return b.userCount - a.userCount;
+        }
+        return new Date(b.lastWatchedAt).getTime() - new Date(a.lastWatchedAt).getTime();
+      });
+
+      return grouped.slice(0, 5);
+    },
+    () => localData.getTrendingMovies(),
+  );
 }
 
 

@@ -746,3 +746,52 @@ export function getSeriesStatus(episodiosVistos: number, totalEpisodios: number)
   if (episodiosVistos <= 0) return 'watchlist';
   return totalEpisodios > 0 && episodiosVistos >= totalEpisodios ? 'watched' : 'watching';
 }
+
+export async function getTrendingMovies(): Promise<Array<{ title: string; coverUrl: string | null; userCount: number; lastWatchedAt: string }>> {
+  const movies = readPersonalMovies();
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const thirtyDaysAgoMs = thirtyDaysAgo.getTime();
+
+  const watchedInLast30 = movies.filter(
+    (m) =>
+      m.status === 'watched' &&
+      new Date(m.created_at).getTime() >= thirtyDaysAgoMs
+  );
+
+  const watcherSets = new Map<string, { title: string; coverUrl: string | null; watchers: Set<string>; lastWatchedAt: string }>();
+
+  for (const m of watchedInLast30) {
+    const key = m.source_movie_id || m.titulo.toLowerCase().trim();
+    let group = watcherSets.get(key);
+    if (!group) {
+      group = {
+        title: m.titulo,
+        coverUrl: m.capa_url,
+        watchers: new Set<string>(),
+        lastWatchedAt: m.created_at,
+      };
+      watcherSets.set(key, group);
+    }
+    group.watchers.add(m.user_id);
+    if (m.created_at > group.lastWatchedAt) {
+      group.lastWatchedAt = m.created_at;
+    }
+  }
+
+  const grouped = Array.from(watcherSets.values()).map((g) => ({
+    title: g.title,
+    coverUrl: g.coverUrl,
+    userCount: g.watchers.size,
+    lastWatchedAt: g.lastWatchedAt,
+  }));
+
+  grouped.sort((a, b) => {
+    if (b.userCount !== a.userCount) {
+      return b.userCount - a.userCount;
+    }
+    return new Date(b.lastWatchedAt).getTime() - new Date(a.lastWatchedAt).getTime();
+  });
+
+  return grouped.slice(0, 5);
+}

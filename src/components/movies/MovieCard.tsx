@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Film, Eye, EyeOff, Trash2, Loader2 } from 'lucide-react';
+import { Film, Eye, EyeOff, Trash2, Loader2, Pencil, MessageSquare } from 'lucide-react';
 import clsx from 'clsx';
 import { generateImagePath } from '../../lib/imageUtils';
 import {
@@ -356,17 +356,7 @@ export default function MovieCard({
 
         {showReadOnlyRating ? (
           <div className="flex flex-col gap-1">
-            <div
-              onClick={(e) => {
-                e.stopPropagation();
-                setPendingRating(localRating);
-                setIsReviewModalOpen(true);
-              }}
-              className={clsx(
-                "flex items-center gap-2 group/stars",
-                canRate ? "cursor-pointer" : "cursor-pointer hover:opacity-80"
-              )}
-            >
+            <div className="flex items-center gap-2 group/stars">
               <StarRatingInput
                 value={localRating}
                 onChange={(stars) => {
@@ -377,10 +367,34 @@ export default function MovieCard({
                 }}
                 disabled={!canRate}
               />
-              {isPersonalMovie(movie) && movie.review && (
-                <span className="text-[9px] font-medium tracking-wider text-brand-gold-alt bg-brand-gold/10 px-1.5 py-0.5 rounded uppercase leading-none hover:bg-brand-gold/20 transition-colors">
-                  Resenha
-                </span>
+              {canRate ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPendingRating(localRating);
+                    setIsReviewModalOpen(true);
+                  }}
+                  className="p-1 text-brand-text-muted hover:text-brand-gold transition-colors"
+                  title="Escrever Resenha"
+                >
+                  <Pencil size={12} className={clsx(isPersonalMovie(movie) && movie.review && "text-brand-gold-alt")} />
+                </button>
+              ) : (
+                isPersonalMovie(movie) && movie.review && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPendingRating(localRating);
+                      setIsReviewModalOpen(true);
+                    }}
+                    className="p-1 text-brand-gold-alt hover:text-brand-gold transition-colors animate-pulse"
+                    title="Ver Resenha"
+                  >
+                    <MessageSquare size={12} />
+                  </button>
+                )
               )}
               {canRate && ratingPending ? <Loader2 size={12} className="animate-spin text-brand-gold ml-1" /> : null}
             </div>

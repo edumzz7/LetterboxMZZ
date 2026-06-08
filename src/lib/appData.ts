@@ -300,6 +300,10 @@ async function updateDocumentWithPermissions<T extends Record<string, unknown>>(
 ) {
   const payload: Record<string, unknown> = { ...data };
 
+  if (Object.keys(payload).length === 0) {
+    return;
+  }
+
   for (let attempt = 0; attempt < 6; attempt += 1) {
     try {
       return await databases.updateDocument(DATABASE_ID, collectionId, documentId, payload, permissions);
@@ -308,6 +312,9 @@ async function updateDocumentWithPermissions<T extends Record<string, unknown>>(
       const unknownAttribute = message.match(/Unknown attribute: "([^"]+)"/);
       if (unknownAttribute) {
         delete payload[unknownAttribute[1]];
+        if (Object.keys(payload).length === 0) {
+          return;
+        }
         continue;
       }
       throw wrapPermissionError(error, collectionId);

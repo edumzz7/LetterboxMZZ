@@ -663,7 +663,7 @@ export async function rateMovie(
   if (current.user_id !== actorUserId) {
     throw new Error('Avaliacao permitida apenas para o dono do filme.');
   }
-  writePersonalMovies(items.map((item) => (item.id === movieId ? { ...item, avaliacao: stars } : item)));
+  writePersonalMovies(items.map((item) => (item.id === movieId ? { ...item, rating: stars } : item)));
 }
 
 export async function rateSeries(
@@ -678,7 +678,7 @@ export async function rateSeries(
   if (current.user_id !== actorUserId) {
     throw new Error('Avaliacao permitida apenas para o dono da serie.');
   }
-  writeSeries(items.map((item) => (item.id === seriesId ? { ...item, avaliacao: stars } : item)));
+  writeSeries(items.map((item) => (item.id === seriesId ? { ...item, rating: stars } : item)));
 }
 
 export async function deleteSeries(seriesId: string) {

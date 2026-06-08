@@ -77,7 +77,7 @@ export function useSeries(userId: string | null) {
         (current) =>
           Array.isArray(current)
             ? current.map((series) =>
-                series.id === variables.seriesId ? { ...series, avaliacao: variables.stars } : series,
+                series.id === variables.seriesId ? { ...series, avaliacao: variables.stars, rating: variables.stars } : series,
               )
             : current,
       );

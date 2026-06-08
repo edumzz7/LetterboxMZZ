@@ -1627,15 +1627,15 @@ export async function rateMovie(
       const writableDoc = await repairPersonalMovieDoc(current);
       try {
         const updated = (await updateDocument(COLLECTION_PERSONAL_MOVIES, writableDoc.$id, {
-          avaliacao: stars,
+          rating: stars,
         })) as unknown as AppwritePersonalMovieDoc;
-        if ((updated.avaliacao ?? null) !== stars) {
-          throw new Error("A coluna 'avaliacao' precisa existir em 'personal_movies' para salvar as estrelas.");
+        if ((updated.rating ?? updated.avaliacao ?? null) !== stars) {
+          throw new Error("A coluna 'rating' (Double) precisa ser criada em 'personal_movies' para salvar avaliações com decimais.");
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : '';
         if (message.includes('Unknown attribute')) {
-          throw new Error("A coluna 'avaliacao' precisa existir em 'personal_movies' para salvar as estrelas.");
+          throw new Error("A coluna 'rating' (Double) precisa ser criada em 'personal_movies' para salvar avaliações com decimais.");
         }
         throw error;
       }
@@ -1666,15 +1666,15 @@ export async function rateSeries(
       const writableDoc = await repairSeriesDoc(current);
       try {
         const updated = (await updateDocument(COLLECTION_PERSONAL_SERIES, writableDoc.$id, {
-          avaliacao: stars,
+          rating: stars,
         })) as unknown as AppwriteSeriesDoc;
-        if ((updated.avaliacao ?? null) !== stars) {
-          throw new Error("A coluna 'avaliacao' precisa existir em 'series_pessoais' para salvar as estrelas.");
+        if ((updated.rating ?? updated.avaliacao ?? null) !== stars) {
+          throw new Error("A coluna 'rating' (Double) precisa ser criada em 'personal_series' para salvar avaliações com decimais.");
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : '';
         if (message.includes('Unknown attribute')) {
-          throw new Error("A coluna 'avaliacao' precisa existir em 'series_pessoais' para salvar as estrelas.");
+          throw new Error("A coluna 'rating' (Double) precisa ser criada em 'personal_series' para salvar avaliações com decimais.");
         }
         throw error;
       }

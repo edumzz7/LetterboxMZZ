@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Film, Eye, EyeOff, Trash2, Loader2, Star } from 'lucide-react';
+import { Film, Eye, EyeOff, Trash2, Loader2 } from 'lucide-react';
 import clsx from 'clsx';
 import { generateImagePath } from '../../lib/imageUtils';
 import {
@@ -11,6 +11,7 @@ import {
   updateOscarMovieStreaming,
   updatePersonalMovieStreaming,
 } from '../../lib/appData';
+import StarRatingInput from '../ui/StarRatingInput';
 import type { MovieStatus, OscarMovieWithStatus, PersonalMovie } from '../../types/app';
 
 type CardMovie = OscarMovieWithStatus | PersonalMovie;
@@ -90,13 +91,13 @@ export default function MovieCard({
   const [reactionsOpen, setReactionsOpen] = useState(false);
   const [ratingPending, setRatingPending] = useState<number | null>(null);
   const [ratingError, setRatingError] = useState<string | null>(null);
-  const [localRating, setLocalRating] = useState<number>(isPersonalMovie(movie) ? (movie.avaliacao ?? 0) : 0);
+  const [localRating, setLocalRating] = useState<number>(isPersonalMovie(movie) ? (movie.rating ?? movie.avaliacao ?? 0) : 0);
   const showReadOnlyRating = isPersonalMovie(movie) && isWatched && (canRate || localRating > 0);
   const providersRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (isPersonalMovie(movie)) {
-      setLocalRating(movie.avaliacao ?? 0);
+      setLocalRating(movie.rating ?? movie.avaliacao ?? 0);
     }
   }, [movie]);
 
@@ -352,31 +353,14 @@ export default function MovieCard({
 
         {showReadOnlyRating ? (
           <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-1 text-lg">
-            {[1, 2, 3, 4, 5].map((star) => (
-              <button
-                key={star}
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (canRate) void handleRate(star);
-                }}
-                disabled={!canRate}
-                className={clsx(
-                  'leading-none transition',
-                  localRating >= star ? 'text-yellow-400' : 'text-[#444]',
-                  canRate && 'hover:text-yellow-300',
-                  !canRate && 'cursor-default',
-                )}
-                title={`${star} estrela(s)`}
-              >
-                <Star
-                  size={16}
-                  fill={localRating >= star ? 'currentColor' : 'none'}
-                  strokeWidth={2}
-                />
-              </button>
-            ))}
+          <div className="flex items-center gap-1">
+            <StarRatingInput
+              value={localRating}
+              onChange={(stars) => {
+                if (canRate) void handleRate(stars);
+              }}
+              disabled={!canRate}
+            />
             {canRate && ratingPending ? <Loader2 size={12} className="animate-spin text-brand-gold ml-1" /> : null}
           </div>
           {ratingError ? <p className="text-[10px] leading-relaxed text-red-300">{ratingError}</p> : null}

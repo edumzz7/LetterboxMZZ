@@ -23,7 +23,7 @@ export function useSocialActions() {
         (current) =>
           Array.isArray(current)
             ? current.map((movie) =>
-                movie.id === variables.movieId ? { ...movie, avaliacao: variables.stars } : movie,
+                movie.id === variables.movieId ? { ...movie, avaliacao: variables.stars, rating: variables.stars } : movie,
               )
             : current,
       );

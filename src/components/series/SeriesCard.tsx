@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Eye, EyeOff, Loader2, Star, Trash2, Tv, X } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Trash2, Tv, X } from 'lucide-react';
 import clsx from 'clsx';
 import { generateImagePath } from '../../lib/imageUtils';
 import type { Series } from '../../hooks/useSeries';
@@ -13,6 +13,7 @@ import {
   type TMDBTvSeasonMeta,
 } from '../../lib/tmdb';
 import { updateSeriesStreaming } from '../../lib/appData';
+import StarRatingInput from '../ui/StarRatingInput';
 
 interface SeriesCardProps {
   series: Series;
@@ -54,7 +55,7 @@ export default function SeriesCard({
   const [isSaving, setIsSaving] = useState(false);
   const [ratingPending, setRatingPending] = useState<number | null>(null);
   const [ratingError, setRatingError] = useState<string | null>(null);
-  const [localRating, setLocalRating] = useState(series.avaliacao ?? 0);
+  const [localRating, setLocalRating] = useState(series.rating ?? series.avaliacao ?? 0);
   const [reactionsOpen, setReactionsOpen] = useState(false);
   const providersRef = useRef<HTMLDivElement | null>(null);
 
@@ -174,8 +175,8 @@ export default function SeriesCard({
   };
 
   useEffect(() => {
-    setLocalRating(series.avaliacao ?? 0);
-  }, [series.avaliacao]);
+    setLocalRating(series.rating ?? series.avaliacao ?? 0);
+  }, [series.rating, series.avaliacao]);
 
   useEffect(() => {
     if (!series.streaming_data) {
@@ -348,31 +349,14 @@ export default function SeriesCard({
 
             {showRating ? (
               <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-1 text-lg">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (canRate) void handleRate(star);
-                      }}
-                      disabled={!canRate}
-                      className={clsx(
-                        'leading-none transition',
-                        localRating >= star ? 'text-yellow-400' : 'text-[#444]',
-                        canRate && 'hover:text-yellow-300',
-                        !canRate && 'cursor-default',
-                      )}
-                      title={`${star} estrela(s)`}
-                    >
-                      <Star
-                        size={16}
-                        fill={localRating >= star ? 'currentColor' : 'none'}
-                        strokeWidth={2}
-                      />
-                    </button>
-                  ))}
+                <div className="flex items-center gap-1">
+                  <StarRatingInput
+                    value={localRating}
+                    onChange={(stars) => {
+                      if (canRate) void handleRate(stars);
+                    }}
+                    disabled={!canRate}
+                  />
                   {canRate && ratingPending ? <Loader2 size={12} className="animate-spin text-brand-gold ml-1" /> : null}
                 </div>
                 {ratingError ? <p className="text-[10px] leading-relaxed text-red-300">{ratingError}</p> : null}

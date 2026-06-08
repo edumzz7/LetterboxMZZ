@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import clsx from 'clsx';
-import { X } from 'lucide-react';
+import { X, Loader2 } from 'lucide-react';
+import { searchMovies, type TMDBMovie } from '../../lib/tmdb';
 import type { RankedUser } from '../../types/app';
 
 interface EditProfileModalProps {
@@ -33,6 +34,22 @@ export default function EditProfileModal({
   const [error, setError] = useState<string | null>(null);
   const [internalSaving, setInternalSaving] = useState(false);
 
+  const [searchResults, setSearchResults] = useState<TMDBMovie[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const searchTimeout = useRef<number | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const handleOpenChange = (nextOpen: boolean) => {
     onOpenChange(nextOpen);
     if (nextOpen) {
@@ -41,7 +58,38 @@ export default function EditProfileModal({
       setFavoriteGenre(user.favorite_genre || '');
       setWatchPref(user.watch_preference || '');
       setError(null);
+      setSearchResults([]);
+      setShowDropdown(false);
+      setIsSearching(false);
     }
+  };
+
+  const handleTitleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value;
+    setFavoriteMovie(value);
+
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+
+    if (!value.trim()) {
+      setSearchResults([]);
+      setShowDropdown(false);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    setShowDropdown(true);
+
+    searchTimeout.current = window.setTimeout(async () => {
+      const results = await searchMovies(value);
+      setSearchResults(results);
+      setIsSearching(false);
+    }, 500);
+  };
+
+  const handleSelectMovie = (movie: TMDBMovie) => {
+    setFavoriteMovie(movie.title);
+    setShowDropdown(false);
   };
 
   const submit = async (event: React.FormEvent) => {
@@ -89,17 +137,72 @@ export default function EditProfileModal({
               />
             </div>
 
-            <div>
+            <div className="flex flex-col gap-2 relative" ref={dropdownRef}>
               <label className="block text-xs uppercase tracking-[0.14em] text-brand-text-muted mb-1">
                 Filme Favorito da Vida
               </label>
-              <input
-                type="text"
-                value={favoriteMovie}
-                onChange={(e) => setFavoriteMovie(e.target.value)}
-                placeholder="Ex: O Poderoso Chefão"
-                className="w-full bg-[#151515] border border-[#222] rounded-lg px-3 py-2 text-sm text-brand-text placeholder-brand-text-muted/50 focus:border-brand-gold/40 focus:outline-none transition"
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  value={favoriteMovie}
+                  onChange={handleTitleChange}
+                  onFocus={() => {
+                    if (favoriteMovie.trim() && searchResults.length > 0) setShowDropdown(true);
+                  }}
+                  placeholder="Ex: O Poderoso Chefão"
+                  autoComplete="off"
+                  className="w-full bg-[#151515] border border-[#222] rounded-lg px-3 py-2 text-sm text-brand-text placeholder-brand-text-muted/50 focus:border-brand-gold/40 focus:outline-none transition pr-10"
+                />
+                {isSearching ? (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-gold">
+                    <Loader2 size={16} className="animate-spin" />
+                  </div>
+                ) : null}
+              </div>
+
+              {showDropdown ? (
+                <div className="absolute top-[100%] left-0 w-full mt-1 bg-[#151515] border border-[#222] rounded-md shadow-[0_10px_30px_rgba(0,0,0,0.8)] z-50 max-h-60 overflow-y-auto">
+                  {isSearching && searchResults.length === 0 ? (
+                    <div className="p-4 text-center text-sm text-brand-text-muted font-light">
+                      Buscando no TMDB...
+                    </div>
+                  ) : searchResults.length > 0 ? (
+                    <ul className="flex flex-col">
+                      {searchResults.map((movie) => (
+                        <li
+                          key={movie.id}
+                          onClick={() => handleSelectMovie(movie)}
+                          className="flex items-center gap-3 p-2 hover:bg-[#1a2235] cursor-pointer transition-colors border-b border-[#222] last:border-none group"
+                        >
+                          {movie.poster_path ? (
+                            <img
+                              src={`https://image.tmdb.org/t/p/w92${movie.poster_path}`}
+                              alt={movie.title}
+                              className="w-8 h-12 object-cover rounded shadow-sm"
+                            />
+                          ) : (
+                            <div className="w-8 h-12 bg-black flex items-center justify-center rounded border border-[#222]">
+                              <span className="text-[10px] text-brand-text-muted">N/A</span>
+                            </div>
+                          )}
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-brand-text line-clamp-1">
+                              {movie.title}
+                            </span>
+                            <span className="text-xs text-brand-gold-alt">
+                              {movie.release_date ? movie.release_date.split('-')[0] : 'N/D'}
+                            </span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : favoriteMovie.trim() !== '' && !isSearching ? (
+                    <div className="p-4 text-center text-sm text-brand-text-muted font-light leading-relaxed">
+                      Nenhum filme encontrado.
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
 
             <div>

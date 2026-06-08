@@ -59,28 +59,28 @@ export default function UserDropdownMenu({
             </div>
 
             <DropdownMenu.Item
-              onSelect={() => setActiveModal('editProfile')}
+              onSelect={() => setTimeout(() => setActiveModal('editProfile'), 50)}
               className="flex items-center gap-2 px-2 py-2 outline-none cursor-pointer rounded hover:bg-brand-gold/10 hover:text-brand-gold transition"
             >
               <UserRound size={16} /> Editar Perfil
             </DropdownMenu.Item>
 
             <DropdownMenu.Item
-              onSelect={() => setActiveModal('avatar')}
+              onSelect={() => setTimeout(() => setActiveModal('avatar'), 50)}
               className="flex items-center gap-2 px-2 py-2 outline-none cursor-pointer rounded hover:bg-brand-gold/10 hover:text-brand-gold transition"
             >
               <ImageIcon size={16} /> Alterar Avatar
             </DropdownMenu.Item>
 
             <DropdownMenu.Item
-              onSelect={() => setActiveModal('suggest')}
+              onSelect={() => setTimeout(() => setActiveModal('suggest'), 50)}
               className="flex items-center gap-2 px-2 py-2 outline-none cursor-pointer rounded hover:bg-brand-gold/10 hover:text-brand-gold transition"
             >
               <Plus size={16} /> Indicar Filme
             </DropdownMenu.Item>
 
             <DropdownMenu.Item
-              onSelect={() => setActiveModal('cineMatch')}
+              onSelect={() => setTimeout(() => setActiveModal('cineMatch'), 50)}
               className="flex items-center gap-2 px-2 py-2 outline-none cursor-pointer rounded hover:bg-brand-gold/10 hover:text-brand-gold transition"
             >
               <Shuffle size={16} /> Cine-Match

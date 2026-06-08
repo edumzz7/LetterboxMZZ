@@ -961,12 +961,25 @@ export async function listRankedUsers() {
       const ranked = users
         .map((user) => {
           const userMeta = metadataByUser.get(user.id);
+          let dbAvatarId = userMeta?.avatar_id ?? fallbackAvatar(user.id);
+          let dbDisplayName: string | undefined = undefined;
+
+          if (dbAvatarId.startsWith('{')) {
+            try {
+              const parsed = JSON.parse(dbAvatarId);
+              dbAvatarId = parsed.avatarId || fallbackAvatar(user.id);
+              dbDisplayName = parsed.displayName || undefined;
+            } catch (e) {
+              console.warn('Failed to parse avatar_id JSON:', e);
+            }
+          }
+
           return {
             ...user,
             user_id: user.id,
             mcoins: userMeta?.mcoins ?? 0,
-            avatar_id: userMeta?.avatar_id ?? fallbackAvatar(user.id),
-            display_name: userMeta?.display_name ?? undefined,
+            avatar_id: dbAvatarId,
+            display_name: dbDisplayName || undefined,
             favorite_movie: userMeta?.favorite_movie ?? undefined,
             favorite_genre: userMeta?.favorite_genre ?? undefined,
             watch_preference: userMeta?.watch_preference ?? undefined,
@@ -1148,8 +1161,27 @@ export async function updateUserAvatar(userId: string, avatarId: string) {
     async () => {
       await requireSessionUser(userId);
       const metadata = await ensureUserMetadata(userId);
+      
+      let currentDisplayName: string | undefined = undefined;
+      const currentDbAvatar = metadata.avatar_id;
+      if (currentDbAvatar && currentDbAvatar.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(currentDbAvatar);
+          currentDisplayName = parsed.displayName;
+        } catch {}
+      }
+
+      const newDbAvatarValue = JSON.stringify({
+        avatarId,
+        displayName: currentDisplayName,
+      });
+
+      if (metadata.avatar_id === newDbAvatarValue) {
+        return;
+      }
+
       await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, {
-        avatar_id: avatarId,
+        avatar_id: newDbAvatarValue,
       });
     },
     () => localData.updateUserAvatar(userId, avatarId),
@@ -1169,11 +1201,36 @@ export async function updateUserProfile(
     async () => {
       await requireSessionUser(userId);
       const metadata = await ensureUserMetadata(userId);
-      const updates: Partial<typeof data> = {};
-      
-      if (data.display_name !== undefined && data.display_name !== metadata.display_name) {
-        updates.display_name = data.display_name;
+      const updates: Record<string, unknown> = {};
+
+      let currentAvatarId = metadata.avatar_id || fallbackAvatar(userId);
+      let currentDisplayName: string | undefined = undefined;
+
+      if (currentAvatarId.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(currentAvatarId);
+          currentAvatarId = parsed.avatarId || fallbackAvatar(userId);
+          currentDisplayName = parsed.displayName;
+        } catch {}
       }
+
+      if (data.display_name !== undefined) {
+        // Save to Auth Account name as well
+        try {
+          await account.updateName(data.display_name);
+        } catch (err) {
+          console.warn('Erro ao atualizar nome na conta Appwrite:', err);
+        }
+        
+        const newDbAvatarValue = JSON.stringify({
+          avatarId: currentAvatarId,
+          displayName: data.display_name,
+        });
+        if (metadata.avatar_id !== newDbAvatarValue) {
+          updates.avatar_id = newDbAvatarValue;
+        }
+      }
+
       if (data.favorite_movie !== undefined && data.favorite_movie !== metadata.favorite_movie) {
         updates.favorite_movie = data.favorite_movie;
       }

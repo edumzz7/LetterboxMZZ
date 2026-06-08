@@ -5,7 +5,7 @@ import AppHeader from './components/layout/Header';
 import DashboardTab from './components/layout/DashboardTab';
 import UserSidebar from './components/layout/UserSidebar';
 import AuthScreen from './components/auth/AuthScreen';
-import MoviesSection from './components/movies/MoviesSection';
+import OscarPredictionsSection from './components/movies/OscarPredictionsSection';
 import PersonalMoviesSection from './components/movies/PersonalMoviesSection';
 import SeriesSection from './components/series/SeriesSection';
 import UserDropdownMenu from './components/layout/UserDropdownMenu';
@@ -28,7 +28,6 @@ import {
 import type { SessionUser } from './types/app';
 
 const SESSION_KEY = 'letterboxmzz_session_v1';
-const OSCAR_ADMIN_USERNAME = (import.meta.env.VITE_OSCAR_ADMIN_USERNAME ?? '').trim().toLowerCase();
 
 function readStoredSession(): SessionUser | null {
   if (typeof window === 'undefined') return null;
@@ -135,11 +134,7 @@ function App() {
   const currentUser = users.find((user) => user.id === session?.id) || session || null;
   const currentRankedUser = users.find((user) => user.id === session?.id);
   const isOwnDashboard = Boolean(session?.id && viewedUser?.id === session.id);
-  const canAccessOscars = isOwnDashboard;
-  const canAddOscarMovie =
-    Boolean(OSCAR_ADMIN_USERNAME) &&
-    session?.username.toLowerCase() === OSCAR_ADMIN_USERNAME &&
-    isOwnDashboard;
+  const canAccessOscars = Boolean(viewedUser);
 
   useEffect(() => {
     if (!canAccessOscars && activeTab === 'oscars') {
@@ -357,10 +352,9 @@ function App() {
                   <DashboardTab user={viewedUser!} />
                 ) : activeTab === 'oscars' ? (
                   <div className="animate-in fade-in duration-500">
-                    <MoviesSection
-                      userId={session.id}
+                    <OscarPredictionsSection
+                      userId={viewedUser.id}
                       canEdit={isOwnDashboard}
-                      canAddOscarMovie={canAddOscarMovie}
                     />
                   </div>
                 ) : (

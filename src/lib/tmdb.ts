@@ -7,6 +7,7 @@ export interface TMDBMovie {
     release_date: string;
     poster_path: string | null;
     vote_average?: number;
+    original_language?: string;
 }
 
 export interface TMDBSeries {
@@ -231,6 +232,35 @@ export async function searchMulti(query: string): Promise<TMDBMultiResult[]> {
         );
     } catch (error) {
         console.error('Error searching TMDB multi:', error);
+        return [];
+    }
+}
+
+export interface TMDBPerson {
+    id: number;
+    name: string;
+    profile_path: string | null;
+}
+
+export async function searchPeople(query: string): Promise<TMDBPerson[]> {
+    if (!query || !query.trim()) return [];
+
+    if (!TMDB_API_KEY) {
+        console.error("TMDB API Key missing. Check .env.local");
+        return [];
+    }
+
+    try {
+        const response = await fetch(
+            `${TMDB_BASE_URL}/search/person?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}&language=pt-BR&page=1`
+        );
+
+        if (!response.ok) throw new Error('TMDB Person Fetch Error');
+
+        const data = await response.json();
+        return data.results || [];
+    } catch (error) {
+        console.error("Error searching TMDB people:", error);
         return [];
     }
 }

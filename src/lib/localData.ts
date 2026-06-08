@@ -13,6 +13,7 @@ import type {
   SeriesEntry,
   SeriesStatus,
   SessionUser,
+  UserOscarPrediction,
 } from '../types/app';
 
 const KEYS = {
@@ -23,6 +24,7 @@ const KEYS = {
   personalMovies: 'letterboxmzz_local_personal_movies_v1',
   series: 'letterboxmzz_local_series_v1',
   activities: 'letterboxmzz_local_activities_v1',
+  oscarPredictions: 'letterboxmzz_local_oscar_predictions_v1',
 };
 const LEGACY_IMPORT_PREFIX = 'letterboxmzz_legacy_imported_v1_';
 
@@ -194,7 +196,8 @@ function getCurrentSessionUserSync(): SessionUser | null {
 }
 
 export async function bootstrapApp() {
-  ensureOscarCatalog();
+  localStorage.removeItem(KEYS.oscarMovies);
+  localStorage.removeItem(KEYS.oscarStatuses);
 }
 
 export async function importLegacyDataForUser(userId: string) {
@@ -794,4 +797,39 @@ export async function getTrendingMovies(): Promise<Array<{ title: string; coverU
   });
 
   return grouped.slice(0, 5);
+}
+
+function readOscarPredictions(): UserOscarPrediction[] {
+  return readJson<UserOscarPrediction[]>(KEYS.oscarPredictions, []);
+}
+
+function writeOscarPredictions(items: UserOscarPrediction[]) {
+  writeJson(KEYS.oscarPredictions, items);
+}
+
+export async function getOscarPredictionsForUser(userId: string): Promise<UserOscarPrediction[]> {
+  return readOscarPredictions().filter((item) => item.user_id === userId);
+}
+
+export async function saveOscarPrediction(
+  userId: string,
+  category: string,
+  tmdbId: string,
+  title: string,
+  posterPath: string
+): Promise<UserOscarPrediction> {
+  const items = readOscarPredictions();
+  const filtered = items.filter((item) => !(item.user_id === userId && item.category === category));
+  const newPrediction: UserOscarPrediction = {
+    id: randomId(),
+    user_id: userId,
+    category,
+    tmdb_id: tmdbId,
+    title,
+    poster_path: posterPath,
+    created_at: nowIso(),
+  };
+  filtered.push(newPrediction);
+  writeOscarPredictions(filtered);
+  return newPrediction;
 }

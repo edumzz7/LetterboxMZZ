@@ -17,6 +17,7 @@ import type {
   SeriesStatus,
   UserFavorite,
   TrendingMovie,
+  UserOscarPrediction,
 } from '../types/app';
 
 type AppwriteUserDoc = Models.Document & {
@@ -94,6 +95,14 @@ type AppwriteActivityDoc = Models.Document & {
   mcoins_delta: number;
 };
 
+type AppwriteUserOscarPredictionDoc = Models.Document & {
+  user_id: string;
+  category: string;
+  tmdb_id: string;
+  title: string;
+  poster_path: string;
+};
+
 const BOOTSTRAP_KEY = 'letterboxmzz_bootstrap_v1';
 const QUERY_LIMIT = 5000;
 
@@ -111,6 +120,7 @@ const COLLECTION_USUARIOS_METADATA =
   import.meta.env.VITE_APPWRITE_COLLECTION_USUARIOS_METADATA ?? 'usuarios_metadata';
 const COLLECTION_ATIVIDADES = import.meta.env.VITE_APPWRITE_COLLECTION_ATIVIDADES ?? 'atividades';
 const COLLECTION_USER_FAVORITES = import.meta.env.VITE_APPWRITE_COLLECTION_USER_FAVORITES ?? 'user_favorites';
+const COLLECTION_USER_OSCAR_PREDICTIONS = import.meta.env.VITE_APPWRITE_COLLECTION_USER_OSCAR_PREDICTIONS ?? 'user_oscar_predictions';
 const MANAGED_PASSWORD_PLACEHOLDER = 'managed-by-appwrite';
 const MANAGED_PASSWORD_PREFIX = 'letterboxzzo::managed::';
 const PUBLIC_APP_URL = (import.meta.env.VITE_PUBLIC_APP_URL ?? 'https://letterbox-mzz.vercel.app').replace(
@@ -393,6 +403,18 @@ function mapActivity(doc: AppwriteActivityDoc): ActivityEntry {
     user_id: doc.user_id,
     message: doc.message,
     mcoins_delta: doc.mcoins_delta,
+    created_at: doc.$createdAt,
+  };
+}
+
+function mapOscarPrediction(doc: AppwriteUserOscarPredictionDoc): UserOscarPrediction {
+  return {
+    id: doc.$id,
+    user_id: doc.user_id,
+    category: doc.category,
+    tmdb_id: doc.tmdb_id,
+    title: doc.title,
+    poster_path: doc.poster_path,
     created_at: doc.$createdAt,
   };
 }
@@ -1835,6 +1857,74 @@ export async function getTrendingMovies(): Promise<TrendingMovie[]> {
       return grouped.slice(0, 5);
     },
     () => localData.getTrendingMovies(),
+  );
+}
+
+export async function getOscarPredictionsForUser(userId: string): Promise<UserOscarPrediction[]> {
+  return withFallback(
+    async () => {
+      const docs = await listDocuments<AppwriteUserOscarPredictionDoc>(COLLECTION_USER_OSCAR_PREDICTIONS, [
+        Query.equal('user_id', [userId]),
+      ]);
+      return docs.map(mapOscarPrediction);
+    },
+    () => localData.getOscarPredictionsForUser(userId),
+  );
+}
+
+export async function saveOscarPrediction(
+  userId: string,
+  category: string,
+  tmdbId: string,
+  title: string,
+  posterPath: string
+): Promise<UserOscarPrediction> {
+  return withFallback(
+    async () => {
+      await requireSessionUser(userId);
+
+      // 1. Delete previous prediction if it exists
+      const existingDocs = await listDocuments<AppwriteUserOscarPredictionDoc>(COLLECTION_USER_OSCAR_PREDICTIONS, [
+        Query.equal('user_id', [userId]),
+        Query.equal('category', [category]),
+      ]);
+
+      for (const doc of existingDocs) {
+        try {
+          await deleteDocument(COLLECTION_USER_OSCAR_PREDICTIONS, doc.$id);
+        } catch (err) {
+          console.error(`Failed to delete old prediction ${doc.$id}:`, err);
+        }
+      }
+
+      // 2. Resolve account scoped permissions for Row Security
+      let permissions: string[] = [];
+      try {
+        permissions = await ownerScopedPermissions(userId, false);
+      } catch {
+        permissions = [
+          Permission.read(Role.user(userId)),
+          Permission.update(Role.user(userId)),
+          Permission.delete(Role.user(userId)),
+        ];
+      }
+
+      // 3. Save new prediction
+      const doc = await createDocument(
+        COLLECTION_USER_OSCAR_PREDICTIONS,
+        {
+          user_id: userId,
+          category,
+          tmdb_id: tmdbId,
+          title,
+          poster_path: posterPath,
+        },
+        permissions
+      );
+
+      return mapOscarPrediction(doc as unknown as AppwriteUserOscarPredictionDoc);
+    },
+    () => localData.saveOscarPrediction(userId, category, tmdbId, title, posterPath),
   );
 }
 

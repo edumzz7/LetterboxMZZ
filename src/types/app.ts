@@ -107,4 +107,12 @@ export interface TrendingMovie {
   userCount: number;
   lastWatchedAt: string;
 }
-
+export interface UserOscarPrediction {
+  id: string;
+  user_id: string;
+  category: string;
+  tmdb_id: string;
+  title: string;
+  poster_path: string;
+  created_at: string;
+}

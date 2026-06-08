@@ -71,7 +71,7 @@ const Header = ({
                   : 'hover:text-brand-text',
               )}
             >
-              OSCARS 2026
+              OSCAR 2027
             </button>
           </div>
         )}

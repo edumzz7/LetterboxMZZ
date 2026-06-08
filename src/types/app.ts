@@ -83,6 +83,13 @@ export interface ActivityEntry {
   created_at: string;
 }
 
+export interface UserFavorite {
+  id: string;
+  owner_user_id: string;
+  favorite_user_id: string;
+  created_at: string;
+}
+
 export type CineMatchMode = 'geral' | 'oscar';
 
 export interface CineMatchSuggestion {

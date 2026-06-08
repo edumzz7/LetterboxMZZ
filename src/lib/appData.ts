@@ -15,6 +15,7 @@ import type {
   RankedUser,
   SeriesEntry,
   SeriesStatus,
+  UserFavorite,
 } from '../types/app';
 
 type AppwriteUserDoc = Models.Document & {
@@ -106,6 +107,7 @@ const COLLECTION_PERSONAL_SERIES =
 const COLLECTION_USUARIOS_METADATA =
   import.meta.env.VITE_APPWRITE_COLLECTION_USUARIOS_METADATA ?? 'usuarios_metadata';
 const COLLECTION_ATIVIDADES = import.meta.env.VITE_APPWRITE_COLLECTION_ATIVIDADES ?? 'atividades';
+const COLLECTION_USER_FAVORITES = import.meta.env.VITE_APPWRITE_COLLECTION_USER_FAVORITES ?? 'user_favorites';
 const MANAGED_PASSWORD_PLACEHOLDER = 'managed-by-appwrite';
 const MANAGED_PASSWORD_PREFIX = 'letterboxzzo::managed::';
 const PUBLIC_APP_URL = (import.meta.env.VITE_PUBLIC_APP_URL ?? 'https://letterbox-mzz.vercel.app').replace(
@@ -496,8 +498,54 @@ async function getCurrentAccount() {
   try {
     return (await account.get()) as unknown as AppwriteAccountDoc;
   } catch {
-    return null;
+    return undefined;
   }
+}
+
+// ==========================================
+// User Favorites (Meus Amigos)
+// ==========================================
+
+export async function listFavorites(ownerUserId: string): Promise<UserFavorite[]> {
+  try {
+    const response = await databases.listDocuments(DATABASE_ID, COLLECTION_USER_FAVORITES, [
+      Query.equal('owner_user_id', ownerUserId),
+      Query.limit(100),
+    ]);
+    return response.documents.map((doc) => ({
+      id: doc.$id,
+      owner_user_id: doc.owner_user_id,
+      favorite_user_id: doc.favorite_user_id,
+      created_at: doc.$createdAt,
+    }));
+  } catch (error) {
+    console.error('Error fetching user favorites:', error);
+    return [];
+  }
+}
+
+export async function addFavorite(ownerUserId: string, favoriteUserId: string): Promise<UserFavorite> {
+  const response = await databases.createDocument(
+    DATABASE_ID,
+    COLLECTION_USER_FAVORITES,
+    ID.unique(),
+    {
+      owner_user_id: ownerUserId,
+      favorite_user_id: favoriteUserId,
+    },
+    [Permission.read(Role.any()), Permission.write(Role.any()), Permission.update(Role.any()), Permission.delete(Role.any())]
+  );
+
+  return {
+    id: response.$id,
+    owner_user_id: response.owner_user_id,
+    favorite_user_id: response.favorite_user_id,
+    created_at: response.$createdAt,
+  };
+}
+
+export async function removeFavorite(documentId: string): Promise<void> {
+  await databases.deleteDocument(DATABASE_ID, COLLECTION_USER_FAVORITES, documentId);
 }
 
 async function getSessionProfile() {

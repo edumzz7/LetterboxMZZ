@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import clsx from 'clsx';
-import { LogOut } from 'lucide-react';
+import { LogOut, Star } from 'lucide-react';
 import type { RankedUser } from '../../types/app';
 import AvatarDisplay from './AvatarDisplay';
+import { useFavorites } from '../../hooks/useFavorites';
 
 interface UserSidebarProps {
   users: RankedUser[];
@@ -22,6 +24,20 @@ export default function UserSidebar({
   isOpen,
   onClose,
 }: UserSidebarProps) {
+  const [rankingMode, setRankingMode] = useState<'geral' | 'amigos'>('geral');
+  const { isUserFavorited, toggleFavorite } = useFavorites(currentUserId);
+
+  let processedUsers = users;
+  if (rankingMode === 'amigos') {
+    processedUsers = users.filter((u) => u.id === currentUserId || isUserFavorited(u.id));
+    // Re-calculate ranks for friends
+    processedUsers = processedUsers.map((u, index) => ({ ...u, rank: index + 1 }));
+  }
+
+  const top5Users = processedUsers.slice(0, 5);
+  const currentUserInTop5 = top5Users.some((u) => u.id === currentUserId);
+  const currentUserItem = processedUsers.find((u) => u.id === currentUserId);
+
   return (
     <>
       <div
@@ -53,8 +69,31 @@ export default function UserSidebar({
           </button>
         </div>
 
-        <div className="mt-2 flex flex-col gap-1.5">
-          {users.map((user) => {
+        <div className="mt-3 flex rounded-xl border border-[#171717] bg-[#0a0a0a] p-1">
+          <button
+            type="button"
+            onClick={() => setRankingMode('geral')}
+            className={clsx(
+              'flex-1 rounded-lg py-1.5 text-[10px] font-medium uppercase tracking-[0.1em] transition',
+              rankingMode === 'geral' ? 'bg-[#151515] text-brand-gold' : 'text-brand-text-muted hover:text-brand-text'
+            )}
+          >
+            Geral
+          </button>
+          <button
+            type="button"
+            onClick={() => setRankingMode('amigos')}
+            className={clsx(
+              'flex-1 rounded-lg py-1.5 text-[10px] font-medium uppercase tracking-[0.1em] transition',
+              rankingMode === 'amigos' ? 'bg-[#151515] text-brand-gold' : 'text-brand-text-muted hover:text-brand-text'
+            )}
+          >
+            Amigos
+          </button>
+        </div>
+
+        <div className="mt-4 flex flex-col gap-1.5">
+          {top5Users.map((user) => {
             const isCurrent = user.id === currentUserId;
             const isSelected = user.id === selectedUserId;
             const isLeader = user.rank === 1;
@@ -82,22 +121,79 @@ export default function UserSidebar({
                   <span className="text-brand-gold">{user.mcoins} MC</span>
                 </div>
 
-                <div className="mt-0.5 flex items-center gap-2 min-w-0">
-                  <div
-                    className={clsx(
-                      'w-8 h-8 rounded-full border flex items-center justify-center shrink-0',
-                      isSelected ? 'border-brand-gold text-brand-gold' : 'border-[#252525] text-brand-gold-alt',
-                    )}
-                  >
-                    <AvatarDisplay avatarId={user.avatar_id} className="w-8 h-8" emojiClassName="text-lg" />
+                <div className="mt-0.5 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div
+                      className={clsx(
+                        'w-8 h-8 rounded-full border flex items-center justify-center shrink-0',
+                        isSelected ? 'border-brand-gold text-brand-gold' : 'border-[#252525] text-brand-gold-alt',
+                      )}
+                    >
+                      <AvatarDisplay avatarId={user.avatar_id} className="w-8 h-8" emojiClassName="text-lg" />
+                    </div>
+                    <p className="text-sm uppercase tracking-[0.14em] text-brand-text truncate">
+                      {user.display_name || user.username} {isCurrent ? '(Você)' : ''}
+                    </p>
                   </div>
-                  <p className="text-sm uppercase tracking-[0.14em] text-brand-text truncate">
-                    {user.display_name || user.username} {isCurrent ? '(Voce)' : ''}
-                  </p>
+                  {!isCurrent && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFavorite(user.id);
+                      }}
+                      className="p-1 hover:bg-white/5 rounded-full transition-colors shrink-0"
+                    >
+                      <Star
+                        size={16}
+                        className={clsx(
+                          isUserFavorited(user.id) ? 'fill-brand-gold text-brand-gold' : 'text-brand-text-muted hover:text-white'
+                        )}
+                      />
+                    </button>
+                  )}
                 </div>
               </button>
             );
           })}
+
+          {!currentUserInTop5 && currentUserItem && (
+            <div className="mt-2 pt-2 border-t border-[#171717]">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-brand-text-muted mb-1.5 px-2">Sua Posição</p>
+              <button
+                type="button"
+                onClick={() => {
+                  onSelectUser(currentUserItem.id);
+                  onClose();
+                }}
+                className={clsx(
+                  'w-full rounded-xl border px-2.5 py-1.5 text-left transition',
+                  selectedUserId === currentUserId
+                    ? 'bg-brand-gold/10 border-slate-400/40'
+                    : 'bg-black/25 border-slate-400/40 hover:border-[#656565]',
+                )}
+              >
+                <div className="flex items-center justify-between gap-2 text-xs uppercase tracking-[0.12em]">
+                  <span className="text-brand-gold-alt">{currentUserItem.rank}&ordm;</span>
+                  <span className="text-brand-gold">{currentUserItem.mcoins} MC</span>
+                </div>
+
+                <div className="mt-0.5 flex items-center gap-2 min-w-0">
+                  <div
+                    className={clsx(
+                      'w-8 h-8 rounded-full border flex items-center justify-center shrink-0',
+                      selectedUserId === currentUserId ? 'border-brand-gold text-brand-gold' : 'border-[#252525] text-brand-gold-alt',
+                    )}
+                  >
+                    <AvatarDisplay avatarId={currentUserItem.avatar_id} className="w-8 h-8" emojiClassName="text-lg" />
+                  </div>
+                  <p className="text-sm uppercase tracking-[0.14em] text-brand-text truncate">
+                    {currentUserItem.display_name || currentUserItem.username} (Você)
+                  </p>
+                </div>
+              </button>
+            </div>
+          )}
         </div>
       </aside>
     </>

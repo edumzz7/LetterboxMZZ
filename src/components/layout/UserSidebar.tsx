@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import clsx from 'clsx';
-import { LogOut, Star } from 'lucide-react';
+import { Star } from 'lucide-react';
 import type { RankedUser } from '../../types/app';
 import AvatarDisplay from './AvatarDisplay';
 import { useFavorites } from '../../hooks/useFavorites';
@@ -10,7 +10,6 @@ interface UserSidebarProps {
   currentUserId: string;
   selectedUserId: string;
   onSelectUser: (userId: string) => void;
-  onLogout: () => void;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -20,16 +19,25 @@ export default function UserSidebar({
   currentUserId,
   selectedUserId,
   onSelectUser,
-  onLogout,
   isOpen,
   onClose,
 }: UserSidebarProps) {
   const [rankingMode, setRankingMode] = useState<'geral' | 'amigos'>('geral');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const { isUserFavorited, toggleFavorite } = useFavorites(currentUserId);
+
+  // Search logic
+  const searchResults = users.filter(
+    (u) =>
+      searchQuery.trim() &&
+      (u.username.toLowerCase().includes(searchQuery.trim().toLowerCase()) ||
+        u.display_name?.toLowerCase().includes(searchQuery.trim().toLowerCase()))
+  ).slice(0, 5);
 
   let processedUsers = users;
   if (rankingMode === 'amigos') {
-    processedUsers = users.filter((u) => u.id === currentUserId || isUserFavorited(u.id));
+    processedUsers = users.filter((u) => isUserFavorited(u.id));
     // Re-calculate ranks for friends
     processedUsers = processedUsers.map((u, index) => ({ ...u, rank: index + 1 }));
   }
@@ -59,14 +67,41 @@ export default function UserSidebar({
             <p className="text-xs uppercase tracking-[0.25em] text-brand-text-muted">Ranking</p>
             <h2 className="text-lg uppercase tracking-[0.15em] text-brand-gold mt-1">MCoins</h2>
           </div>
-          <button
-            type="button"
-            onClick={onLogout}
-            className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-brand-text-muted hover:text-brand-text transition"
-          >
-            <LogOut size={14} />
-            Sair
-          </button>
+          <div className="relative flex-1 max-w-[120px]">
+            <input
+              type="text"
+              placeholder="Buscar..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => setIsSearchFocused(true)}
+              onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
+              className="w-full bg-black/40 border border-[#222] rounded-lg px-2.5 py-1.5 text-xs text-brand-text placeholder-brand-text-muted focus:outline-none focus:border-brand-gold transition-colors"
+            />
+            {isSearchFocused && searchResults.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-[#0a0a0a] border border-[#222] rounded-lg shadow-xl z-50 overflow-hidden">
+                {searchResults.map((u) => (
+                  <button
+                    key={u.id}
+                    className="w-full text-left px-2.5 py-2 hover:bg-[#151515] text-brand-text transition-colors flex items-center gap-2"
+                    onClick={() => {
+                      onSelectUser(u.id);
+                      setSearchQuery('');
+                      setIsSearchFocused(false);
+                      onClose();
+                    }}
+                  >
+                    <AvatarDisplay avatarId={u.avatar_id} className="w-5 h-5 shrink-0" />
+                    <span className="text-xs truncate">{u.display_name || u.username}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {isSearchFocused && searchQuery.trim() && searchResults.length === 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-[#0a0a0a] border border-[#222] rounded-lg shadow-xl z-50 p-2 text-xs text-center text-brand-text-muted">
+                Nenhum usuário
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="mt-3 flex rounded-xl border border-[#171717] bg-[#0a0a0a] p-1">

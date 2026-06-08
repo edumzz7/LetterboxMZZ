@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
-import { Film, Loader2 } from 'lucide-react';
+import { Film, Loader2, Star } from 'lucide-react';
 import AppHeader from './components/layout/Header';
 import DashboardTab from './components/layout/DashboardTab';
 import UserSidebar from './components/layout/UserSidebar';
@@ -11,6 +11,8 @@ import SeriesSection from './components/series/SeriesSection';
 import UserDropdownMenu from './components/layout/UserDropdownMenu';
 import UserEventBell from './components/layout/UserEventBell';
 import { useAvatarMutation, useUsers } from './hooks/useUsers';
+import { useFavorites } from './hooks/useFavorites';
+import clsx from 'clsx';
 import {
   bootstrapApp,
   getCurrentSessionUser,
@@ -46,6 +48,8 @@ function App() {
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const { isUserFavorited, toggleFavorite } = useFavorites(session?.id || '');
 
   const usersQuery = useUsers();
   const avatarMutation = useAvatarMutation();
@@ -154,10 +158,32 @@ function App() {
       };
     }
 
+    const isFavorited = isUserFavorited(viewedUser.id);
+
     return {
-      title: `Perfil de ${viewedUser.display_name || viewedUser.username}`,
+      title: (
+        <span className="flex items-center gap-4">
+          Perfil de {viewedUser.display_name || viewedUser.username}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleFavorite(viewedUser.id);
+            }}
+            className="p-1 hover:bg-white/5 rounded-full transition-colors shrink-0"
+            title={isFavorited ? "Remover dos amigos" : "Adicionar aos amigos"}
+          >
+            <Star
+              size={32}
+              className={clsx(
+                isFavorited ? 'fill-brand-gold text-brand-gold' : 'text-[#444] hover:text-white transition-colors'
+              )}
+            />
+          </button>
+        </span>
+      ),
     };
-  }, [viewedUser, urlUsername, isOwnDashboard]);
+  }, [viewedUser, urlUsername, isOwnDashboard, isUserFavorited, toggleFavorite]);
 
   const persistSession = (nextSession: SessionUser | null) => {
     setSession(nextSession);
@@ -258,7 +284,6 @@ function App() {
               const u = users.find((x) => x.id === id);
               if (u) setLocation(`/${u.username}`);
             }}
-            onLogout={handleLogout}
             isOpen={sidebarOpen}
             onClose={() => setSidebarOpen(false)}
           />

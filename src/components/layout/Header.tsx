@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 interface HeaderProps {
   activeTab: 'dashboard' | 'oscars' | 'personal';
   onTabChange: (tab: 'dashboard' | 'oscars' | 'personal') => void;
-  title: string;
+  title: ReactNode;
   canAccessOscars: boolean;
   onToggleSidebar: () => void;
   rightSlot?: ReactNode;

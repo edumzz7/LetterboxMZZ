@@ -3,6 +3,7 @@ import * as Icons from 'lucide-react';
 import clsx from 'clsx';
 import { getUnlockedAchievements, type Achievement } from '../../lib/achievements';
 import type { PersonalMovie, SeriesEntry, RankedUser } from '../../types/app';
+import { useOscarPredictions } from '../../hooks/useOscarPredictions';
 
 interface AchievementBadgeProps {
   achievement: Achievement;
@@ -77,7 +78,11 @@ export default function UserAchievements({
   userId,
   isLoading = false,
 }: UserAchievementsProps) {
-  if (isLoading) {
+  const { predictionsQuery } = useOscarPredictions(userId);
+  const isPredictionsLoading = predictionsQuery.isLoading;
+  const predictions = predictionsQuery.data || [];
+
+  if (isLoading || isPredictionsLoading) {
     return (
       <div className="flex items-center gap-1.5 opacity-50 py-1">
         <Icons.Loader2 size={12} className="animate-spin text-brand-gold" />
@@ -86,7 +91,7 @@ export default function UserAchievements({
     );
   }
 
-  const unlocked = getUnlockedAchievements(movies, series, users, userId);
+  const unlocked = getUnlockedAchievements(movies, series, users, userId, predictions);
 
   if (unlocked.length === 0) return null;
 

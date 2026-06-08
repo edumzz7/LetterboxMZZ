@@ -1,4 +1,4 @@
-import type { PersonalMovie, SeriesEntry, RankedUser } from '../types/app';
+import type { PersonalMovie, SeriesEntry, RankedUser, UserOscarPrediction } from '../types/app';
 
 export interface Achievement {
   id: string;
@@ -10,7 +10,8 @@ export interface Achievement {
     movies: PersonalMovie[],
     series: SeriesEntry[],
     users: RankedUser[],
-    userId: string
+    userId: string,
+    predictions: UserOscarPrediction[]
   ) => boolean;
 }
 
@@ -247,18 +248,18 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     id: 'oscar_bet',
     name: 'Vai de BET',
-    description: 'Interagiu com 1 filme indicado ao Oscar.',
+    description: 'Palpitou em 1 categoria do Oscar.',
     icon: 'Dices',
     secret: false,
-    check: (movies) => movies.filter((m) => m.source === 'oscar').length >= 1,
+    check: (_movies, _series, _users, _userId, predictions) => predictions.length >= 1,
   },
   {
     id: 'oscar_tigrinho',
     name: 'Tigrinho',
-    description: 'Interagiu com 5 filmes indicados ao Oscar.',
+    description: 'Palpitou em todas as 5 categorias do Oscar.',
     icon: 'Coins',
     secret: false,
-    check: (movies) => movies.filter((m) => m.source === 'oscar').length >= 5,
+    check: (_movies, _series, _users, _userId, predictions) => predictions.length >= 5,
   },
 
   // SECRETAS (só aparecem depois de desbloquear)
@@ -327,7 +328,8 @@ export function getUnlockedAchievements(
   movies: PersonalMovie[],
   series: SeriesEntry[],
   users: RankedUser[],
-  userId: string
+  userId: string,
+  predictions: UserOscarPrediction[]
 ): Achievement[] {
-  return ACHIEVEMENTS.filter((ach) => ach.check(movies, series, users, userId));
+  return ACHIEVEMENTS.filter((ach) => ach.check(movies, series, users, userId, predictions));
 }

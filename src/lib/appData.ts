@@ -101,6 +101,7 @@ type AppwriteUserOscarPredictionDoc = Models.Document & {
   tmdb_id: string;
   title: string;
   poster_path: string;
+  created_at?: string;
 };
 
 const BOOTSTRAP_KEY = 'letterboxmzz_bootstrap_v1';
@@ -415,7 +416,7 @@ function mapOscarPrediction(doc: AppwriteUserOscarPredictionDoc): UserOscarPredi
     tmdb_id: doc.tmdb_id,
     title: doc.title,
     poster_path: doc.poster_path,
-    created_at: doc.$createdAt,
+    created_at: doc.created_at || doc.$createdAt,
   };
 }
 
@@ -1918,6 +1919,7 @@ export async function saveOscarPrediction(
           tmdb_id: tmdbId,
           title,
           poster_path: posterPath,
+          created_at: new Date().toISOString(),
         },
         permissions
       );

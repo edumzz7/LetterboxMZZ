@@ -466,13 +466,13 @@ async function addActivity(userId: string, message: string, mcoinsDelta: number)
 }
 
 async function ownerScopedPermissions(ownerUserId: string, readAny = true) {
-  const readRole = readAny ? Role.users() : Role.user(ownerUserId);
   const currentAccount = await getCurrentAccount();
   const currentAppUserId =
     currentAccount && typeof currentAccount.prefs?.appUserId === 'string'
       ? currentAccount.prefs.appUserId
       : null;
   const ownerPrincipalId = currentAppUserId === ownerUserId && currentAccount ? currentAccount.$id : ownerUserId;
+  const readRole = readAny ? Role.users() : Role.user(ownerPrincipalId);
   return [
     Permission.read(readRole),
     Permission.update(Role.user(ownerPrincipalId)),
@@ -525,6 +525,7 @@ export async function listFavorites(ownerUserId: string): Promise<UserFavorite[]
 }
 
 export async function addFavorite(ownerUserId: string, favoriteUserId: string): Promise<UserFavorite> {
+  const permissions = await ownerScopedPermissions(ownerUserId, false);
   const response = await databases.createDocument(
     DATABASE_ID,
     COLLECTION_USER_FAVORITES,
@@ -533,12 +534,7 @@ export async function addFavorite(ownerUserId: string, favoriteUserId: string): 
       owner_user_id: ownerUserId,
       favorite_user_id: favoriteUserId,
     },
-    [
-      Permission.read(Role.user(ownerUserId)),
-      Permission.write(Role.user(ownerUserId)),
-      Permission.update(Role.user(ownerUserId)),
-      Permission.delete(Role.user(ownerUserId))
-    ]
+    permissions
   );
 
   return {

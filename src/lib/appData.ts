@@ -533,7 +533,12 @@ export async function addFavorite(ownerUserId: string, favoriteUserId: string): 
       owner_user_id: ownerUserId,
       favorite_user_id: favoriteUserId,
     },
-    [Permission.read(Role.any()), Permission.write(Role.any()), Permission.update(Role.any()), Permission.delete(Role.any())]
+    [
+      Permission.read(Role.user(ownerUserId)),
+      Permission.write(Role.user(ownerUserId)),
+      Permission.update(Role.user(ownerUserId)),
+      Permission.delete(Role.user(ownerUserId))
+    ]
   );
 
   return {

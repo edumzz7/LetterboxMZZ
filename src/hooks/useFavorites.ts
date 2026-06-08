@@ -17,7 +17,10 @@ export function useFavorites(currentUserId: string | undefined) {
   const toggleFavoriteMutation = useMutation({
     mutationFn: async ({ favoriteUserId, isFavorite }: { favoriteUserId: string; isFavorite: boolean }) => {
       if (!currentUserId) throw new Error('Not logged in');
+      if (currentUserId === favoriteUserId) return null; // Prevent self-favorite
       
+      console.log("Saving favorite:", { owner_user_id: currentUserId, favorite_user_id: favoriteUserId });
+
       if (isFavorite) {
         // Find the document ID to remove
         const doc = favorites.find(f => f.favorite_user_id === favoriteUserId);
@@ -37,6 +40,8 @@ export function useFavorites(currentUserId: string | undefined) {
       
       await queryClient.cancelQueries({ queryKey: [FAVORITES_QUERY_KEY, currentUserId] });
       const previousFavorites = queryClient.getQueryData<UserFavorite[]>([FAVORITES_QUERY_KEY, currentUserId]) || [];
+
+      console.log("Favorites fetched:", previousFavorites);
 
       // Optimistic update
       queryClient.setQueryData<UserFavorite[]>([FAVORITES_QUERY_KEY, currentUserId], (old = []) => {
@@ -73,7 +78,11 @@ export function useFavorites(currentUserId: string | undefined) {
   };
 
   const toggleFavorite = (favoriteUserId: string) => {
-    toggleFavoriteMutation.mutate({ favoriteUserId, isFavorite: isUserFavorited(favoriteUserId) });
+    if (currentUserId === favoriteUserId) return;
+    
+    // Prevent duplicate inserts if not synced yet
+    const isFav = isUserFavorited(favoriteUserId);
+    toggleFavoriteMutation.mutate({ favoriteUserId, isFavorite: isFav });
   };
 
   return {

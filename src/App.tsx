@@ -12,6 +12,9 @@ import UserDropdownMenu from './components/layout/UserDropdownMenu';
 import UserEventBell from './components/layout/UserEventBell';
 import { useAvatarMutation, useUsers } from './hooks/useUsers';
 import { useFavorites } from './hooks/useFavorites';
+import { usePersonalMovies } from './hooks/usePersonalMovies';
+import { useSeries } from './hooks/useSeries';
+import UserAchievements from './components/ui/UserAchievements';
 import clsx from 'clsx';
 import {
   bootstrapApp,
@@ -124,6 +127,11 @@ function App() {
     : (users.find((user) => user.id === session?.id) || null);
   
   const selectedUserId = viewedUser?.id || null;
+  const { moviesQuery: personalMoviesQuery } = usePersonalMovies(selectedUserId);
+  const { seriesQuery: userSeriesQuery } = useSeries(selectedUserId);
+  const personalMovies = personalMoviesQuery.data || [];
+  const userSeries = userSeriesQuery.data || [];
+  const achievementsLoading = personalMoviesQuery.isLoading || userSeriesQuery.isLoading || usersQuery.isLoading;
   const currentUser = users.find((user) => user.id === session?.id) || session || null;
   const currentRankedUser = users.find((user) => user.id === session?.id);
   const isOwnDashboard = Boolean(session?.id && viewedUser?.id === session.id);
@@ -322,6 +330,17 @@ function App() {
                   />
                 </div>
               )}
+              subSlot={
+                selectedUserId && (
+                  <UserAchievements
+                    movies={personalMovies}
+                    series={userSeries}
+                    users={users}
+                    userId={selectedUserId}
+                    isLoading={achievementsLoading}
+                  />
+                )
+              }
             />
 
             {usersQuery.isLoading ? (

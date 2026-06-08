@@ -9,6 +9,7 @@ interface HeaderProps {
   canAccessOscars: boolean;
   onToggleSidebar: () => void;
   rightSlot?: ReactNode;
+  subSlot?: ReactNode;
 }
 
 const Header = ({
@@ -18,6 +19,7 @@ const Header = ({
   canAccessOscars,
   onToggleSidebar,
   rightSlot,
+  subSlot,
 }: HeaderProps) => {
   return (
     <header className="flex flex-col gap-6">
@@ -38,6 +40,7 @@ const Header = ({
             </button>
           </div>
         </div>
+        {subSlot}
       </div>
 
       <div className="w-24 h-[1px] bg-brand-gold opacity-50" />

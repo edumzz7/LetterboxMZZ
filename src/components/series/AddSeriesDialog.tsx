@@ -2,15 +2,20 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Loader2, Plus, X } from 'lucide-react';
 import clsx from 'clsx';
-import { getTvWatchProviders, searchSeries, type TMDBSeries } from '../../lib/tmdb';
-import type { SeriesEntry } from '../../types/app';
+import { getTvDetails, getTvWatchProviders, searchSeries, type TMDBSeries, type TMDBTvSeasonMeta } from '../../lib/tmdb';
+import type { SeriesEntry, SeriesStatus } from '../../types/app';
 
 interface AddSeriesDialogProps {
   onSubmit: (series: Omit<SeriesEntry, 'id' | 'user_id' | 'created_at'>) => Promise<unknown>;
   isPending: boolean;
+  defaultStatus?: SeriesStatus;
 }
 
-export default function AddSeriesDialog({ onSubmit, isPending }: AddSeriesDialogProps) {
+export default function AddSeriesDialog({
+  onSubmit,
+  isPending,
+  defaultStatus = 'watching',
+}: AddSeriesDialogProps) {
   const [open, setOpen] = useState(false);
   const [titulo, setTitulo] = useState('');
   const [capaUrl, setCapaUrl] = useState('');
@@ -21,6 +26,8 @@ export default function AddSeriesDialog({ onSubmit, isPending }: AddSeriesDialog
   const [showDropdown, setShowDropdown] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [selectedSeries, setSelectedSeries] = useState<TMDBSeries | null>(null);
+  const [seasonMeta, setSeasonMeta] = useState<TMDBTvSeasonMeta[]>([]);
+  const [totalSeasons, setTotalSeasons] = useState(0);
   const [streamingData, setStreamingData] = useState<string | null>(null);
   const searchTimeout = useRef<number | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -46,6 +53,8 @@ export default function AddSeriesDialog({ onSubmit, isPending }: AddSeriesDialog
     setShowDropdown(false);
     setSubmitError(null);
     setSelectedSeries(null);
+    setSeasonMeta([]);
+    setTotalSeasons(0);
     setStreamingData(null);
   };
 
@@ -80,9 +89,33 @@ export default function AddSeriesDialog({ onSubmit, isPending }: AddSeriesDialog
     }
     setShowDropdown(false);
     void (async () => {
-      const providers = await getTvWatchProviders(series.id, 'BR');
+      const [providers, details] = await Promise.all([
+        getTvWatchProviders(series.id, 'BR'),
+        getTvDetails(series.id),
+      ]);
       setStreamingData(JSON.stringify(providers));
+      if (details) {
+        setSeasonMeta(details.seasons);
+        setTotalSeasons(details.number_of_seasons || details.seasons.length);
+        setTemporada('1');
+        const seasonOneCount = details.seasons.find((item) => item.season_number === 1)?.episode_count;
+        if (seasonOneCount && seasonOneCount > 0) {
+          setTotalEps(String(seasonOneCount));
+        } else if (details.number_of_episodes > 0) {
+          setTotalEps(String(details.number_of_episodes));
+        }
+      }
     })();
+  };
+
+  const handleSeasonChange = (value: string) => {
+    setTemporada(value);
+    const seasonNumber = parseInt(value, 10);
+    if (Number.isNaN(seasonNumber)) return;
+    const currentSeason = seasonMeta.find((item) => item.season_number === seasonNumber);
+    if (currentSeason?.episode_count && currentSeason.episode_count > 0) {
+      setTotalEps(String(currentSeason.episode_count));
+    }
   };
 
   const handleSave = async (event: React.FormEvent) => {
@@ -90,6 +123,8 @@ export default function AddSeriesDialog({ onSubmit, isPending }: AddSeriesDialog
     if (!titulo.trim()) return;
 
     const total = parseInt(totalEps, 10) || 0;
+    const episodiosVistos =
+      defaultStatus === 'watched' ? total : defaultStatus === 'watching' ? Math.min(1, total) : 0;
     setSubmitError(null);
 
     try {
@@ -98,8 +133,8 @@ export default function AddSeriesDialog({ onSubmit, isPending }: AddSeriesDialog
         capa_url: capaUrl.trim() || null,
         temporada: parseInt(temporada, 10) || 1,
         total_episodios: total,
-        episodios_vistos: 0,
-        status: 'watching',
+        episodios_vistos: episodiosVistos,
+        status: defaultStatus,
         plataforma_slug: 'stremio',
         rating: selectedSeries?.vote_average ?? null,
         streaming_data: streamingData,
@@ -114,7 +149,7 @@ export default function AddSeriesDialog({ onSubmit, isPending }: AddSeriesDialog
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger asChild>
-        <button className="flex flex-col items-center justify-center gap-2 border border-[#222] text-brand-gold-alt text-xs tracking-widest uppercase rounded-md hover:border-brand-gold hover:text-brand-gold transition-all bg-brand-bg group min-h-[140px] w-full min-w-[140px] md:min-w-[180px] shrink-0 snap-center border-dashed aspect-[2/3]">
+        <button className="flex min-w-0 w-full flex-col items-center justify-center gap-2 border border-[#222] text-brand-gold-alt text-xs tracking-widest uppercase rounded-md hover:border-brand-gold hover:text-brand-gold transition-all bg-brand-bg group min-h-[140px] snap-center border-dashed aspect-[2/3]">
           <Plus size={24} className="group-hover:scale-110 transition-transform" />
           <span>Add Serie</span>
         </button>
@@ -221,9 +256,14 @@ export default function AddSeriesDialog({ onSubmit, isPending }: AddSeriesDialog
                   min="1"
                   required
                   value={temporada}
-                  onChange={(event) => setTemporada(event.target.value)}
+                  onChange={(event) => handleSeasonChange(event.target.value)}
                   className="w-full bg-[#0a0f1e] border border-[#222] text-brand-text p-2.5 rounded focus:outline-none focus:border-brand-gold font-light text-center"
                 />
+                {totalSeasons > 0 ? (
+                  <span className="text-[10px] text-brand-text-muted uppercase tracking-[0.12em]">
+                    {totalSeasons} temporadas
+                  </span>
+                ) : null}
               </div>
 
               <div className="flex flex-col gap-2 w-full">
@@ -237,7 +277,8 @@ export default function AddSeriesDialog({ onSubmit, isPending }: AddSeriesDialog
                   required
                   value={totalEps}
                   onChange={(event) => setTotalEps(event.target.value)}
-                  className="w-full bg-[#0a0f1e] border border-[#222] text-brand-text p-2.5 rounded focus:outline-none focus:border-brand-gold font-light text-center"
+                  readOnly
+                  className="w-full bg-[#0a0f1e] border border-[#222] text-brand-text p-2.5 rounded font-light text-center cursor-not-allowed opacity-80"
                 />
               </div>
             </div>

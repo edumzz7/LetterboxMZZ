@@ -8,10 +8,19 @@ import type { AppUser, CineMatchMode, CineMatchSuggestion } from '../../types/ap
 interface CineMatchModalProps {
   currentUserId: string;
   users: AppUser[];
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export default function CineMatchModal({ currentUserId, users }: CineMatchModalProps) {
-  const [open, setOpen] = useState(false);
+export default function CineMatchModal({ currentUserId, users, open: controlledOpen, onOpenChange: controlledOnOpenChange }: CineMatchModalProps) {
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : uncontrolledOpen;
+  
+  const handleOpenChange = (newOpen: boolean) => {
+    if (!isControlled) setUncontrolledOpen(newOpen);
+    controlledOnOpenChange?.(newOpen);
+  };
   const [friendId, setFriendId] = useState('');
   const [mode, setMode] = useState<CineMatchMode>('geral');
   const [result, setResult] = useState<CineMatchSuggestion | null>(null);
@@ -31,12 +40,14 @@ export default function CineMatchModal({ currentUserId, users }: CineMatchModalP
   };
 
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
-      <Dialog.Trigger asChild>
-        <button className="inline-flex items-center gap-2 px-3 py-2 border border-brand-gold/40 rounded-lg text-xs uppercase tracking-[0.14em] text-brand-gold hover:bg-brand-gold/10 transition">
-          <Shuffle size={14} /> Cine-Match
-        </button>
-      </Dialog.Trigger>
+    <Dialog.Root open={open} onOpenChange={handleOpenChange}>
+      {!isControlled && (
+        <Dialog.Trigger asChild>
+          <button className="inline-flex items-center gap-2 px-3 py-2 border border-brand-gold/40 rounded-lg text-xs uppercase tracking-[0.14em] text-brand-gold hover:bg-brand-gold/10 transition">
+            <Shuffle size={14} /> Cine-Match
+          </button>
+        </Dialog.Trigger>
+      )}
 
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40" />

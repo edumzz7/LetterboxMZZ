@@ -130,6 +130,7 @@ export default function PersonalMoviesSection({
                 mode="personal"
                 layout="grid"
                 isPending={addMovieMutation.isPending}
+                defaultStatus={filter}
                 onSubmit={handleAddMovie}
               />
             </div>

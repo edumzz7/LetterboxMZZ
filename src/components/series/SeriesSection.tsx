@@ -2,18 +2,20 @@ import { useState } from 'react';
 import clsx from 'clsx';
 import { Loader2 } from 'lucide-react';
 import { useSeries } from '../../hooks/useSeries';
+import type { SeriesStatus } from '../../types/app';
 import AddSeriesDialog from './AddSeriesDialog';
 import SeriesCard from './SeriesCard';
 
 interface SeriesSectionProps {
   userId: string;
   canEdit: boolean;
+  currentUserId: string;
 }
 
-export default function SeriesSection({ userId, canEdit }: SeriesSectionProps) {
-  const { seriesQuery, updateProgressMutation, addSeriesMutation, deleteSeriesMutation } =
+export default function SeriesSection({ userId, canEdit, currentUserId }: SeriesSectionProps) {
+  const { seriesQuery, updateProgressMutation, addSeriesMutation, deleteSeriesMutation, rateSeriesMutation } =
     useSeries(userId);
-  const [filter, setFilter] = useState<'watching' | 'watched'>('watching');
+  const [filter, setFilter] = useState<SeriesStatus>('watched');
 
   const filteredSeries = (seriesQuery.data || []).filter((series) => series.status === filter);
 
@@ -46,6 +48,18 @@ export default function SeriesSection({ userId, canEdit }: SeriesSectionProps) {
           >
             Em andamento
           </button>
+          <span className="text-[#333]">|</span>
+          <button
+            onClick={() => setFilter('watchlist')}
+            className={clsx(
+              'transition-colors pb-1',
+              filter === 'watchlist'
+                ? 'text-brand-gold border-b border-brand-gold'
+                : 'text-brand-text-muted hover:text-brand-text',
+            )}
+          >
+            Watchlist
+          </button>
         </div>
       </div>
 
@@ -60,14 +74,23 @@ export default function SeriesSection({ userId, canEdit }: SeriesSectionProps) {
               key={series.id}
               series={series}
               canEdit={canEdit}
-              onSaveProgress={(payload) => updateProgressMutation.mutate(payload)}
+              currentUserId={currentUserId}
+              onSaveProgress={(payload) => updateProgressMutation.mutateAsync(payload)}
               onDelete={(seriesId) => deleteSeriesMutation.mutate(seriesId)}
+              onRate={(seriesId, stars) =>
+                rateSeriesMutation.mutateAsync({
+                  actorUserId: currentUserId,
+                  seriesId,
+                  stars,
+                })
+              }
             />
           ))}
 
           {canEdit ? (
             <div className="flex">
               <AddSeriesDialog
+                defaultStatus={filter}
                 onSubmit={(series) => addSeriesMutation.mutateAsync(series)}
                 isPending={addSeriesMutation.isPending}
               />

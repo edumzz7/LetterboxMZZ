@@ -1,17 +1,25 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useRoute, useLocation } from 'wouter';
 import { Film, Loader2 } from 'lucide-react';
 import AppHeader from './components/layout/Header';
+import DashboardTab from './components/layout/DashboardTab';
 import UserSidebar from './components/layout/UserSidebar';
 import AuthScreen from './components/auth/AuthScreen';
 import MoviesSection from './components/movies/MoviesSection';
 import PersonalMoviesSection from './components/movies/PersonalMoviesSection';
 import SeriesSection from './components/series/SeriesSection';
-import ActivityFeed from './components/layout/ActivityFeed';
-import CineMatchModal from './components/layout/CineMatchModal';
-import SuggestMovieModal from './components/layout/SuggestMovieModal';
-import ProfileAvatarModal from './components/layout/ProfileAvatarModal';
+import UserDropdownMenu from './components/layout/UserDropdownMenu';
+import UserEventBell from './components/layout/UserEventBell';
 import { useAvatarMutation, useUsers } from './hooks/useUsers';
-import { bootstrapApp, getCurrentSessionUser, loginUser, logoutUser, registerUser } from './lib/appData';
+import {
+  bootstrapApp,
+  getCurrentSessionUser,
+  importLegacyDataForUser,
+  loginUser,
+  logoutUser,
+  registerUser,
+  updateUserProfile,
+} from './lib/appData';
 import type { SessionUser } from './types/app';
 
 const SESSION_KEY = 'letterboxmzz_session_v1';
@@ -29,9 +37,10 @@ function readStoredSession(): SessionUser | null {
 }
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'oscars' | 'personal'>('oscars');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'oscars' | 'personal'>('dashboard');
   const [session, setSession] = useState<SessionUser | null>(() => readStoredSession());
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(session?.id ?? null);
+  const [location, setLocation] = useLocation();
+  const [match, params] = useRoute('/:username');
   const [authError, setAuthError] = useState<string | null>(null);
   const [authPending, setAuthPending] = useState(false);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
@@ -42,6 +51,14 @@ function App() {
   const avatarMutation = useAvatarMutation();
   const { refetch: refetchUsers } = usersQuery;
 
+  const runLegacyImport = async (userId: string) => {
+    const imported = await importLegacyDataForUser(userId);
+    if (imported) {
+      await refetchUsers();
+    }
+    return imported;
+  };
+
   useEffect(() => {
     let isMounted = true;
 
@@ -49,15 +66,20 @@ function App() {
       try {
         await bootstrapApp();
         const currentSession = await getCurrentSessionUser();
+        if (currentSession) {
+          const imported = await importLegacyDataForUser(currentSession.id);
+          if (imported) {
+            await refetchUsers();
+          }
+        }
         if (!isMounted) return;
 
         if (currentSession) {
           setSession(currentSession);
-          setSelectedUserId((current) => current ?? currentSession.id);
+          if (location === '/') setLocation(`/${currentSession.username}`);
           localStorage.setItem(SESSION_KEY, JSON.stringify(currentSession));
         } else {
           setSession(null);
-          setSelectedUserId(null);
           localStorage.removeItem(SESSION_KEY);
         }
       } catch (error) {
@@ -78,7 +100,7 @@ function App() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [refetchUsers]);
 
   useEffect(() => {
     if (!isBootstrapping) {
@@ -88,11 +110,16 @@ function App() {
 
   useEffect(() => {
     if (!session?.id) return;
-    setSelectedUserId((current) => current ?? session.id);
-  }, [session]);
+    if (location === '/') setLocation(`/${session.username}`);
+  }, [session, location, setLocation]);
 
   const users = usersQuery.data || [];
-  const viewedUser = users.find((user) => user.id === selectedUserId) || null;
+  const urlUsername = match ? params.username : null;
+  const viewedUser = urlUsername 
+    ? (users.find((user) => user.username === urlUsername) || null)
+    : (users.find((user) => user.id === session?.id) || null);
+  
+  const selectedUserId = viewedUser?.id || null;
   const currentUser = users.find((user) => user.id === session?.id) || session || null;
   const currentRankedUser = users.find((user) => user.id === session?.id);
   const isOwnDashboard = Boolean(session?.id && viewedUser?.id === session.id);
@@ -104,41 +131,44 @@ function App() {
 
   useEffect(() => {
     if (!canAccessOscars && activeTab === 'oscars') {
-      setActiveTab('personal');
+      setActiveTab('dashboard');
     }
   }, [activeTab, canAccessOscars]);
 
   const headerCopy = useMemo(() => {
+    if (urlUsername && !viewedUser) {
+      return {
+        title: 'Usuário não encontrado',
+      };
+    }
+
     if (!viewedUser) {
       return {
         title: 'LetterboxZZO',
-        subtitle: 'Central pessoal de acompanhamento',
       };
     }
 
     if (isOwnDashboard) {
       return {
-        title: `Dashboard de ${viewedUser.username}`,
-        subtitle: 'Seu perfil completo com Oscar, filmes e series',
+        title: `Dashboard de ${viewedUser.display_name || viewedUser.username}`,
       };
     }
 
     return {
-      title: `Perfil de ${viewedUser.username}`,
-      subtitle: 'Visualizacao social de filmes e series particulares',
+      title: `Perfil de ${viewedUser.display_name || viewedUser.username}`,
     };
-  }, [isOwnDashboard, viewedUser]);
+  }, [viewedUser, urlUsername, isOwnDashboard]);
 
   const persistSession = (nextSession: SessionUser | null) => {
     setSession(nextSession);
     if (nextSession) {
       localStorage.setItem(SESSION_KEY, JSON.stringify(nextSession));
-      setSelectedUserId(nextSession.id);
+      if (location === '/') setLocation(`/${nextSession.username}`);
       return;
     }
 
     localStorage.removeItem(SESSION_KEY);
-    setSelectedUserId(null);
+    setLocation('/');
   };
 
   const handleLogin = async (username: string, password: string) => {
@@ -147,6 +177,7 @@ function App() {
 
     try {
       const nextSession = await loginUser(username, password);
+      await runLegacyImport(nextSession.id);
       persistSession(nextSession);
       await refetchUsers();
     } catch (error) {
@@ -162,6 +193,7 @@ function App() {
 
     try {
       const nextSession = await registerUser(username, password);
+      await runLegacyImport(nextSession.id);
       persistSession(nextSession);
       await refetchUsers();
     } catch (error) {
@@ -174,7 +206,7 @@ function App() {
   const handleLogout = () => {
     void logoutUser();
     persistSession(null);
-    setActiveTab('oscars');
+    setActiveTab('dashboard');
     setAuthError(null);
   };
 
@@ -222,7 +254,10 @@ function App() {
             users={users}
             currentUserId={session.id}
             selectedUserId={selectedUserId || session.id}
-            onSelectUser={setSelectedUserId}
+            onSelectUser={(id) => {
+              const u = users.find((x) => x.id === id);
+              if (u) setLocation(`/${u.username}`);
+            }}
             onLogout={handleLogout}
             isOpen={sidebarOpen}
             onClose={() => setSidebarOpen(false)}
@@ -233,33 +268,50 @@ function App() {
               activeTab={activeTab}
               onTabChange={setActiveTab}
               title={headerCopy.title}
-              subtitle={headerCopy.subtitle}
               canAccessOscars={canAccessOscars}
               onToggleSidebar={() => setSidebarOpen(true)}
               rightSlot={(
                 <div className="flex items-center gap-2">
-                  <ProfileAvatarModal
-                    currentAvatarId={currentRankedUser?.avatar_id ?? 'avatar_clapper'}
-                    isSaving={avatarMutation.isPending}
-                    onSave={async (avatarId) =>
-                      avatarMutation.mutateAsync({ userId: session.id, avatarId })
-                    }
+                  <UserEventBell
+                    currentUserId={session.id}
+                    viewedUserId={viewedUser?.id ?? session.id}
+                    isOwnDashboard={isOwnDashboard}
                   />
-                  <SuggestMovieModal currentUserId={session.id} users={users} />
-                  <CineMatchModal currentUserId={session.id} users={users} />
+                  <UserDropdownMenu
+                    session={session}
+                    currentRankedUser={currentRankedUser}
+                    users={users}
+                    onLogout={handleLogout}
+                    avatarMutationPending={avatarMutation.isPending}
+                    onSaveAvatar={async (avatarId, displayName) => {
+                      await avatarMutation.mutateAsync({ userId: session.id, avatarId });
+                      if (displayName !== currentRankedUser?.display_name) {
+                        await updateUserProfile(session.id, { display_name: displayName });
+                        await refetchUsers();
+                      }
+                    }}
+                    onSaveProfile={async (data) => {
+                      await updateUserProfile(session.id, data);
+                      await refetchUsers();
+                    }}
+                  />
                 </div>
               )}
             />
 
-            <ActivityFeed />
-
-            {usersQuery.isLoading || !viewedUser ? (
+            {usersQuery.isLoading ? (
               <div className="flex justify-center items-center py-20 text-brand-gold-alt opacity-50">
                 <Loader2 className="animate-spin" size={32} />
               </div>
-            ) : (
+            ) : urlUsername && !viewedUser ? (
+              <div className="flex justify-center items-center py-20 text-brand-text-muted">
+                <p>Usuário "{urlUsername}" não encontrado.</p>
+              </div>
+            ) : !viewedUser ? null : (
               <main className="flex flex-col gap-16 min-h-[50vh]">
-                {activeTab === 'oscars' ? (
+                {activeTab === 'dashboard' ? (
+                  <DashboardTab user={viewedUser!} />
+                ) : activeTab === 'oscars' ? (
                   <div className="animate-in fade-in duration-500">
                     <MoviesSection
                       userId={session.id}
@@ -274,7 +326,11 @@ function App() {
                       canEdit={isOwnDashboard}
                       currentUserId={session.id}
                     />
-                    <SeriesSection userId={viewedUser.id} canEdit={isOwnDashboard} />
+                    <SeriesSection
+                      userId={viewedUser.id}
+                      canEdit={isOwnDashboard}
+                      currentUserId={session.id}
+                    />
                   </div>
                 )}
               </main>

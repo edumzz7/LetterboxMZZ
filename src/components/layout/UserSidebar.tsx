@@ -1,7 +1,7 @@
 import clsx from 'clsx';
 import { LogOut } from 'lucide-react';
 import type { RankedUser } from '../../types/app';
-import { avatarEmoji } from '../../lib/avatars';
+import AvatarDisplay from './AvatarDisplay';
 
 interface UserSidebarProps {
   users: RankedUser[];
@@ -78,7 +78,7 @@ export default function UserSidebar({
                 )}
               >
                 <div className="flex items-center justify-between gap-2 text-xs uppercase tracking-[0.12em]">
-                  <span className="text-brand-gold-alt">{user.rank}º</span>
+                  <span className="text-brand-gold-alt">{user.rank}&ordm;</span>
                   <span className="text-brand-gold">{user.mcoins} MC</span>
                 </div>
 
@@ -89,10 +89,10 @@ export default function UserSidebar({
                       isSelected ? 'border-brand-gold text-brand-gold' : 'border-[#252525] text-brand-gold-alt',
                     )}
                   >
-                    <span className="text-lg leading-none">{avatarEmoji(user.avatar_id)}</span>
+                    <AvatarDisplay avatarId={user.avatar_id} className="w-8 h-8" emojiClassName="text-lg" />
                   </div>
                   <p className="text-sm uppercase tracking-[0.14em] text-brand-text truncate">
-                    {user.username} {isCurrent ? '(Voce)' : ''}
+                    {user.display_name || user.username} {isCurrent ? '(Voce)' : ''}
                   </p>
                 </div>
               </button>

@@ -32,7 +32,7 @@ interface LegacySeries {
   id: string;
   titulo: string;
   capa_url: string | null;
-  status: 'watching' | 'watched';
+  status: 'watchlist' | 'watching' | 'watched';
   temporada: number;
   total_episodios: number;
   episodios_vistos: number;
@@ -73,24 +73,35 @@ export function readLegacyMovieData() {
   }
 }
 
-export function readLegacySeriesData() {
+export function readLegacySeriesData(fallbackToDefault = true) {
   try {
     const raw = localStorage.getItem('cinehub_series');
     if (!raw) {
-      return DEFAULT_EDUMZZ_SERIES;
+      return fallbackToDefault ? DEFAULT_EDUMZZ_SERIES : [];
     }
 
     const items = JSON.parse(raw) as LegacySeries[];
-    return items.map((series) => ({
-      titulo: series.titulo,
-      capa_url: series.capa_url,
-      status: series.status,
-      temporada: series.temporada || 1,
-      total_episodios: series.total_episodios || 0,
-      episodios_vistos: series.episodios_vistos || 0,
-      plataforma_slug: series.plataforma_slug,
-    }));
+    return items.map((series) => {
+      const status: SeriesEntry['status'] =
+        (series.episodios_vistos || 0) <= 0
+          ? 'watchlist'
+          : (series.total_episodios || 0) > 0 && (series.episodios_vistos || 0) >= (series.total_episodios || 0)
+            ? 'watched'
+            : series.status === 'watched'
+              ? 'watched'
+              : 'watching';
+
+      return {
+        titulo: series.titulo,
+        capa_url: series.capa_url,
+        status,
+        temporada: series.temporada || 1,
+        total_episodios: series.total_episodios || 0,
+        episodios_vistos: series.episodios_vistos || 0,
+        plataforma_slug: series.plataforma_slug,
+      };
+    });
   } catch {
-    return DEFAULT_EDUMZZ_SERIES;
+    return fallbackToDefault ? DEFAULT_EDUMZZ_SERIES : [];
   }
 }

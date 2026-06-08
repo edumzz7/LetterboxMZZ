@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { addSeries, deleteSeries, getSeriesStatus, listSeries, updateSeries } from '../lib/appData';
+import { addSeries, deleteSeries, getSeriesStatus, listSeries, rateSeries, updateSeries } from '../lib/appData';
 import type { SeriesEntry, SeriesStatus } from '../types/app';
 
 export function useSeries(userId: string | null) {
@@ -19,6 +19,7 @@ export function useSeries(userId: string | null) {
       total_episodios,
       status,
       plataforma_slug,
+      avaliacao,
     }: {
       id: string;
       episodios_vistos?: number;
@@ -26,6 +27,7 @@ export function useSeries(userId: string | null) {
       total_episodios?: number;
       status?: SeriesStatus;
       plataforma_slug?: string;
+      avaliacao?: number;
     }) => {
       const nextStatus =
         status ??
@@ -39,12 +41,13 @@ export function useSeries(userId: string | null) {
         total_episodios,
         status: nextStatus,
         plataforma_slug,
+        avaliacao,
       });
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['series', userId] });
       void queryClient.invalidateQueries({ queryKey: ['users'] });
-      void queryClient.invalidateQueries({ queryKey: ['activities'] });
+      void queryClient.invalidateQueries({ queryKey: ['notifications', userId] });
     },
   });
 
@@ -54,7 +57,7 @@ export function useSeries(userId: string | null) {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['series', userId] });
       void queryClient.invalidateQueries({ queryKey: ['users'] });
-      void queryClient.invalidateQueries({ queryKey: ['activities'] });
+      void queryClient.invalidateQueries({ queryKey: ['notifications', userId] });
     },
   });
 
@@ -65,7 +68,23 @@ export function useSeries(userId: string | null) {
     },
   });
 
-  return { seriesQuery, updateProgressMutation, addSeriesMutation, deleteSeriesMutation };
+  const rateSeriesMutation = useMutation({
+    mutationFn: ({ actorUserId, seriesId, stars }: { actorUserId: string; seriesId: string; stars: number }) =>
+      rateSeries(actorUserId, seriesId, stars),
+    onSuccess: (_data, variables) => {
+      queryClient.setQueriesData<SeriesEntry[]>(
+        { queryKey: ['series'] },
+        (current) =>
+          Array.isArray(current)
+            ? current.map((series) =>
+                series.id === variables.seriesId ? { ...series, avaliacao: variables.stars } : series,
+              )
+            : current,
+      );
+    },
+  });
+
+  return { seriesQuery, updateProgressMutation, addSeriesMutation, deleteSeriesMutation, rateSeriesMutation };
 }
 
 export type Series = SeriesEntry;

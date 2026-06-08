@@ -1,5 +1,5 @@
-﻿export type MovieStatus = 'watchlist' | 'watched';
-export type SeriesStatus = 'watching' | 'watched';
+export type MovieStatus = 'watchlist' | 'watched';
+export type SeriesStatus = 'watchlist' | 'watching' | 'watched';
 
 export interface AppUser {
   id: string;
@@ -11,6 +11,10 @@ export interface UserMetadata {
   user_id: string;
   mcoins: number;
   avatar_id: string;
+  display_name?: string;
+  favorite_movie?: string;
+  favorite_genre?: string;
+  watch_preference?: 'home' | 'cinema';
 }
 
 export interface RankedUser extends AppUser, UserMetadata {

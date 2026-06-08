@@ -16,18 +16,41 @@ export function useOscarMovies(userId: string | null) {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['oscar-movies'] });
       void queryClient.invalidateQueries({ queryKey: ['users'] });
-      void queryClient.invalidateQueries({ queryKey: ['activities'] });
+      void queryClient.invalidateQueries({ queryKey: ['notifications', userId] });
     },
   });
 
   const updateStatusMutation = useMutation({
     mutationFn: ({ movie, status }: { movie: OscarMovie; status: MovieStatus }) =>
       setOscarMovieStatus(userId as string, movie, status),
-    onSuccess: () => {
+    onMutate: async ({ movie, status }) => {
+      await queryClient.cancelQueries({ queryKey: ['oscar-movies', userId] });
+      await queryClient.cancelQueries({ queryKey: ['personal-movies', userId] });
+
+      const previousOscarMovies = queryClient.getQueryData<OscarMovieWithStatus[]>(['oscar-movies', userId]);
+
+      queryClient.setQueryData<OscarMovieWithStatus[]>(
+        ['oscar-movies', userId],
+        (current) =>
+          (current ?? []).map((item) =>
+            item.id === movie.id ? { ...item, status } : item,
+          ),
+      );
+
+      return { previousOscarMovies };
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previousOscarMovies) {
+        queryClient.setQueryData(['oscar-movies', userId], context.previousOscarMovies);
+      }
+    },
+    onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['oscar-movies', userId] });
       void queryClient.invalidateQueries({ queryKey: ['personal-movies', userId] });
-      void queryClient.invalidateQueries({ queryKey: ['users'] });
-      void queryClient.invalidateQueries({ queryKey: ['activities'] });
+      if (variables.status === 'watched') {
+        void queryClient.invalidateQueries({ queryKey: ['users'] });
+        void queryClient.invalidateQueries({ queryKey: ['notifications', userId] });
+      }
     },
   });
 

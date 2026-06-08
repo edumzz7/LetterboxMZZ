@@ -17,14 +17,13 @@ type AddMovieDialogProps =
       onSubmit: (movie: Omit<PersonalMovie, 'id' | 'user_id' | 'created_at'>) => Promise<unknown>;
       isPending: boolean;
       layout?: 'carousel' | 'grid';
+      defaultStatus?: 'watchlist' | 'watched';
     };
 
-export default function AddMovieDialog({
-  mode,
-  onSubmit,
-  isPending,
-  layout = 'carousel',
-}: AddMovieDialogProps) {
+export default function AddMovieDialog(props: AddMovieDialogProps) {
+  const { mode, onSubmit, isPending, layout = 'carousel' } = props;
+  const personalDefaultStatus =
+    mode === 'personal' ? props.defaultStatus ?? 'watchlist' : 'watchlist';
   const isPersonal = mode === 'personal';
   const [open, setOpen] = useState(false);
   const [titulo, setTitulo] = useState('');
@@ -118,7 +117,7 @@ export default function AddMovieDialog({
           ano_lancamento: parseInt(ano, 10) || new Date().getFullYear(),
           capa_url: capaUrl.trim() || null,
           plataforma_slug: 'stremio',
-          status: 'watchlist',
+          status: personalDefaultStatus,
           source: 'manual',
           source_movie_id: selectedMovie ? String(selectedMovie.id) : null,
           rating: selectedMovie?.vote_average ?? null,

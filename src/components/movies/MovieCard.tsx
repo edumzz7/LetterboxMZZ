@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Film, Eye, EyeOff, Trash2, Loader2 } from 'lucide-react';
+import { Film, Eye, EyeOff, Trash2, Loader2, Star } from 'lucide-react';
 import clsx from 'clsx';
 import { generateImagePath } from '../../lib/imageUtils';
 import {
@@ -14,8 +14,15 @@ import {
 import type { MovieStatus, OscarMovieWithStatus, PersonalMovie } from '../../types/app';
 
 type CardMovie = OscarMovieWithStatus | PersonalMovie;
-type ReactionEmoji = '❤️' | '🔥' | '😂' | '👎';
+type ReactionEmoji = string;
 type ProviderItem = TMDBWatchProvider;
+
+const REACTION_OPTIONS = [
+  { value: '\u2764\uFE0F', label: 'Amei' },
+  { value: '\u{1F525}', label: 'Fogo' },
+  { value: '\u{1F602}', label: 'Riso' },
+  { value: '\u{1F44E}', label: 'Nao curti' },
+] as const;
 
 interface MovieCardProps {
   movie: CardMovie;
@@ -80,7 +87,9 @@ export default function MovieCard({
   const [showProviders, setShowProviders] = useState(false);
   const [providersLoading, setProvidersLoading] = useState(false);
   const [reactionPending, setReactionPending] = useState<ReactionEmoji | null>(null);
+  const [reactionsOpen, setReactionsOpen] = useState(false);
   const [ratingPending, setRatingPending] = useState<number | null>(null);
+  const [ratingError, setRatingError] = useState<string | null>(null);
   const [localRating, setLocalRating] = useState<number>(isPersonalMovie(movie) ? (movie.avaliacao ?? 0) : 0);
   const showReadOnlyRating = isPersonalMovie(movie) && isWatched && (canRate || localRating > 0);
   const providersRef = useRef<HTMLDivElement | null>(null);
@@ -139,10 +148,15 @@ export default function MovieCard({
 
   const handleRate = async (stars: number) => {
     if (!isPersonalMovie(movie) || !onRate) return;
+    const previousRating = localRating;
+    setRatingError(null);
     setLocalRating(stars);
     setRatingPending(stars);
     try {
       await onRate(movie, stars);
+    } catch (error) {
+      setLocalRating(previousRating);
+      setRatingError(error instanceof Error ? error.message : 'Falha ao salvar avaliacao.');
     } finally {
       setRatingPending(null);
     }
@@ -185,7 +199,10 @@ export default function MovieCard({
         isPending && 'opacity-90',
       )}
     >
-      <div className="relative aspect-[2/3] w-full rounded-md overflow-hidden bg-brand-card border border-[#222] transition-all hover:border-brand-gold-alt hover:shadow-[0_0_15px_rgba(212,175,55,0.15)] group cursor-pointer">
+      <div
+        className="relative aspect-[2/3] w-full rounded-md overflow-hidden bg-brand-card border border-[#222] transition-all hover:border-brand-gold-alt hover:shadow-[0_0_15px_rgba(212,175,55,0.15)] group cursor-pointer"
+        onClick={() => { if (isFriendCard) setReactionsOpen((prev) => !prev); }}
+      >
         <img
           src={imageSrc}
           alt={movie.titulo}
@@ -245,19 +262,31 @@ export default function MovieCard({
         ) : null}
 
         {isFriendCard ? (
-          <div className="absolute left-1/2 -translate-x-1/2 top-3 opacity-0 pointer-events-none group-hover/card:opacity-100 group-hover/card:pointer-events-auto transition-opacity duration-300 delay-500 z-20">
+          <div
+            className={clsx(
+              'absolute left-1/2 -translate-x-1/2 top-3 transition-opacity duration-200 z-20',
+              reactionsOpen
+                ? 'opacity-100 pointer-events-auto'
+                : 'opacity-0 pointer-events-none group-hover/card:opacity-100 group-hover/card:pointer-events-auto',
+            )}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="bg-black/80 border border-[#333] rounded-full px-2 py-1 flex items-center gap-1">
-              {(['❤️', '🔥', '😂', '👎'] as ReactionEmoji[]).map((emoji) => (
+              {REACTION_OPTIONS.map((reaction) => (
                 <button
-                  key={emoji}
+                  key={reaction.label}
                   type="button"
-                  onClick={() => void handleReaction(emoji)}
+                  onClick={() => {
+                    void handleReaction(reaction.value);
+                    setReactionsOpen(false);
+                  }}
                   className={clsx(
                     'w-7 h-7 rounded-full border border-[#333] text-sm hover:border-brand-gold/40 bg-brand-bg/70',
-                    reactionPending === emoji && 'opacity-60',
+                    reactionPending === reaction.value && 'opacity-60',
                   )}
+                  title={reaction.label}
                 >
-                  {emoji}
+                  {reaction.value}
                 </button>
               ))}
               {reactionPending ? <Loader2 size={12} className="animate-spin text-brand-gold ml-1" /> : null}
@@ -322,12 +351,14 @@ export default function MovieCard({
         ) : null}
 
         {showReadOnlyRating ? (
+          <div className="flex flex-col gap-1">
           <div className="flex items-center gap-1 text-lg">
             {[1, 2, 3, 4, 5].map((star) => (
               <button
                 key={star}
                 type="button"
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   if (canRate) void handleRate(star);
                 }}
                 disabled={!canRate}
@@ -339,10 +370,16 @@ export default function MovieCard({
                 )}
                 title={`${star} estrela(s)`}
               >
-                ★
+                <Star
+                  size={16}
+                  fill={localRating >= star ? 'currentColor' : 'none'}
+                  strokeWidth={2}
+                />
               </button>
             ))}
             {canRate && ratingPending ? <Loader2 size={12} className="animate-spin text-brand-gold ml-1" /> : null}
+          </div>
+          {ratingError ? <p className="text-[10px] leading-relaxed text-red-300">{ratingError}</p> : null}
           </div>
         ) : null}
       </div>

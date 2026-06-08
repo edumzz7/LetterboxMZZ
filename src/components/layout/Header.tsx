@@ -3,10 +3,9 @@ import { Menu } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 interface HeaderProps {
-  activeTab: 'oscars' | 'personal';
-  onTabChange: (tab: 'oscars' | 'personal') => void;
+  activeTab: 'dashboard' | 'oscars' | 'personal';
+  onTabChange: (tab: 'dashboard' | 'oscars' | 'personal') => void;
   title: string;
-  subtitle: string;
   canAccessOscars: boolean;
   onToggleSidebar: () => void;
   rightSlot?: ReactNode;
@@ -16,7 +15,6 @@ const Header = ({
   activeTab,
   onTabChange,
   title,
-  subtitle,
   canAccessOscars,
   onToggleSidebar,
   rightSlot,
@@ -40,9 +38,6 @@ const Header = ({
             </button>
           </div>
         </div>
-        <p className="text-sm md:text-base text-brand-text-muted tracking-[0.18em] uppercase">
-          {subtitle}
-        </p>
       </div>
 
       <div className="w-24 h-[1px] bg-brand-gold opacity-50" />
@@ -50,19 +45,33 @@ const Header = ({
       <nav className="flex flex-col md:flex-row items-center justify-center w-full gap-8 md:gap-16 mt-4 text-sm md:text-base text-brand-text-muted font-light tracking-wider border-b border-[#111] pb-4">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => onTabChange('oscars')}
-            disabled={!canAccessOscars}
+            onClick={() => onTabChange('dashboard')}
             className={clsx(
               'uppercase transition-colors pb-1',
-              activeTab === 'oscars'
+              activeTab === 'dashboard'
                 ? 'text-brand-gold border-b-2 border-brand-gold'
                 : 'hover:text-brand-text',
-              !canAccessOscars && 'opacity-30 pointer-events-none',
             )}
           >
-            OSCARS 2026
+            PAINEL PESSOAL
           </button>
         </div>
+
+        {canAccessOscars && (
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => onTabChange('oscars')}
+              className={clsx(
+                'uppercase transition-colors pb-1',
+                activeTab === 'oscars'
+                  ? 'text-brand-gold border-b-2 border-brand-gold'
+                  : 'hover:text-brand-text',
+              )}
+            >
+              OSCARS 2026
+            </button>
+          </div>
+        )}
 
         <div className="flex items-center gap-4">
           <button

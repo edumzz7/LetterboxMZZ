@@ -17,6 +17,23 @@ export interface TMDBSeries {
     vote_average?: number;
 }
 
+export interface TMDBTvSeasonMeta {
+    season_number: number;
+    episode_count: number;
+}
+
+export interface TMDBTvDetails {
+    id: number;
+    number_of_seasons: number;
+    number_of_episodes: number;
+    seasons: TMDBTvSeasonMeta[];
+}
+
+export interface TMDBSeasonEpisode {
+    episode_number: number;
+    name: string;
+}
+
 export interface TMDBWatchProvider {
     provider_id: number;
     provider_name: string;
@@ -153,6 +170,47 @@ export async function getTvWatchProviders(
         return Array.from(unique.values()).slice(0, 5);
     } catch (error) {
         console.error('Error fetching TV watch providers:', error);
+        return [];
+    }
+}
+
+export async function getTvDetails(tvId: number): Promise<TMDBTvDetails | null> {
+    if (!TMDB_API_KEY || !tvId) return null;
+    try {
+        const response = await fetch(
+            `${TMDB_BASE_URL}/tv/${tvId}?api_key=${TMDB_API_KEY}&language=pt-BR`
+        );
+        if (!response.ok) throw new Error('TMDB TV Details Fetch Error');
+        const data = await response.json();
+        return {
+            id: data.id,
+            number_of_seasons: data.number_of_seasons ?? 0,
+            number_of_episodes: data.number_of_episodes ?? 0,
+            seasons: (data.seasons || []).map((season: { season_number?: number; episode_count?: number }) => ({
+                season_number: season.season_number ?? 0,
+                episode_count: season.episode_count ?? 0,
+            })),
+        };
+    } catch (error) {
+        console.error('Error fetching TV details:', error);
+        return null;
+    }
+}
+
+export async function getTvSeasonEpisodes(tvId: number, seasonNumber: number): Promise<TMDBSeasonEpisode[]> {
+    if (!TMDB_API_KEY || !tvId || seasonNumber <= 0) return [];
+    try {
+        const response = await fetch(
+            `${TMDB_BASE_URL}/tv/${tvId}/season/${seasonNumber}?api_key=${TMDB_API_KEY}&language=pt-BR`
+        );
+        if (!response.ok) throw new Error('TMDB TV Season Fetch Error');
+        const data = await response.json();
+        return (data.episodes || []).map((episode: { episode_number?: number; name?: string }) => ({
+            episode_number: episode.episode_number ?? 0,
+            name: episode.name ?? `Episodio ${episode.episode_number ?? '?'}`,
+        }));
+    } catch (error) {
+        console.error('Error fetching TV season episodes:', error);
         return [];
     }
 }

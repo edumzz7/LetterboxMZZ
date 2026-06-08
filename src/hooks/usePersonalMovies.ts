@@ -19,9 +19,12 @@ export function usePersonalMovies(userId: string | null) {
   const addMovieMutation = useMutation({
     mutationFn: (movie: Omit<PersonalMovie, 'id' | 'user_id' | 'created_at'>) =>
       addPersonalMovie(userId as string, movie),
-    onSuccess: () => {
+    onSuccess: (_data, movie) => {
       void queryClient.invalidateQueries({ queryKey: ['personal-movies', userId] });
-      void queryClient.invalidateQueries({ queryKey: ['activities'] });
+      if (movie.status === 'watched') {
+        void queryClient.invalidateQueries({ queryKey: ['users'] });
+        void queryClient.invalidateQueries({ queryKey: ['notifications', userId] });
+      }
     },
   });
 
@@ -36,10 +39,12 @@ export function usePersonalMovies(userId: string | null) {
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: MovieStatus }) =>
       updatePersonalMovie(id, { status }),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['personal-movies', userId] });
-      void queryClient.invalidateQueries({ queryKey: ['users'] });
-      void queryClient.invalidateQueries({ queryKey: ['activities'] });
+      if (variables.status === 'watched') {
+        void queryClient.invalidateQueries({ queryKey: ['users'] });
+        void queryClient.invalidateQueries({ queryKey: ['notifications', userId] });
+      }
     },
   });
 

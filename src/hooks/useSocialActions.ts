@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import type { PersonalMovie } from '../types/app';
 import { rateMovie, reactToMovie } from '../lib/appData';
 
 export function useSocialActions() {
@@ -16,9 +17,16 @@ export function useSocialActions() {
       movieTitle: string;
       stars: number;
     }) => rateMovie(actorUserId, movieId, movieTitle, stars),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['personal-movies'] });
-      void queryClient.invalidateQueries({ queryKey: ['activities'] });
+    onSuccess: (_data, variables) => {
+      queryClient.setQueriesData<PersonalMovie[]>(
+        { queryKey: ['personal-movies'] },
+        (current) =>
+          Array.isArray(current)
+            ? current.map((movie) =>
+                movie.id === variables.movieId ? { ...movie, avaliacao: variables.stars } : movie,
+              )
+            : current,
+      );
     },
   });
 
@@ -34,8 +42,10 @@ export function useSocialActions() {
       movieTitle: string;
       reaction: string;
     }) => reactToMovie(actorUserId, targetUserId, movieTitle, reaction),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['activities'] });
+    onSuccess: (_data, variables) => {
+      if (variables.targetUserId === variables.actorUserId) {
+        void queryClient.invalidateQueries({ queryKey: ['notifications', variables.actorUserId] });
+      }
     },
   });
 

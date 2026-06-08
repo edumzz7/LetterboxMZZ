@@ -17,10 +17,11 @@ export function useSuggestMovie() {
       movie: Omit<PersonalMovie, 'id' | 'user_id' | 'created_at'>;
       mediaType: 'movie' | 'tv';
     }) => suggestMovieToUser(fromUserId, toUserId, movie, mediaType),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['users'] });
-      void queryClient.invalidateQueries({ queryKey: ['activities'] });
-      void queryClient.invalidateQueries({ queryKey: ['personal-movies'] });
+      if (variables.toUserId === variables.fromUserId) {
+        void queryClient.invalidateQueries({ queryKey: ['notifications', variables.fromUserId] });
+      }
     },
   });
 }

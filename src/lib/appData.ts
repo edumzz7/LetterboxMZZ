@@ -1,5 +1,6 @@
 import type { Models } from 'appwrite';
 import { account, databases, ID, Permission, Query, Role } from './appwrite';
+import * as localData from './localData';
 import { normalizeUsername } from './auth';
 import { DEFAULT_OSCAR_MOVIES, readLegacyMovieData, readLegacySeriesData } from './catalog';
 import type {
@@ -63,9 +64,12 @@ type AppwriteSeriesDoc = Models.Document & {
   titulo: string;
   capaUrl: string | null;
   plataforma: string | null;
+  temporada?: number | null;
+  Temporada?: number | null;
   totalEpisodios: number;
   episodiosVistos: number;
   status: AppwriteSeriesStatus;
+  avaliacao?: number | null;
   rating?: number | null;
   streamingData?: string | null;
 };
@@ -74,6 +78,10 @@ type AppwriteMetadataDoc = Models.Document & {
   user_id: string;
   mcoins: number;
   avatar_id: string;
+  display_name?: string;
+  favorite_movie?: string;
+  favorite_genre?: string;
+  watch_preference?: 'home' | 'cinema';
 };
 
 type AppwriteActivityDoc = Models.Document & {
@@ -100,18 +108,23 @@ const COLLECTION_USUARIOS_METADATA =
 const COLLECTION_ATIVIDADES = import.meta.env.VITE_APPWRITE_COLLECTION_ATIVIDADES ?? 'atividades';
 const MANAGED_PASSWORD_PLACEHOLDER = 'managed-by-appwrite';
 const MANAGED_PASSWORD_PREFIX = 'letterboxzzo::managed::';
-
-const SEED_USERNAME = import.meta.env.VITE_SEED_USERNAME?.trim();
-const SEED_PASSWORD = import.meta.env.VITE_SEED_PASSWORD?.trim();
 const PUBLIC_APP_URL = (import.meta.env.VITE_PUBLIC_APP_URL ?? 'https://letterbox-mzz.vercel.app').replace(
   /\/$/,
   '',
 );
 const FALLBACK_POSTER_URL = 'https://placehold.co/600x900/png';
-const AVATAR_IDS = ['reel', 'clapper', 'popcorn', 'projector', 'ticket'];
+const AVATAR_IDS = ['avatar_clapper', 'avatar_popcorn', 'avatar_projector', 'avatar_girl', 'avatar_robot'];
+const LOCAL_MODE_KEY = 'letterboxmzz_force_local_v1';
+const LEGACY_IMPORT_PREFIX = 'letterboxmzz_legacy_imported_v1_';
+const HAS_APPWRITE_ENV = Boolean(
+  import.meta.env.VITE_APPWRITE_ENDPOINT &&
+    import.meta.env.VITE_APPWRITE_PROJECT_ID &&
+    import.meta.env.VITE_APPWRITE_DATABASE_ID,
+);
+let runtimeLocalMode = !HAS_APPWRITE_ENV;
 
-if (!DATABASE_ID) {
-  throw new Error('VITE_APPWRITE_DATABASE_ID nao configurado.');
+if (typeof window !== 'undefined') {
+  sessionStorage.removeItem(LOCAL_MODE_KEY);
 }
 
 const TRIGGER_POINTS = {
@@ -153,6 +166,9 @@ function toAppwriteSeriesStatus(
   episodiosVistos: number,
   totalEpisodios: number,
 ): AppwriteSeriesStatus {
+  if (status === 'watchlist' || episodiosVistos <= 0) {
+    return 'naoIniciado';
+  }
   if (status === 'watched' || (totalEpisodios > 0 && episodiosVistos >= totalEpisodios)) {
     return 'concluido';
   }
@@ -160,7 +176,13 @@ function toAppwriteSeriesStatus(
 }
 
 function fromAppwriteSeriesStatus(status: AppwriteSeriesStatus | string | null | undefined): SeriesStatus {
-  return status === 'concluido' ? 'watched' : 'watching';
+  if (status === 'concluido') return 'watched';
+  if (status === 'naoIniciado') return 'watchlist';
+  return 'watching';
+}
+
+function readSeriesSeason(doc: Pick<AppwriteSeriesDoc, 'temporada' | 'Temporada'>) {
+  return Math.max(1, doc.temporada ?? doc.Temporada ?? 1);
 }
 
 function wrapPermissionError(error: unknown, collectionId: string) {
@@ -170,6 +192,42 @@ function wrapPermissionError(error: unknown, collectionId: string) {
   }
 
   return error;
+}
+
+function isBackendUnavailable(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return (
+    !HAS_APPWRITE_ENV ||
+    message.includes('Failed to fetch') ||
+    message.includes('Network request failed') ||
+    message.includes('fetch') ||
+    message.includes('ERR_NETWORK')
+  );
+}
+
+function shouldUseLocalMode() {
+  return runtimeLocalMode;
+}
+
+function activateLocalMode() {
+  runtimeLocalMode = true;
+}
+
+async function withFallback<T>(remote: () => Promise<T>, local: () => Promise<T>) {
+  if (shouldUseLocalMode()) {
+    return local();
+  }
+
+  try {
+    return await remote();
+  } catch (error) {
+    if (isBackendUnavailable(error)) {
+      console.warn('Appwrite indisponivel. Ativando modo local.', error);
+      activateLocalMode();
+      return local();
+    }
+    throw error;
+  }
 }
 
 async function createDocument<T extends Record<string, unknown>>(
@@ -186,14 +244,14 @@ async function createDocumentInternal<T extends Record<string, unknown>>(
   data: T,
   permissions?: string[],
 ) {
-  let payload: Record<string, unknown> = { ...data };
+  const payload: Record<string, unknown> = { ...data };
 
   for (let attempt = 0; attempt < 6; attempt += 1) {
     try {
       return await databases.createDocument(DATABASE_ID, collectionId, documentId, payload, permissions);
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
-      const unknownAttribute = message.match(/Unknown attribute: \"([^\"]+)\"/);
+      const unknownAttribute = message.match(/Unknown attribute: "([^"]+)"/);
       if (unknownAttribute) {
         delete payload[unknownAttribute[1]];
         continue;
@@ -223,14 +281,14 @@ async function updateDocumentWithPermissions<T extends Record<string, unknown>>(
   data: T,
   permissions?: string[],
 ) {
-  let payload: Record<string, unknown> = { ...data };
+  const payload: Record<string, unknown> = { ...data };
 
   for (let attempt = 0; attempt < 6; attempt += 1) {
     try {
       return await databases.updateDocument(DATABASE_ID, collectionId, documentId, payload, permissions);
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
-      const unknownAttribute = message.match(/Unknown attribute: \"([^\"]+)\"/);
+      const unknownAttribute = message.match(/Unknown attribute: "([^"]+)"/);
       if (unknownAttribute) {
         delete payload[unknownAttribute[1]];
         continue;
@@ -291,20 +349,28 @@ function mapPersonalMovie(doc: AppwritePersonalMovieDoc): PersonalMovie {
 function mapSeries(doc: AppwriteSeriesDoc): SeriesEntry {
   const totalEpisodios = doc.totalEpisodios ?? 0;
   const episodiosVistos = doc.episodiosVistos ?? 0;
+  const derivedStatus = getSeriesStatus(episodiosVistos, totalEpisodios);
+  const storedStatus = fromAppwriteSeriesStatus(doc.status);
   return {
     id: doc.$id,
     user_id: doc.user_id ?? '',
     titulo: doc.titulo,
     capa_url: doc.capaUrl ?? null,
-    status: fromAppwriteSeriesStatus(doc.status) ?? getSeriesStatus(episodiosVistos, totalEpisodios),
-    temporada: 1,
+    status: episodiosVistos <= 0 ? 'watchlist' : storedStatus === 'watched' ? 'watched' : derivedStatus,
+    temporada: readSeriesSeason(doc),
     total_episodios: totalEpisodios,
     episodios_vistos: episodiosVistos,
     plataforma_slug: doc.plataforma ?? null,
+    avaliacao: doc.avaliacao ?? null,
     rating: doc.rating ?? null,
     streaming_data: doc.streamingData ?? null,
     created_at: doc.$createdAt,
   };
+}
+
+function isIncomingNotificationMessage(message: string) {
+  const normalized = message.toLowerCase();
+  return normalized.includes('para voce') || normalized.includes('ao seu filme');
 }
 
 function parseRecommendedSource(sourceMovieId: string | null | undefined) {
@@ -434,19 +500,6 @@ async function getCurrentAccount() {
   }
 }
 
-async function createManagedAccount(username: string, password: string) {
-  const normalized = normalizeUsername(username);
-  const email = createSessionEmail(normalized);
-  try {
-    return await account.create(ID.unique(), email, createManagedPassword(password), normalized);
-  } catch (error) {
-    if (isConflictError(error)) {
-      return null;
-    }
-    throw error;
-  }
-}
-
 async function getSessionProfile() {
   const currentAccount = await getCurrentAccount();
   if (!currentAccount) return null;
@@ -567,9 +620,12 @@ async function repairSeriesDoc(doc: AppwriteSeriesDoc) {
       titulo: doc.titulo,
       capaUrl: doc.capaUrl ?? null,
       plataforma: doc.plataforma ?? null,
+      temporada: readSeriesSeason(doc),
+      Temporada: readSeriesSeason(doc),
       totalEpisodios: doc.totalEpisodios,
       episodiosVistos: doc.episodiosVistos,
       status: doc.status,
+      avaliacao: doc.avaliacao ?? null,
       rating: doc.rating ?? null,
       streamingData: doc.streamingData ?? null,
     }, permissions)) as unknown as AppwriteSeriesDoc;
@@ -649,450 +705,620 @@ async function upsertPersonalOscarMovie(userId: string, movie: OscarMovie, statu
 }
 
 export async function bootstrapApp() {
-  if (typeof window === 'undefined') return;
-  if (sessionStorage.getItem(BOOTSTRAP_KEY)) return;
+  return withFallback(
+    async () => {
+      if (typeof window === 'undefined') return;
+      if (sessionStorage.getItem(BOOTSTRAP_KEY)) return;
 
-  const existingOscarMovies = await listDocuments<AppwriteOscarMovieDoc>(COLLECTION_OSCAR_MOVIES, [
-    Query.limit(1),
-  ]);
+      const existingOscarMovies = await listDocuments<AppwriteOscarMovieDoc>(COLLECTION_OSCAR_MOVIES, [
+        Query.limit(1),
+      ]);
 
-  if (existingOscarMovies.length === 0) {
-    await Promise.all(
-      DEFAULT_OSCAR_MOVIES.map((movie) =>
-        createDocument(COLLECTION_OSCAR_MOVIES, {
-          titulo: movie.titulo,
-          capaUrl: ensureValidUrl(movie.capa_url),
-          plataforma: movie.plataforma_slug ?? 'stremio',
-          categoria: movie.categoria_principal ?? 'Melhor Filme',
-          ano: movie.ano_oscar,
-          rating: movie.rating ?? null,
-          streamingData: movie.streaming_data ?? null,
-        }),
-      ),
-    );
-  }
+      if (existingOscarMovies.length === 0) {
+        await Promise.all(
+          DEFAULT_OSCAR_MOVIES.map((movie) =>
+            createDocument(COLLECTION_OSCAR_MOVIES, {
+              titulo: movie.titulo,
+              capaUrl: ensureValidUrl(movie.capa_url),
+              plataforma: movie.plataforma_slug ?? 'stremio',
+              categoria: movie.categoria_principal ?? 'Melhor Filme',
+              ano: movie.ano_oscar,
+              rating: movie.rating ?? null,
+              streamingData: movie.streaming_data ?? null,
+            }),
+          ),
+        );
+      }
 
-  if (!SEED_USERNAME || !SEED_PASSWORD) {
-    sessionStorage.setItem(BOOTSTRAP_KEY, '1');
-    return;
-  }
-
-  const currentAccount = await getCurrentAccount();
-  if (!currentAccount) {
-    sessionStorage.setItem(BOOTSTRAP_KEY, '1');
-    return;
-  }
-
-  try {
-    const normalized = normalizeUsername(SEED_USERNAME);
-    const existingUser = await firstDocument<AppwriteUserDoc>(COLLECTION_APP_USERS, [
-      Query.equal('username', [normalized]),
-    ]);
-
-    let userId = existingUser?.$id;
-
-    if (!userId) {
-      const managedSeedAccount = await createManagedAccount(normalized, SEED_PASSWORD);
-      const insertedUser = (await createDocumentWithId(
-        COLLECTION_APP_USERS,
-        managedSeedAccount?.$id ?? ID.unique(),
-        {
-          username: normalized,
-          password_hash: MANAGED_PASSWORD_PLACEHOLDER,
-        },
-        managedSeedAccount ? await ownerScopedPermissions(managedSeedAccount.$id) : undefined,
-      )) as unknown as AppwriteUserDoc;
-      userId = insertedUser.$id;
-      await ensureUserMetadata(userId);
-    }
-
-    const personalDocs = await listDocuments<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
-      Query.equal('user_id', [userId]),
-      Query.limit(1),
-    ]);
-
-    const seriesDocs = await listDocuments<AppwriteSeriesDoc>(COLLECTION_PERSONAL_SERIES, [
-      Query.equal('user_id', [userId]),
-      Query.limit(1),
-    ]);
-
-    const oscarMovies = await listDocuments<AppwriteOscarMovieDoc>(COLLECTION_OSCAR_MOVIES, [
-      Query.orderDesc('ano'),
-      Query.orderAsc('titulo'),
-    ]);
-
-    const { personalMovies, oscarStatuses } = readLegacyMovieData();
-    const legacySeries = readLegacySeriesData();
-
-    if (personalDocs.length === 0 && personalMovies.length > 0) {
-      await Promise.all(
-        personalMovies.map((movie) =>
-          createDocument(COLLECTION_PERSONAL_MOVIES, {
-            ...movie,
-            user_id: userId,
-          }),
-        ),
-      );
-    }
-
-    if (seriesDocs.length === 0 && legacySeries.length > 0) {
-      await Promise.all(
-        legacySeries.map((series) =>
-          createDocument(COLLECTION_PERSONAL_SERIES, {
-            user_id: userId,
-            titulo: series.titulo,
-            capaUrl: ensureValidUrl(series.capa_url),
-            plataforma: series.plataforma_slug ?? 'stremio',
-            episodiosVistos: Math.max(0, series.episodios_vistos),
-            totalEpisodios: Math.max(1, series.total_episodios),
-            status: toAppwriteSeriesStatus(
-              series.status,
-              Math.max(0, series.episodios_vistos),
-              Math.max(1, series.total_episodios),
-            ),
-          }),
-        ),
-      );
-    }
-
-    if (oscarStatuses.size > 0) {
-      const updates = oscarMovies
-        .map((movie) => {
-          const status = oscarStatuses.get(titleKey(movie.titulo));
-          if (!status) return null;
-          return { movie, status };
-        })
-        .filter(Boolean) as { movie: AppwriteOscarMovieDoc; status: MovieStatus }[];
-
-      await Promise.all(
-        updates.map(({ movie, status }) => upsertUserOscarMovie(userId, movie.$id, status)),
-      );
-    }
-  } catch (error) {
-    console.warn('Bootstrap parcial ignorado:', error);
-  }
-
-  sessionStorage.setItem(BOOTSTRAP_KEY, '1');
+      sessionStorage.setItem(BOOTSTRAP_KEY, '1');
+    },
+    () => localData.bootstrapApp(),
+  );
 }
 
 export async function loginUser(username: string, password: string) {
-  const normalized = normalizeUsername(username);
+  return withFallback(
+    async () => {
+      const normalized = normalizeUsername(username);
 
-  try {
-    await ensureAppwriteSession(normalized, password);
-    const profile = await getSessionProfile();
-    if (!profile) {
-      throw new Error('Perfil do usuario nao encontrado.');
-    }
-    return profile;
-  } catch {
-    throw new Error('Usuario ou senha invalidos.');
-  }
+      try {
+        await ensureAppwriteSession(normalized, password);
+        const profile = await getSessionProfile();
+        if (!profile) {
+          throw new Error('Perfil do usuario nao encontrado.');
+        }
+        return profile;
+      } catch {
+        throw new Error('Usuario ou senha invalidos.');
+      }
+    },
+    () => localData.loginUser(username, password),
+  );
 }
 
 export async function registerUser(username: string, password: string) {
-  const normalized = normalizeUsername(username);
+  return withFallback(
+    async () => {
+      const normalized = normalizeUsername(username);
 
-  const existing = await firstDocument<AppwriteUserDoc>(COLLECTION_APP_USERS, [
-    Query.equal('username', [normalized]),
-  ]);
+      const existing = await firstDocument<AppwriteUserDoc>(COLLECTION_APP_USERS, [
+        Query.equal('username', [normalized]),
+      ]);
 
-  if (existing) {
-    throw new Error('Esse username ja esta em uso.');
-  }
+      if (existing) {
+        throw new Error('Esse username ja esta em uso.');
+      }
 
-  try {
-    const createdAccount = await account.create(
-      ID.unique(),
-      createSessionEmail(normalized),
-      createManagedPassword(password),
-      normalized,
-    );
-    await ensureAppwriteSession(normalized, password);
+      try {
+        const createdAccount = await account.create(
+          ID.unique(),
+          createSessionEmail(normalized),
+          createManagedPassword(password),
+          normalized,
+        );
+        await ensureAppwriteSession(normalized, password);
 
-    const data = (await createDocumentWithId(COLLECTION_APP_USERS, createdAccount.$id, {
-      username: normalized,
-      password_hash: MANAGED_PASSWORD_PLACEHOLDER,
-    }, await ownerScopedPermissions(createdAccount.$id))) as unknown as AppwriteUserDoc;
+        const data = (await createDocumentWithId(COLLECTION_APP_USERS, createdAccount.$id, {
+          username: normalized,
+          password_hash: MANAGED_PASSWORD_PLACEHOLDER,
+        }, await ownerScopedPermissions(createdAccount.$id))) as unknown as AppwriteUserDoc;
 
-    try {
-      await account.updatePrefs({
-        appUserId: data.$id,
-        username: data.username,
-      });
-    } catch {
-      // Non-fatal
-    }
+        try {
+          await account.updatePrefs({
+            appUserId: data.$id,
+            username: data.username,
+          });
+        } catch {
+          // Non-fatal
+        }
 
-    await ensureUserMetadata(data.$id);
-    await addActivity(data.$id, `${data.username} entrou no LetterboxZZO.`, 0);
+        await ensureUserMetadata(data.$id);
+        await addActivity(data.$id, `${data.username} entrou no LetterboxZZO.`, 0);
 
-    return { id: data.$id, username: data.username as string };
-  } catch (error) {
-    if (isConflictError(error)) {
-      throw new Error('Esse username ja esta em uso.');
-    }
-    throw error;
-  }
+        return { id: data.$id, username: data.username as string };
+      } catch (error) {
+        if (isConflictError(error)) {
+          throw new Error('Esse username ja esta em uso.');
+        }
+        throw error;
+      }
+    },
+    () => localData.registerUser(username, password),
+  );
 }
 
 export async function listUsers() {
-  const data = await listDocuments<AppwriteUserDoc>(COLLECTION_APP_USERS, [Query.orderAsc('username')]);
-  return data.map(mapUser);
+  return withFallback(
+    async () => {
+      const data = await listDocuments<AppwriteUserDoc>(COLLECTION_APP_USERS, [Query.orderAsc('username')]);
+      return data.map(mapUser);
+    },
+    () => localData.listUsers(),
+  );
 }
 
 export async function listRankedUsers() {
-  const [users, metadata] = await Promise.all([
-    listUsers(),
-    listDocuments<AppwriteMetadataDoc>(COLLECTION_USUARIOS_METADATA),
-  ]);
+  return withFallback(
+    async () => {
+      const [users, metadata] = await Promise.all([
+        listUsers(),
+        listDocuments<AppwriteMetadataDoc>(COLLECTION_USUARIOS_METADATA),
+      ]);
 
-  const metadataByUser = new Map<string, AppwriteMetadataDoc>();
-  for (const item of metadata) {
-    const current = metadataByUser.get(item.user_id);
-    if (!current || item.$updatedAt > current.$updatedAt) {
-      metadataByUser.set(item.user_id, item);
-    }
-  }
+      const metadataByUser = new Map<string, AppwriteMetadataDoc>();
+      for (const item of metadata) {
+        const current = metadataByUser.get(item.user_id);
+        if (!current || item.$updatedAt > current.$updatedAt) {
+          metadataByUser.set(item.user_id, item);
+        }
+      }
 
-  const ranked = users
-    .map((user) => {
-      const userMeta = metadataByUser.get(user.id);
-      return {
-        ...user,
-        user_id: user.id,
-        mcoins: userMeta?.mcoins ?? 0,
-        avatar_id: userMeta?.avatar_id ?? fallbackAvatar(user.id),
-      };
-    })
-    .sort((a, b) => b.mcoins - a.mcoins || a.username.localeCompare(b.username));
+      const ranked = users
+        .map((user) => {
+          const userMeta = metadataByUser.get(user.id);
+          return {
+            ...user,
+            user_id: user.id,
+            mcoins: userMeta?.mcoins ?? 0,
+            avatar_id: userMeta?.avatar_id ?? fallbackAvatar(user.id),
+            display_name: userMeta?.display_name ?? undefined,
+            favorite_movie: userMeta?.favorite_movie ?? undefined,
+            favorite_genre: userMeta?.favorite_genre ?? undefined,
+            watch_preference: userMeta?.watch_preference ?? undefined,
+          };
+        })
+        .sort((a, b) => b.mcoins - a.mcoins || a.username.localeCompare(b.username));
 
-  return ranked.map((user, index) => ({ ...user, rank: index + 1 })) as RankedUser[];
+      return ranked.map((user, index) => ({ ...user, rank: index + 1 })) as RankedUser[];
+    },
+    () => localData.listRankedUsers(),
+  );
 }
 
 export async function listActivities(limit = 30) {
-  const data = await listDocuments<AppwriteActivityDoc>(COLLECTION_ATIVIDADES, [
-    Query.orderDesc('$createdAt'),
-    Query.limit(limit),
-  ]);
+  return withFallback(
+    async () => {
+      const data = await listDocuments<AppwriteActivityDoc>(COLLECTION_ATIVIDADES, [
+        Query.orderDesc('$createdAt'),
+        Query.limit(limit),
+      ]);
 
-  return data.map(mapActivity);
+      return data.map(mapActivity);
+    },
+    () => localData.listActivities(limit),
+  );
+}
+
+export async function listNotifications(userId: string, limit = 20) {
+  return withFallback(
+    async () => {
+      const data = await listDocuments<AppwriteActivityDoc>(COLLECTION_ATIVIDADES, [
+        Query.equal('user_id', [userId]),
+        Query.orderDesc('$createdAt'),
+        Query.limit(limit),
+      ]);
+
+      return data
+        .map(mapActivity)
+        .filter((item) => isIncomingNotificationMessage(item.message));
+    },
+    () => localData.listNotifications(userId, limit),
+  );
+}
+
+export async function listUserActivity(userId: string, limit = 20) {
+  return withFallback(
+    async () => {
+      const data = await listDocuments<AppwriteActivityDoc>(COLLECTION_ATIVIDADES, [
+        Query.equal('user_id', [userId]),
+        Query.orderDesc('$createdAt'),
+        Query.limit(limit),
+      ]);
+
+      return data
+        .map(mapActivity)
+        .filter((item) => !isIncomingNotificationMessage(item.message));
+    },
+    () => localData.listUserActivity(userId, limit),
+  );
 }
 
 export async function getCurrentSessionUser() {
-  return getSessionProfile();
+  return withFallback(
+    async () => getSessionProfile(),
+    () => localData.getCurrentSessionUser(),
+  );
+}
+
+export async function importLegacyDataForUser(userId: string) {
+  return withFallback(
+    async () => {
+      if (typeof window === 'undefined') return false;
+
+      const importKey = `${LEGACY_IMPORT_PREFIX}${userId}`;
+      if (localStorage.getItem(importKey) === '1') return false;
+
+      const rawMovies = localStorage.getItem('cinehub_movies');
+      const rawSeries = localStorage.getItem('cinehub_series');
+      if (!rawMovies && !rawSeries) return false;
+
+      await requireSessionUser(userId);
+
+      const [personalDocs, seriesDocs, oscarMovies] = await Promise.all([
+        listDocuments<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
+          Query.equal('user_id', [userId]),
+          Query.limit(1),
+        ]),
+        listDocuments<AppwriteSeriesDoc>(COLLECTION_PERSONAL_SERIES, [
+          Query.equal('user_id', [userId]),
+          Query.limit(1),
+        ]),
+        listDocuments<AppwriteOscarMovieDoc>(COLLECTION_OSCAR_MOVIES, [
+          Query.orderDesc('ano'),
+          Query.orderAsc('titulo'),
+        ]),
+      ]);
+
+      const { personalMovies, oscarStatuses } = readLegacyMovieData();
+      const legacySeries = readLegacySeriesData(false);
+      let changed = false;
+      const permissions = await ownerScopedPermissions(userId);
+
+      if (personalDocs.length === 0 && personalMovies.length > 0) {
+        await Promise.all(
+          personalMovies.map((movie) =>
+            createDocument(COLLECTION_PERSONAL_MOVIES, {
+              ...movie,
+              user_id: userId,
+            }, permissions),
+          ),
+        );
+        changed = true;
+      }
+
+      if (seriesDocs.length === 0 && legacySeries.length > 0) {
+        await Promise.all(
+          legacySeries.map((series) =>
+            createDocument(COLLECTION_PERSONAL_SERIES, {
+              user_id: userId,
+              titulo: series.titulo,
+              capaUrl: ensureValidUrl(series.capa_url),
+              plataforma: series.plataforma_slug ?? 'stremio',
+              episodiosVistos: Math.max(0, series.episodios_vistos),
+              totalEpisodios: Math.max(1, series.total_episodios),
+              status: toAppwriteSeriesStatus(
+                series.status,
+                Math.max(0, series.episodios_vistos),
+                Math.max(1, series.total_episodios),
+              ),
+            }, permissions),
+          ),
+        );
+        changed = true;
+      }
+
+      if (oscarStatuses.size > 0) {
+        const updates = oscarMovies
+          .map((movie) => {
+            const status = oscarStatuses.get(titleKey(movie.titulo));
+            if (!status) return null;
+            return { movie, status };
+          })
+          .filter(Boolean) as { movie: AppwriteOscarMovieDoc; status: MovieStatus }[];
+
+        if (updates.length > 0) {
+          await Promise.all(
+            updates.map(({ movie, status }) => upsertUserOscarMovie(userId, movie.$id, status)),
+          );
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        await addActivity(userId, 'dados legados foram importados para este perfil.', 0);
+      }
+
+      localStorage.setItem(importKey, '1');
+      return changed;
+    },
+    () => localData.importLegacyDataForUser(userId),
+  );
 }
 
 export async function logoutUser() {
-  try {
-    await account.deleteSession('current');
-  } catch {
-    // Ignore missing session and proceed with local cleanup.
-  }
+  return withFallback(
+    async () => {
+      try {
+        await account.deleteSession('current');
+      } catch {
+        // Ignore missing session and proceed with local cleanup.
+      }
+    },
+    () => localData.logoutUser(),
+  );
 }
 
 export async function updateUserAvatar(userId: string, avatarId: string) {
-  await requireSessionUser(userId);
-  const metadata = await ensureUserMetadata(userId);
-  await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, {
-    avatar_id: avatarId,
-  });
+  return withFallback(
+    async () => {
+      await requireSessionUser(userId);
+      const metadata = await ensureUserMetadata(userId);
+      await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, {
+        avatar_id: avatarId,
+      });
+    },
+    () => localData.updateUserAvatar(userId, avatarId),
+  );
+}
+
+export async function updateUserProfile(
+  userId: string,
+  data: {
+    display_name?: string;
+    favorite_movie?: string;
+    favorite_genre?: string;
+    watch_preference?: 'home' | 'cinema';
+  }
+) {
+  return withFallback(
+    async () => {
+      await requireSessionUser(userId);
+      const metadata = await ensureUserMetadata(userId);
+      const updates: Partial<typeof data> = {};
+      if (data.display_name !== undefined) updates.display_name = data.display_name;
+      if (data.favorite_movie !== undefined) updates.favorite_movie = data.favorite_movie;
+      if (data.favorite_genre !== undefined) updates.favorite_genre = data.favorite_genre;
+      if (data.watch_preference !== undefined) updates.watch_preference = data.watch_preference;
+
+      await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, updates);
+    },
+    () => localData.updateUserProfile(userId, data),
+  );
 }
 
 export async function getOscarMoviesForUser(userId: string) {
-  const [moviesResult, statusesResult] = await Promise.all([
-    listDocuments<AppwriteOscarMovieDoc>(COLLECTION_OSCAR_MOVIES, [
-      Query.orderDesc('ano'),
-      Query.orderAsc('titulo'),
-    ]),
-    listDocuments<AppwriteUserOscarMovieDoc>(COLLECTION_USER_OSCAR_MOVIES, [
-      Query.equal('user_id', [userId]),
-    ]),
-  ]);
+  return withFallback(
+    async () => {
+      const [moviesResult, statusesResult] = await Promise.all([
+        listDocuments<AppwriteOscarMovieDoc>(COLLECTION_OSCAR_MOVIES, [
+          Query.orderDesc('ano'),
+          Query.orderAsc('titulo'),
+        ]),
+        listDocuments<AppwriteUserOscarMovieDoc>(COLLECTION_USER_OSCAR_MOVIES, [
+          Query.equal('user_id', [userId]),
+        ]),
+      ]);
 
-  const statusByMovie = new Map(
-    statusesResult.map((item) => [item.oscar_movie_id, item.status as MovieStatus]),
+      const statusByMovie = new Map(
+        statusesResult.map((item) => [item.oscar_movie_id, item.status as MovieStatus]),
+      );
+
+      return moviesResult.map((movie) => ({
+        ...mapOscarMovie(movie),
+        status: statusByMovie.get(movie.$id) ?? 'watchlist',
+      })) as OscarMovieWithStatus[];
+    },
+    () => localData.getOscarMoviesForUser(userId),
   );
-
-  return moviesResult.map((movie) => ({
-    ...mapOscarMovie(movie),
-    status: statusByMovie.get(movie.$id) ?? 'watchlist',
-  })) as OscarMovieWithStatus[];
 }
 
 export async function addOscarMovie(userId: string, movie: Omit<OscarMovie, 'id'>) {
-  await requireSessionUser(userId);
-  const data = await createDocument(COLLECTION_OSCAR_MOVIES, {
-    titulo: movie.titulo,
-    capaUrl: ensureValidUrl(movie.capa_url),
-    plataforma: movie.plataforma_slug ?? 'stremio',
-    categoria: movie.categoria_principal ?? 'Melhor Filme',
-    ano: movie.ano_oscar,
-    rating: movie.rating ?? null,
-    streamingData: movie.streaming_data ?? null,
-  });
+  return withFallback(
+    async () => {
+      await requireSessionUser(userId);
+      const data = await createDocument(COLLECTION_OSCAR_MOVIES, {
+        titulo: movie.titulo,
+        capaUrl: ensureValidUrl(movie.capa_url),
+        plataforma: movie.plataforma_slug ?? 'stremio',
+        categoria: movie.categoria_principal ?? 'Melhor Filme',
+        ano: movie.ano_oscar,
+        rating: movie.rating ?? null,
+        streamingData: movie.streaming_data ?? null,
+      });
 
-  await awardMCoins(userId, 'INDICOU_FILME', `${movie.titulo} foi indicado para a lista.`);
-  return mapOscarMovie(data as unknown as AppwriteOscarMovieDoc);
+      await awardMCoins(userId, 'INDICOU_FILME', `${movie.titulo} foi indicado para a lista.`);
+      return mapOscarMovie(data as unknown as AppwriteOscarMovieDoc);
+    },
+    () => localData.addOscarMovie(userId, movie),
+  );
 }
 
 export async function setOscarMovieStatus(userId: string, movie: OscarMovie, status: MovieStatus) {
-  await requireSessionUser(userId);
-  const previous = await upsertUserOscarMovie(userId, movie.id, status);
-  await upsertPersonalOscarMovie(userId, movie, status);
+  return withFallback(
+    async () => {
+      await requireSessionUser(userId);
+      const previous = await upsertUserOscarMovie(userId, movie.id, status);
+      await upsertPersonalOscarMovie(userId, movie, status);
 
-  if (status === 'watched' && previous?.status !== 'watched') {
-    await awardMCoins(userId, 'ASSISTIU_FILME', `Assistiu ao filme ${movie.titulo}.`);
-  }
+      if (status === 'watched' && previous?.status !== 'watched') {
+        await awardMCoins(userId, 'ASSISTIU_FILME', `Assistiu ao filme ${movie.titulo}.`);
+      }
+    },
+    () => localData.setOscarMovieStatus(userId, movie, status),
+  );
 }
 
 export async function listPersonalMovies(userId: string) {
-  const data = await listDocuments<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
-    Query.equal('user_id', [userId]),
-    Query.orderDesc('$createdAt'),
-  ]);
-  const repaired = await Promise.all(data.map((doc) => repairPersonalMovieDoc(doc)));
-  const deduped = new Map<string, AppwritePersonalMovieDoc>();
-  for (const doc of repaired) {
-    const key = movieIdentityKey(doc);
-    const current = deduped.get(key);
-    if (!current || doc.$updatedAt > current.$updatedAt) {
-      deduped.set(key, doc);
-    }
-  }
-  return Array.from(deduped.values()).map(mapPersonalMovie) as PersonalMovie[];
+  return withFallback(
+    async () => {
+      const data = await listDocuments<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
+        Query.equal('user_id', [userId]),
+        Query.orderDesc('$createdAt'),
+      ]);
+      const deduped = new Map<string, AppwritePersonalMovieDoc>();
+      for (const doc of data) {
+        const key = movieIdentityKey(doc);
+        const current = deduped.get(key);
+        if (!current || doc.$updatedAt > current.$updatedAt) {
+          deduped.set(key, doc);
+        }
+      }
+      return Array.from(deduped.values()).map(mapPersonalMovie) as PersonalMovie[];
+    },
+    () => localData.listPersonalMovies(userId),
+  );
 }
 
 export async function addPersonalMovie(
   userId: string,
   movie: Omit<PersonalMovie, 'id' | 'user_id' | 'created_at'>,
 ) {
-  await requireSessionUser(userId);
-  const existingByTitle = await firstDocument<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
-    Query.equal('user_id', [userId]),
-    Query.equal('titulo', [movie.titulo]),
-  ]);
-  if (existingByTitle) {
-    throw new Error('Esse filme ja esta na sua lista.');
-  }
+  return withFallback(
+    async () => {
+      await requireSessionUser(userId);
+      const existingByTitle = await firstDocument<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
+        Query.equal('user_id', [userId]),
+        Query.equal('titulo', [movie.titulo]),
+      ]);
+      if (existingByTitle) {
+        throw new Error('Esse filme ja esta na sua lista.');
+      }
 
-  if (movie.source_movie_id) {
-    const existingBySource = await firstDocument<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
-      Query.equal('user_id', [userId]),
-      Query.equal('source_movie_id', [movie.source_movie_id]),
-    ]);
-    if (existingBySource) {
-      throw new Error('Esse filme ja esta na sua lista.');
-    }
-  }
+      if (movie.source_movie_id) {
+        const existingBySource = await firstDocument<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
+          Query.equal('user_id', [userId]),
+          Query.equal('source_movie_id', [movie.source_movie_id]),
+        ]);
+        if (existingBySource) {
+          throw new Error('Esse filme ja esta na sua lista.');
+        }
+      }
 
-  const data = await createDocument(COLLECTION_PERSONAL_MOVIES, {
-    ...movie,
-    rating: movie.rating ?? null,
-    streamingData: movie.streaming_data ?? null,
-    user_id: userId,
-  }, await ownerScopedPermissions(userId));
+      const data = await createDocument(COLLECTION_PERSONAL_MOVIES, {
+        ...movie,
+        rating: movie.rating ?? null,
+        streamingData: movie.streaming_data ?? null,
+        user_id: userId,
+      }, await ownerScopedPermissions(userId));
 
-  return mapPersonalMovie(data as unknown as AppwritePersonalMovieDoc);
+      const created = mapPersonalMovie(data as unknown as AppwritePersonalMovieDoc);
+
+      if (created.status === 'watched') {
+        const recommendation = parseRecommendedSource(created.source_movie_id);
+        if (recommendation) {
+          await awardMCoins(created.user_id, 'FILME_INDICADO_ASSISTIDO', `Assistiu ao filme indicado: ${created.titulo}.`);
+          await awardMCoins(
+            recommendation.recommenderId,
+            'BONUS_CURADOR',
+            `Seu filme indicado (${created.titulo}) foi assistido.`,
+          );
+        } else {
+          await awardMCoins(created.user_id, 'ASSISTIU_FILME', `Assistiu ao filme ${created.titulo}.`);
+        }
+      }
+
+      return created;
+    },
+    () => localData.addPersonalMovie(userId, movie),
+  );
 }
 
 export async function updatePersonalMovie(
   movieId: string,
   updates: Partial<Pick<PersonalMovie, 'status' | 'plataforma_slug' | 'avaliacao'>>,
 ) {
-  const current = await databases.getDocument(DATABASE_ID, COLLECTION_PERSONAL_MOVIES, movieId);
-  const currentDoc = current as unknown as AppwritePersonalMovieDoc;
-  await requireSessionUser(currentDoc.user_id);
+  return withFallback(
+    async () => {
+      const currentDoc = (await databases.getDocument(
+        DATABASE_ID,
+        COLLECTION_PERSONAL_MOVIES,
+        movieId,
+      )) as unknown as AppwritePersonalMovieDoc;
+      await requireSessionUser(currentDoc.user_id);
+      const writableDoc = await repairPersonalMovieDoc(currentDoc);
 
-  const data = await updateDocument(
-    COLLECTION_PERSONAL_MOVIES,
-    movieId,
-    updates as Record<string, string | number | null>,
-  );
-
-  const nextDoc = data as unknown as AppwritePersonalMovieDoc;
-
-  if (currentDoc.status !== 'watched' && nextDoc.status === 'watched') {
-    const recommendation = parseRecommendedSource(nextDoc.source_movie_id);
-    if (recommendation) {
-      await awardMCoins(nextDoc.user_id, 'FILME_INDICADO_ASSISTIDO', `Assistiu ao filme indicado: ${nextDoc.titulo}.`);
-      await awardMCoins(
-        recommendation.recommenderId,
-        'BONUS_CURADOR',
-        `Seu filme indicado (${nextDoc.titulo}) foi assistido.`,
+      const data = await updateDocument(
+        COLLECTION_PERSONAL_MOVIES,
+        writableDoc.$id,
+        updates as Record<string, string | number | null>,
       );
-    } else {
-      await awardMCoins(nextDoc.user_id, 'ASSISTIU_FILME', `Assistiu ao filme ${nextDoc.titulo}.`);
-    }
-  }
 
-  return mapPersonalMovie(nextDoc);
+      const nextDoc = data as unknown as AppwritePersonalMovieDoc;
+
+      if (currentDoc.status !== 'watched' && nextDoc.status === 'watched') {
+        const recommendation = parseRecommendedSource(nextDoc.source_movie_id);
+        if (recommendation) {
+          await awardMCoins(nextDoc.user_id, 'FILME_INDICADO_ASSISTIDO', `Assistiu ao filme indicado: ${nextDoc.titulo}.`);
+          await awardMCoins(
+            recommendation.recommenderId,
+            'BONUS_CURADOR',
+            `Seu filme indicado (${nextDoc.titulo}) foi assistido.`,
+          );
+        } else {
+          await awardMCoins(nextDoc.user_id, 'ASSISTIU_FILME', `Assistiu ao filme ${nextDoc.titulo}.`);
+        }
+      }
+
+      return mapPersonalMovie(nextDoc);
+    },
+    () => localData.updatePersonalMovie(movieId, updates),
+  );
 }
 
 export async function deletePersonalMovie(movieId: string) {
-  const current = (await databases.getDocument(
-    DATABASE_ID,
-    COLLECTION_PERSONAL_MOVIES,
-    movieId,
-  )) as unknown as AppwritePersonalMovieDoc;
-  await requireSessionUser(current.user_id);
-  await deleteDocument(COLLECTION_PERSONAL_MOVIES, movieId);
+  return withFallback(
+    async () => {
+      const current = (await databases.getDocument(
+        DATABASE_ID,
+        COLLECTION_PERSONAL_MOVIES,
+        movieId,
+      )) as unknown as AppwritePersonalMovieDoc;
+      await requireSessionUser(current.user_id);
+      const writableDoc = await repairPersonalMovieDoc(current);
+      await deleteDocument(COLLECTION_PERSONAL_MOVIES, writableDoc.$id);
+    },
+    () => localData.deletePersonalMovie(movieId),
+  );
 }
 
 export async function listSeries(userId: string) {
-  try {
-    const data = await listDocuments<AppwriteSeriesDoc>(COLLECTION_PERSONAL_SERIES, [
-      Query.equal('user_id', [userId]),
-      Query.orderDesc('$createdAt'),
-    ]);
-    const repaired = await Promise.all(data.map((doc) => repairSeriesDoc(doc)));
-    const deduped = new Map<string, AppwriteSeriesDoc>();
-    for (const doc of repaired) {
-      const key = seriesIdentityKey(doc);
-      const current = deduped.get(key);
-      if (!current || doc.$updatedAt > current.$updatedAt) {
-        deduped.set(key, doc);
+  return withFallback(
+    async () => {
+      try {
+        const data = await listDocuments<AppwriteSeriesDoc>(COLLECTION_PERSONAL_SERIES, [
+          Query.equal('user_id', [userId]),
+          Query.orderDesc('$createdAt'),
+        ]);
+        const deduped = new Map<string, AppwriteSeriesDoc>();
+        for (const doc of data) {
+          const key = seriesIdentityKey(doc);
+          const current = deduped.get(key);
+          if (!current || doc.$updatedAt > current.$updatedAt) {
+            deduped.set(key, doc);
+          }
+        }
+        return Array.from(deduped.values()).map(mapSeries) as SeriesEntry[];
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '';
+        if (message.includes('user_id')) {
+          throw new Error("A colecao 'series_pessoais' precisa da coluna 'user_id' para isolar as series por usuario.");
+        }
+        throw error;
       }
-    }
-    return Array.from(deduped.values()).map(mapSeries) as SeriesEntry[];
-  } catch (error) {
-    const message = error instanceof Error ? error.message : '';
-    if (message.includes('user_id')) {
-      throw new Error("A colecao 'series_pessoais' precisa da coluna 'user_id' para isolar as series por usuario.");
-    }
-    throw error;
-  }
+    },
+    () => localData.listSeries(userId),
+  );
 }
 
 export async function addSeries(
   userId: string,
   series: Omit<SeriesEntry, 'id' | 'user_id' | 'created_at'>,
 ) {
-  await requireSessionUser(userId);
-  const existing = await firstDocument<AppwriteSeriesDoc>(COLLECTION_PERSONAL_SERIES, [
-    Query.equal('user_id', [userId]),
-    Query.equal('titulo', [series.titulo]),
-  ]);
-  if (existing) {
-    throw new Error('Essa serie ja esta cadastrada.');
-  }
+  return withFallback(
+    async () => {
+      await requireSessionUser(userId);
+      const existing = await firstDocument<AppwriteSeriesDoc>(COLLECTION_PERSONAL_SERIES, [
+        Query.equal('user_id', [userId]),
+        Query.equal('titulo', [series.titulo]),
+      ]);
+      if (existing) {
+        throw new Error('Essa serie ja esta cadastrada.');
+      }
 
-  const episodiosVistos = Math.max(0, series.episodios_vistos);
-  const totalEpisodios = Math.max(1, series.total_episodios);
-  const data = await createDocument(COLLECTION_PERSONAL_SERIES, {
-    user_id: userId,
-    titulo: series.titulo,
-    capaUrl: ensureValidUrl(series.capa_url),
-    plataforma: series.plataforma_slug ?? 'stremio',
-    episodiosVistos,
-    totalEpisodios,
-    status: toAppwriteSeriesStatus(series.status, episodiosVistos, totalEpisodios),
-    rating: series.rating ?? null,
-    streamingData: series.streaming_data ?? null,
-  }, await ownerScopedPermissions(userId));
+      const episodiosVistos = Math.max(0, series.episodios_vistos);
+      const totalEpisodios = Math.max(1, series.total_episodios);
+      const data = await createDocument(COLLECTION_PERSONAL_SERIES, {
+        user_id: userId,
+        titulo: series.titulo,
+        capaUrl: ensureValidUrl(series.capa_url),
+        plataforma: series.plataforma_slug ?? 'stremio',
+        temporada: Math.max(1, series.temporada || 1),
+        Temporada: Math.max(1, series.temporada || 1),
+        episodiosVistos,
+        totalEpisodios,
+        status: toAppwriteSeriesStatus(series.status, episodiosVistos, totalEpisodios),
+        avaliacao: series.avaliacao ?? 0,
+        rating: series.rating ?? null,
+        streamingData: series.streaming_data ?? null,
+      }, await ownerScopedPermissions(userId));
 
-  await awardMCoins(userId, 'INICIOU_SERIE', `Iniciou a serie ${series.titulo}.`);
-  return mapSeries(data as unknown as AppwriteSeriesDoc);
+      if (fromAppwriteSeriesStatus((data as unknown as AppwriteSeriesDoc).status) !== 'watchlist') {
+        await awardMCoins(userId, 'INICIOU_SERIE', `Iniciou a serie ${series.titulo}.`);
+      }
+      return mapSeries(data as unknown as AppwriteSeriesDoc);
+    },
+    () => localData.addSeries(userId, series),
+  );
 }
 
 export async function updateSeries(
@@ -1100,101 +1326,154 @@ export async function updateSeries(
   updates: Partial<
     Pick<
       SeriesEntry,
-      'status' | 'temporada' | 'total_episodios' | 'episodios_vistos' | 'plataforma_slug'
+      'status' | 'temporada' | 'total_episodios' | 'episodios_vistos' | 'plataforma_slug' | 'avaliacao'
     >
   >,
 ) {
-  const current = (await databases.getDocument(DATABASE_ID, COLLECTION_PERSONAL_SERIES, seriesId)) as unknown as AppwriteSeriesDoc;
-  if (!current.user_id) {
-    throw new Error("Serie sem user_id. Corrija o registro antigo antes de editar.");
-  }
-  await requireSessionUser(current.user_id);
+  return withFallback(
+    async () => {
+      const current = (await databases.getDocument(DATABASE_ID, COLLECTION_PERSONAL_SERIES, seriesId)) as unknown as AppwriteSeriesDoc;
+      if (!current.user_id) {
+        throw new Error("Serie sem user_id. Corrija o registro antigo antes de editar.");
+      }
+      await requireSessionUser(current.user_id);
+      const writableDoc = await repairSeriesDoc(current);
 
-  const mappedUpdates: Record<string, number | string | null> = {};
-  const nextEpisodiosVistos = updates.episodios_vistos ?? current.episodiosVistos;
-  const nextTotalEpisodios = updates.total_episodios ?? current.totalEpisodios;
+      const mappedUpdates: Record<string, number | string | null> = {};
+      const nextEpisodiosVistos = updates.episodios_vistos ?? current.episodiosVistos;
+      const nextTotalEpisodios = updates.total_episodios ?? current.totalEpisodios;
 
-  if (updates.episodios_vistos !== undefined) mappedUpdates.episodiosVistos = updates.episodios_vistos;
-  if (updates.total_episodios !== undefined) mappedUpdates.totalEpisodios = updates.total_episodios;
-  if (updates.plataforma_slug !== undefined) mappedUpdates.plataforma = updates.plataforma_slug;
-  if (updates.status !== undefined) {
-    mappedUpdates.status = toAppwriteSeriesStatus(updates.status, nextEpisodiosVistos, nextTotalEpisodios);
-  } else if (
-    updates.episodios_vistos !== undefined ||
-    updates.total_episodios !== undefined
-  ) {
-    mappedUpdates.status = toAppwriteSeriesStatus(undefined, nextEpisodiosVistos, nextTotalEpisodios);
-  }
+      if (updates.temporada !== undefined) {
+        mappedUpdates.temporada = updates.temporada;
+        mappedUpdates.Temporada = updates.temporada;
+      }
+      if (updates.episodios_vistos !== undefined) mappedUpdates.episodiosVistos = updates.episodios_vistos;
+      if (updates.total_episodios !== undefined) mappedUpdates.totalEpisodios = updates.total_episodios;
+      if (updates.plataforma_slug !== undefined) mappedUpdates.plataforma = updates.plataforma_slug;
+      if (updates.avaliacao !== undefined) mappedUpdates.avaliacao = updates.avaliacao;
+      if (updates.status !== undefined) {
+        mappedUpdates.status = toAppwriteSeriesStatus(updates.status, nextEpisodiosVistos, nextTotalEpisodios);
+      } else if (
+        updates.episodios_vistos !== undefined ||
+        updates.total_episodios !== undefined
+      ) {
+        mappedUpdates.status = toAppwriteSeriesStatus(undefined, nextEpisodiosVistos, nextTotalEpisodios);
+      }
 
-  const data = (await updateDocument(COLLECTION_PERSONAL_SERIES, seriesId, mappedUpdates)) as unknown as AppwriteSeriesDoc;
+      const data = (await updateDocument(
+        COLLECTION_PERSONAL_SERIES,
+        writableDoc.$id,
+        mappedUpdates,
+      )) as unknown as AppwriteSeriesDoc;
 
-  const crossedCompletion =
-    (current.episodiosVistos ?? 0) < (current.totalEpisodios ?? 1) &&
-    (data.episodiosVistos ?? 0) >= (data.totalEpisodios ?? 1);
+      if (
+        updates.temporada !== undefined &&
+        readSeriesSeason(data) !== Math.max(1, updates.temporada)
+      ) {
+        throw new Error("A coluna 'temporada' precisa existir em 'series_pessoais' para salvar a temporada atual.");
+      }
 
-  if (crossedCompletion) {
-    const viewerId = (current as { user_id?: string }).user_id ?? '';
-    if (viewerId) {
-      await awardMCoins(
-        viewerId,
-        'BONUS_EPISODIOS_COMPLETOS',
-        `bateu 100% dos episodios de ${data.titulo}.`,
-      );
-    }
-  }
+      const crossedCompletion =
+        (current.episodiosVistos ?? 0) < (current.totalEpisodios ?? 1) &&
+        (data.episodiosVistos ?? 0) >= (data.totalEpisodios ?? 1);
+      const previousSeriesStatus = fromAppwriteSeriesStatus(current.status);
+      const nextSeriesStatus = fromAppwriteSeriesStatus(data.status);
 
-  if (fromAppwriteSeriesStatus(current.status) !== 'watched' && fromAppwriteSeriesStatus(data.status) === 'watched') {
-    const viewerId = (current as { user_id?: string }).user_id ?? '';
-    if (viewerId) {
-      await awardMCoins(viewerId, 'SERIE_100', `Finalizou 100% da serie ${data.titulo}.`);
-    }
-  }
+      if (previousSeriesStatus === 'watchlist' && nextSeriesStatus === 'watching') {
+        const viewerId = (current as { user_id?: string }).user_id ?? '';
+        if (viewerId) {
+          await awardMCoins(viewerId, 'INICIOU_SERIE', `Iniciou a serie ${data.titulo}.`);
+        }
+      }
 
-  return mapSeries(data);
+      if (crossedCompletion) {
+        const viewerId = (current as { user_id?: string }).user_id ?? '';
+        if (viewerId) {
+          await awardMCoins(
+            viewerId,
+            'BONUS_EPISODIOS_COMPLETOS',
+            `bateu 100% dos episodios de ${data.titulo}.`,
+          );
+        }
+      }
+
+      if (previousSeriesStatus !== 'watched' && nextSeriesStatus === 'watched') {
+        const viewerId = (current as { user_id?: string }).user_id ?? '';
+        if (viewerId) {
+          await awardMCoins(viewerId, 'SERIE_100', `Finalizou 100% da serie ${data.titulo}.`);
+        }
+      }
+
+      return mapSeries(data);
+    },
+    () => localData.updateSeries(seriesId, updates),
+  );
 }
 
 
 export async function updateOscarMoviePlatform(movieId: string, platformSlug: string) {
-  const session = await getSessionProfile();
-  if (!session) throw new Error('Sessao invalida.');
-  await updateDocument(COLLECTION_OSCAR_MOVIES, movieId, {
-    plataforma: platformSlug,
-  });
+  return withFallback(
+    async () => {
+      const session = await getSessionProfile();
+      if (!session) throw new Error('Sessao invalida.');
+      await updateDocument(COLLECTION_OSCAR_MOVIES, movieId, {
+        plataforma: platformSlug,
+      });
+    },
+    () => localData.updateOscarMoviePlatform(movieId, platformSlug),
+  );
 }
 
 export async function updateOscarMovieStreaming(movieId: string, streamingData: string) {
-  const session = await getSessionProfile();
-  if (!session) throw new Error('Sessao invalida.');
-  await updateDocument(COLLECTION_OSCAR_MOVIES, movieId, {
-    streamingData,
-  });
+  return withFallback(
+    async () => {
+      const session = await getSessionProfile();
+      if (!session) throw new Error('Sessao invalida.');
+      await updateDocument(COLLECTION_OSCAR_MOVIES, movieId, {
+        streamingData,
+      });
+    },
+    () => localData.updateOscarMovieStreaming(movieId, streamingData),
+  );
 }
 
 export async function updatePersonalMovieStreaming(movieId: string, streamingData: string) {
-  const current = (await databases.getDocument(
-    DATABASE_ID,
-    COLLECTION_PERSONAL_MOVIES,
-    movieId,
-  )) as unknown as AppwritePersonalMovieDoc;
-  await requireSessionUser(current.user_id);
-  await updateDocument(COLLECTION_PERSONAL_MOVIES, movieId, {
-    streamingData,
-  });
+  return withFallback(
+    async () => {
+      const current = (await databases.getDocument(
+        DATABASE_ID,
+        COLLECTION_PERSONAL_MOVIES,
+        movieId,
+      )) as unknown as AppwritePersonalMovieDoc;
+      await requireSessionUser(current.user_id);
+      const writableDoc = await repairPersonalMovieDoc(current);
+      await updateDocument(COLLECTION_PERSONAL_MOVIES, writableDoc.$id, {
+        streamingData,
+      });
+    },
+    () => localData.updatePersonalMovieStreaming(movieId, streamingData),
+  );
 }
 
 export async function updateSeriesStreaming(seriesId: string, streamingData: string) {
-  const current = (await databases.getDocument(
-    DATABASE_ID,
-    COLLECTION_PERSONAL_SERIES,
-    seriesId,
-  )) as unknown as AppwriteSeriesDoc;
-  if (!current.user_id) {
-    throw new Error("Serie sem user_id. Corrija o registro antigo antes de editar.");
-  }
-  await requireSessionUser(current.user_id);
-  await updateDocument(COLLECTION_PERSONAL_SERIES, seriesId, {
-    streamingData,
-  });
+  return withFallback(
+    async () => {
+      const current = (await databases.getDocument(
+        DATABASE_ID,
+        COLLECTION_PERSONAL_SERIES,
+        seriesId,
+      )) as unknown as AppwriteSeriesDoc;
+      if (!current.user_id) {
+        throw new Error("Serie sem user_id. Corrija o registro antigo antes de editar.");
+      }
+      await requireSessionUser(current.user_id);
+      const writableDoc = await repairSeriesDoc(current);
+      await updateDocument(COLLECTION_PERSONAL_SERIES, writableDoc.$id, {
+        streamingData,
+      });
+    },
+    () => localData.updateSeriesStreaming(seriesId, streamingData),
+  );
 }
 
 export async function suggestMovieToUser(
@@ -1203,49 +1482,63 @@ export async function suggestMovieToUser(
   movie: Omit<PersonalMovie, 'id' | 'user_id' | 'created_at'>,
   mediaType: 'movie' | 'tv' = 'movie',
 ) {
-  await requireSessionUser(fromUserId);
-  if (mediaType === 'movie') {
-    const existingByTitle = await firstDocument<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
-      Query.equal('user_id', [toUserId]),
-      Query.equal('titulo', [movie.titulo]),
-    ]);
-    if (existingByTitle) {
-      throw new Error('Esse filme ja esta na lista do amigo.');
-    }
+  return withFallback(
+    async () => {
+      await requireSessionUser(fromUserId);
+      if (mediaType === 'movie') {
+        const existingByTitle = await firstDocument<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
+          Query.equal('user_id', [toUserId]),
+          Query.equal('titulo', [movie.titulo]),
+        ]);
+        if (existingByTitle) {
+          throw new Error('Esse filme ja esta na lista do amigo.');
+        }
 
-    await createDocument(COLLECTION_PERSONAL_MOVIES, {
-      ...movie,
-      source_movie_id: movie.source_movie_id
-        ? `tmdb:${movie.source_movie_id}|rec:${fromUserId}`
-        : null,
-      rating: movie.rating ?? null,
-      streamingData: movie.streaming_data ?? null,
-      user_id: toUserId,
-    }, await ownerScopedPermissions(toUserId));
-  } else {
-    await createDocument(COLLECTION_PERSONAL_SERIES, {
-      user_id: toUserId,
-      titulo: movie.titulo,
-      capaUrl: ensureValidUrl(movie.capa_url),
-      plataforma: 'stremio',
-      totalEpisodios: 1,
-      episodiosVistos: 0,
-      status: 'naoIniciado',
-      rating: movie.rating ?? null,
-      streamingData: movie.streaming_data ?? null,
-    }, await ownerScopedPermissions(toUserId));
-  }
+        await createDocument(COLLECTION_PERSONAL_MOVIES, {
+          ...movie,
+          source_movie_id: movie.source_movie_id
+            ? `tmdb:${movie.source_movie_id}|rec:${fromUserId}`
+            : null,
+          rating: movie.rating ?? null,
+          streamingData: movie.streaming_data ?? null,
+          user_id: toUserId,
+        }, await ownerScopedPermissions(fromUserId));
+      } else {
+        await createDocument(COLLECTION_PERSONAL_SERIES, {
+          user_id: toUserId,
+          titulo: movie.titulo,
+          capaUrl: ensureValidUrl(movie.capa_url),
+          plataforma: 'stremio',
+          temporada: 1,
+          Temporada: 1,
+          totalEpisodios: 1,
+          episodiosVistos: 0,
+          status: 'naoIniciado',
+          rating: movie.rating ?? null,
+          streamingData: movie.streaming_data ?? null,
+        }, await ownerScopedPermissions(fromUserId));
+      }
 
-  const [fromName, toName, delta] = await Promise.all([
-    getUsernameById(fromUserId),
-    getUsernameById(toUserId),
-    grantMCoins(fromUserId, 'INDICOU_FILME'),
-  ]);
-  const label = mediaType === 'movie' ? 'filme' : 'serie';
-  await addActivity(
-    fromUserId,
-    `@${fromName} indicou ${label} ${movie.titulo} para @${toName}. (+${delta} MC)`,
-    delta,
+      const [fromName, toName, delta] = await Promise.all([
+        getUsernameById(fromUserId),
+        getUsernameById(toUserId),
+        grantMCoins(fromUserId, 'INDICOU_FILME'),
+      ]);
+      const label = mediaType === 'movie' ? 'filme' : 'serie';
+      await Promise.all([
+        addActivity(
+          toUserId,
+          `@${fromName} indicou ${label} ${movie.titulo} para voce.`,
+          0,
+        ),
+        addActivity(
+          fromUserId,
+          `${fromName} indicou ${label} ${movie.titulo} para @${toName}. (+${delta} MC)`,
+          delta,
+        ),
+      ]);
+    },
+    () => localData.suggestMovieToUser(fromUserId, toUserId, movie, mediaType),
   );
 }
 
@@ -1255,12 +1548,14 @@ export async function reactToMovie(
   movieTitle: string,
   reaction: string,
 ) {
-  await requireSessionUser(actorUserId);
-  const [actorName, targetName] = await Promise.all([
-    getUsernameById(actorUserId),
-    getUsernameById(targetUserId),
-  ]);
-  await addActivity(actorUserId, `${actorName} reagiu com ${reaction} ao filme de ${targetName} (${movieTitle}).`, 0);
+  return withFallback(
+    async () => {
+      await requireSessionUser(actorUserId);
+      const actorName = await getUsernameById(actorUserId);
+      await addActivity(targetUserId, `${actorName} reagiu com ${reaction} ao seu filme ${movieTitle}.`, 0);
+    },
+    () => localData.reactToMovie(actorUserId, targetUserId, movieTitle, reaction),
+  );
 }
 
 export async function rateMovie(
@@ -1269,39 +1564,93 @@ export async function rateMovie(
   _movieTitle: string,
   stars: number,
 ) {
-  const current = (await databases.getDocument(
-    DATABASE_ID,
-    COLLECTION_PERSONAL_MOVIES,
-    movieId,
-  )) as unknown as AppwritePersonalMovieDoc;
-  await requireSessionUser(actorUserId);
-  if (current.user_id !== actorUserId) {
-    throw new Error('Avaliacao permitida apenas para o dono do filme.');
-  }
-  try {
-    await updateDocument(COLLECTION_PERSONAL_MOVIES, movieId, {
-      avaliacao: stars,
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : '';
-    if (!message.includes('Unknown attribute')) {
-      throw error;
-    }
-  }
+  return withFallback(
+    async () => {
+      const current = (await databases.getDocument(
+        DATABASE_ID,
+        COLLECTION_PERSONAL_MOVIES,
+        movieId,
+      )) as unknown as AppwritePersonalMovieDoc;
+      await requireSessionUser(actorUserId);
+      if (current.user_id !== actorUserId) {
+        throw new Error('Avaliacao permitida apenas para o dono do filme.');
+      }
+      const writableDoc = await repairPersonalMovieDoc(current);
+      try {
+        const updated = (await updateDocument(COLLECTION_PERSONAL_MOVIES, writableDoc.$id, {
+          avaliacao: stars,
+        })) as unknown as AppwritePersonalMovieDoc;
+        if ((updated.avaliacao ?? null) !== stars) {
+          throw new Error("A coluna 'avaliacao' precisa existir em 'personal_movies' para salvar as estrelas.");
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '';
+        if (message.includes('Unknown attribute')) {
+          throw new Error("A coluna 'avaliacao' precisa existir em 'personal_movies' para salvar as estrelas.");
+        }
+        throw error;
+      }
+    },
+    () => localData.rateMovie(actorUserId, movieId, _movieTitle, stars),
+  );
+}
 
+export async function rateSeries(
+  actorUserId: string,
+  seriesId: string,
+  stars: number,
+) {
+  return withFallback(
+    async () => {
+      const current = (await databases.getDocument(
+        DATABASE_ID,
+        COLLECTION_PERSONAL_SERIES,
+        seriesId,
+      )) as unknown as AppwriteSeriesDoc;
+      if (!current.user_id) {
+        throw new Error("Serie sem user_id. Corrija o registro antigo antes de avaliar.");
+      }
+      await requireSessionUser(actorUserId);
+      if (current.user_id !== actorUserId) {
+        throw new Error('Avaliacao permitida apenas para o dono da serie.');
+      }
+      const writableDoc = await repairSeriesDoc(current);
+      try {
+        const updated = (await updateDocument(COLLECTION_PERSONAL_SERIES, writableDoc.$id, {
+          avaliacao: stars,
+        })) as unknown as AppwriteSeriesDoc;
+        if ((updated.avaliacao ?? null) !== stars) {
+          throw new Error("A coluna 'avaliacao' precisa existir em 'series_pessoais' para salvar as estrelas.");
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '';
+        if (message.includes('Unknown attribute')) {
+          throw new Error("A coluna 'avaliacao' precisa existir em 'series_pessoais' para salvar as estrelas.");
+        }
+        throw error;
+      }
+    },
+    () => localData.rateSeries(actorUserId, seriesId, stars),
+  );
 }
 
 export async function deleteSeries(seriesId: string) {
-  const current = (await databases.getDocument(
-    DATABASE_ID,
-    COLLECTION_PERSONAL_SERIES,
-    seriesId,
-  )) as unknown as AppwriteSeriesDoc;
-  if (!current.user_id) {
-    throw new Error("Serie sem user_id. Corrija o registro antigo antes de excluir.");
-  }
-  await requireSessionUser(current.user_id);
-  await deleteDocument(COLLECTION_PERSONAL_SERIES, seriesId);
+  return withFallback(
+    async () => {
+      const current = (await databases.getDocument(
+        DATABASE_ID,
+        COLLECTION_PERSONAL_SERIES,
+        seriesId,
+      )) as unknown as AppwriteSeriesDoc;
+      if (!current.user_id) {
+        throw new Error("Serie sem user_id. Corrija o registro antigo antes de excluir.");
+      }
+      await requireSessionUser(current.user_id);
+      const writableDoc = await repairSeriesDoc(current);
+      await deleteDocument(COLLECTION_PERSONAL_SERIES, writableDoc.$id);
+    },
+    () => localData.deleteSeries(seriesId),
+  );
 }
 
 function pickRandom<T>(items: T[]) {
@@ -1313,54 +1662,60 @@ export async function getCineMatchSuggestion(
   friendUserId: string,
   mode: CineMatchMode,
 ): Promise<CineMatchSuggestion | null> {
-  if (mode === 'geral') {
-    const [meOscar, friendOscar, mePersonal, friendPersonal] = await Promise.all([
-      getOscarMoviesForUser(currentUserId),
-      getOscarMoviesForUser(friendUserId),
-      listPersonalMovies(currentUserId),
-      listPersonalMovies(friendUserId),
-    ]);
+  return withFallback(
+    async () => {
+      if (mode === 'geral') {
+        const [meOscar, friendOscar, mePersonal, friendPersonal] = await Promise.all([
+          getOscarMoviesForUser(currentUserId),
+          getOscarMoviesForUser(friendUserId),
+          listPersonalMovies(currentUserId),
+          listPersonalMovies(friendUserId),
+        ]);
 
-    const meWatchlist = [...meOscar.filter((item) => item.status === 'watchlist'), ...mePersonal.filter((item) => item.status === 'watchlist')];
-    const friendWatchlist = [...friendOscar.filter((item) => item.status === 'watchlist'), ...friendPersonal.filter((item) => item.status === 'watchlist')];
+        const meWatchlist = [...meOscar.filter((item) => item.status === 'watchlist'), ...mePersonal.filter((item) => item.status === 'watchlist')];
+        const friendWatchlist = [...friendOscar.filter((item) => item.status === 'watchlist'), ...friendPersonal.filter((item) => item.status === 'watchlist')];
 
-    const friendByTitle = new Map(friendWatchlist.map((item) => [titleKey(item.titulo), item]));
-    const common = meWatchlist.filter((item) => friendByTitle.has(titleKey(item.titulo)));
-    const picked = pickRandom(common);
+        const friendByTitle = new Map(friendWatchlist.map((item) => [titleKey(item.titulo), item]));
+        const common = meWatchlist.filter((item) => friendByTitle.has(titleKey(item.titulo)));
+        const picked = pickRandom(common);
 
-    if (!picked) return null;
+        if (!picked) return null;
 
-    return {
-      titulo: picked.titulo,
-      capa_url: picked.capa_url,
-      origem: 'geral',
-      reason: 'Watchlist em comum encontrada para os dois.',
-    };
-  }
+        return {
+          titulo: picked.titulo,
+          capa_url: picked.capa_url,
+          origem: 'geral',
+          reason: 'Watchlist em comum encontrada para os dois.',
+        };
+      }
 
-  const [allOscar, myStatuses, friendStatuses] = await Promise.all([
-    listDocuments<AppwriteOscarMovieDoc>(COLLECTION_OSCAR_MOVIES),
-    listDocuments<AppwriteUserOscarMovieDoc>(COLLECTION_USER_OSCAR_MOVIES, [Query.equal('user_id', [currentUserId])]),
-    listDocuments<AppwriteUserOscarMovieDoc>(COLLECTION_USER_OSCAR_MOVIES, [Query.equal('user_id', [friendUserId])]),
-  ]);
+      const [allOscar, myStatuses, friendStatuses] = await Promise.all([
+        listDocuments<AppwriteOscarMovieDoc>(COLLECTION_OSCAR_MOVIES),
+        listDocuments<AppwriteUserOscarMovieDoc>(COLLECTION_USER_OSCAR_MOVIES, [Query.equal('user_id', [currentUserId])]),
+        listDocuments<AppwriteUserOscarMovieDoc>(COLLECTION_USER_OSCAR_MOVIES, [Query.equal('user_id', [friendUserId])]),
+      ]);
 
-  const watchedByMe = new Set(myStatuses.filter((item) => item.status === 'watched').map((item) => item.oscar_movie_id));
-  const watchedByFriend = new Set(friendStatuses.filter((item) => item.status === 'watched').map((item) => item.oscar_movie_id));
+      const watchedByMe = new Set(myStatuses.filter((item) => item.status === 'watched').map((item) => item.oscar_movie_id));
+      const watchedByFriend = new Set(friendStatuses.filter((item) => item.status === 'watched').map((item) => item.oscar_movie_id));
 
-  const available = allOscar.filter((movie) => !watchedByMe.has(movie.$id) && !watchedByFriend.has(movie.$id));
-  const picked = pickRandom(available);
+      const available = allOscar.filter((movie) => !watchedByMe.has(movie.$id) && !watchedByFriend.has(movie.$id));
+      const picked = pickRandom(available);
 
-  if (!picked) return null;
+      if (!picked) return null;
 
-  return {
-    titulo: picked.titulo,
-    capa_url: picked.capaUrl,
-    origem: 'oscar',
-    reason: 'Oscar pendente para os dois usuarios.',
-  };
+      return {
+        titulo: picked.titulo,
+        capa_url: picked.capaUrl,
+        origem: 'oscar',
+        reason: 'Oscar pendente para os dois usuarios.',
+      };
+    },
+    () => localData.getCineMatchSuggestion(currentUserId, friendUserId, mode),
+  );
 }
 
 export function getSeriesStatus(episodiosVistos: number, totalEpisodios: number): SeriesStatus {
+  if (episodiosVistos <= 0) return 'watchlist';
   return totalEpisodios > 0 && episodiosVistos >= totalEpisodios ? 'watched' : 'watching';
 }
 

@@ -1,32 +1,42 @@
 import { useEffect, useRef, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Eye, EyeOff, Loader2, Trash2, Tv, X } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Star, Trash2, Tv, X } from 'lucide-react';
 import clsx from 'clsx';
 import { generateImagePath } from '../../lib/imageUtils';
 import type { Series } from '../../hooks/useSeries';
-import { PlatformSelect } from '../ui/PlatformSelect';
-import { getTvWatchProviders, searchSeries } from '../../lib/tmdb';
+import {
+  getTvDetails,
+  getTvSeasonEpisodes,
+  getTvWatchProviders,
+  searchSeries,
+  type TMDBSeasonEpisode,
+  type TMDBTvSeasonMeta,
+} from '../../lib/tmdb';
 import { updateSeriesStreaming } from '../../lib/appData';
 
 interface SeriesCardProps {
   series: Series;
   canEdit: boolean;
+  currentUserId: string;
   onSaveProgress: (payload: {
     id: string;
     episodios_vistos?: number;
     temporada?: number;
     total_episodios?: number;
-    status?: 'watching' | 'watched';
+    status?: 'watchlist' | 'watching' | 'watched';
     plataforma_slug?: string;
-  }) => void;
+  }) => Promise<unknown>;
   onDelete: (id: string) => void;
+  onRate: (seriesId: string, stars: number) => Promise<unknown>;
 }
 
 export default function SeriesCard({
   series,
   canEdit,
+  currentUserId,
   onSaveProgress,
   onDelete,
+  onRate,
 }: SeriesCardProps) {
   const [open, setOpen] = useState(false);
   const [localEps, setLocalEps] = useState(series.episodios_vistos.toString());
@@ -35,6 +45,17 @@ export default function SeriesCard({
   const [showProviders, setShowProviders] = useState(false);
   const [providersLoading, setProvidersLoading] = useState(false);
   const [providers, setProviders] = useState<Array<{ provider_id?: number; provider_name?: string; logo_path?: string | null }>>([]);
+  const [tmdbSeriesId, setTmdbSeriesId] = useState<number | null>(null);
+  const [seasonMeta, setSeasonMeta] = useState<TMDBTvSeasonMeta[]>([]);
+  const [seasonEpisodes, setSeasonEpisodes] = useState<TMDBSeasonEpisode[]>([]);
+  const [episodesLoading, setEpisodesLoading] = useState(false);
+  const [episodesCache, setEpisodesCache] = useState<Record<number, TMDBSeasonEpisode[]>>({});
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [ratingPending, setRatingPending] = useState<number | null>(null);
+  const [ratingError, setRatingError] = useState<string | null>(null);
+  const [localRating, setLocalRating] = useState(series.avaliacao ?? 0);
+  const [reactionsOpen, setReactionsOpen] = useState(false);
   const providersRef = useRef<HTMLDivElement | null>(null);
 
   const syncLocalState = () => {
@@ -43,11 +64,54 @@ export default function SeriesCard({
     setLocalTotalEps((series.total_episodios || 0).toString());
   };
 
+  const loadSeasonEpisodes = async (seriesId: number, seasonNumber: number) => {
+    if (episodesCache[seasonNumber]) {
+      setSeasonEpisodes(episodesCache[seasonNumber]);
+      return;
+    }
+    setEpisodesLoading(true);
+    try {
+      const episodes = await getTvSeasonEpisodes(seriesId, seasonNumber);
+      setSeasonEpisodes(episodes);
+      setEpisodesCache((prev) => ({ ...prev, [seasonNumber]: episodes }));
+    } finally {
+      setEpisodesLoading(false);
+    }
+  };
+
+  const hydrateSeriesContext = async (seasonNumber: number) => {
+    let currentId = tmdbSeriesId;
+    if (!currentId) {
+      const candidates = await searchSeries(series.titulo);
+      const picked = candidates[0];
+      if (!picked) {
+        setSeasonMeta([]);
+        setSeasonEpisodes([]);
+        return;
+      }
+      currentId = picked.id;
+      setTmdbSeriesId(currentId);
+    }
+
+    if (seasonMeta.length === 0) {
+      const details = await getTvDetails(currentId);
+      if (details) {
+        setSeasonMeta(details.seasons);
+        const activeSeason = details.seasons.find((item) => item.season_number === seasonNumber);
+        if (activeSeason?.episode_count && activeSeason.episode_count > 0) {
+          setLocalTotalEps(String(activeSeason.episode_count));
+        }
+      }
+    }
+
+    await loadSeasonEpisodes(currentId, seasonNumber);
+  };
+
   const limit = parseInt(localTotalEps, 10) || 1;
   const progressPercent =
     limit > 0 ? Math.min(100, Math.round((series.episodios_vistos / limit) * 100)) : 0;
 
-  const handleSave = (event: React.FormEvent) => {
+  const handleSave = async (event: React.FormEvent) => {
     event.preventDefault();
     const episodiosVistos = parseInt(localEps, 10);
     const temporada = parseInt(localTemporada, 10);
@@ -57,21 +121,33 @@ export default function SeriesCard({
       return;
     }
 
-    onSaveProgress({
-      id: series.id,
-      episodios_vistos: episodiosVistos,
-      temporada,
-      total_episodios: totalEpisodios,
-    });
-    setOpen(false);
+    setSaveError(null);
+    setIsSaving(true);
+    try {
+      await onSaveProgress({
+        id: series.id,
+        episodios_vistos: episodiosVistos,
+        temporada,
+        total_episodios: totalEpisodios,
+      });
+      setOpen(false);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Falha ao salvar progresso.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const toggleStatus = (event: React.MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
     if (!canEdit) return;
-    const nextStatus = series.status === 'watched' ? 'watching' : 'watched';
-    onSaveProgress({ id: series.id, status: nextStatus });
+    const nextStatus = series.status === 'watched' ? 'watchlist' : 'watched';
+    onSaveProgress({
+      id: series.id,
+      status: nextStatus,
+      episodios_vistos: nextStatus === 'watched' ? Math.max(series.total_episodios, 1) : 0,
+    });
   };
 
   const handleDelete = (event: React.MouseEvent) => {
@@ -85,6 +161,21 @@ export default function SeriesCard({
 
   const imageSrc = generateImagePath(series.titulo, series.capa_url);
   const isWatched = series.status === 'watched';
+  const isFriendCard = series.user_id !== currentUserId;
+  const canRate = canEdit && !isFriendCard && isWatched;
+  const showRating = isWatched && (canRate || localRating > 0);
+
+  const handleCoverClick = (event: React.MouseEvent) => {
+    if (isFriendCard) {
+      event.preventDefault();
+      event.stopPropagation();
+      setReactionsOpen((prev) => !prev);
+    }
+  };
+
+  useEffect(() => {
+    setLocalRating(series.avaliacao ?? 0);
+  }, [series.avaliacao]);
 
   useEffect(() => {
     if (!series.streaming_data) {
@@ -127,21 +218,47 @@ export default function SeriesCard({
     }
   };
 
+  const derivedEpisodeCount = Math.min(
+    Math.max(parseInt(localEps, 10) || 0, 0),
+    Math.max(parseInt(localTotalEps, 10) || 0, 0),
+  );
+
+  const handleRate = async (stars: number) => {
+    const previousRating = localRating;
+    setRatingError(null);
+    setLocalRating(stars);
+    setRatingPending(stars);
+    try {
+      await onRate(series.id, stars);
+    } catch (error) {
+      setLocalRating(previousRating);
+      setRatingError(error instanceof Error ? error.message : 'Falha ao salvar avaliacao.');
+    } finally {
+      setRatingPending(null);
+    }
+  };
+
   return (
     <Dialog.Root
       open={open}
       onOpenChange={(nextOpen) => {
-        if (nextOpen) syncLocalState();
+        if (nextOpen) {
+          syncLocalState();
+          setSaveError(null);
+          void hydrateSeriesContext(series.temporada || 1);
+        }
         setOpen(nextOpen);
       }}
     >
       <Dialog.Trigger asChild disabled={!canEdit}>
-        <div className="flex flex-col gap-3 min-w-[140px] md:min-w-[180px] snap-center group">
+        <div className="flex min-w-0 w-full flex-col gap-3 snap-center group">
           <div
             className={clsx(
               'relative aspect-[2/3] w-full rounded-md overflow-hidden bg-brand-card border border-[#222] transition-all',
               canEdit && 'hover:border-brand-gold-alt hover:shadow-[0_0_15px_rgba(212,175,55,0.15)] cursor-pointer',
+              isFriendCard && 'cursor-pointer',
             )}
+            onClick={handleCoverClick}
           >
             <img
               src={imageSrc}
@@ -158,23 +275,51 @@ export default function SeriesCard({
               <span className="text-xs text-brand-text-muted">{series.titulo}</span>
             </div>
 
-            <div
-              onClick={toggleStatus}
-              className={clsx(
-                'absolute top-2 left-2 p-1.5 rounded-full bg-brand-bg/80 backdrop-blur-sm transition-all',
-                canEdit && 'hover:scale-110',
-                isWatched
-                  ? 'text-brand-gold border border-brand-gold/30'
-                  : 'text-brand-text-muted border border-[#333]/50 hover:text-brand-text',
-              )}
-              title={isWatched ? 'Retornar para watchlist' : 'Marcar como visto'}
-            >
-              {isWatched ? <Eye size={14} /> : <EyeOff size={14} />}
-            </div>
+            {isFriendCard ? (
+              <div
+                className={clsx(
+                  'absolute inset-0 flex items-center justify-center transition-opacity duration-200 z-20',
+                  reactionsOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto',
+                )}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="bg-black/80 border border-[#333] rounded-full px-2 py-1 flex items-center gap-1">
+                  {(['❤️', '🔥', '😂', '👎'] as const).map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setReactionsOpen(false);
+                      }}
+                      className="w-8 h-8 rounded-full border border-[#333] text-base hover:border-brand-gold/40 bg-brand-bg/70 flex items-center justify-center"
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {!isFriendCard ? (
+              <div
+                onClick={(e) => { e.stopPropagation(); toggleStatus(e); }}
+                className={clsx(
+                  'absolute top-2 left-2 p-1.5 rounded-full bg-brand-bg/80 backdrop-blur-sm transition-all',
+                  canEdit && 'hover:scale-110',
+                  isWatched
+                    ? 'text-brand-gold border border-brand-gold/30'
+                    : 'text-brand-text-muted border border-[#333]/50 hover:text-brand-text',
+                )}
+                title={isWatched ? 'Retornar para watchlist' : 'Marcar como visto'}
+              >
+                {isWatched ? <Eye size={14} /> : <EyeOff size={14} />}
+              </div>
+            ) : null}
 
             {canEdit ? (
               <div
-                onClick={handleDelete}
+                onClick={(e) => { e.stopPropagation(); handleDelete(e); }}
                 className="absolute top-10 left-2 p-1.5 rounded-full bg-brand-bg/80 backdrop-blur-sm text-brand-text-muted border border-[#333]/50 hover:text-red-500 hover:border-red-500/30 transition-all hover:scale-110"
                 title="Remover"
               >
@@ -190,7 +335,7 @@ export default function SeriesCard({
 
             <div className="flex items-center justify-between mt-1 text-[10px] tracking-wider font-light uppercase">
               <span className="text-brand-text-muted">
-                T{series.temporada || 1} • {series.episodios_vistos} / {limit > 0 ? limit : '?'} EPS
+                T{series.temporada || 1} {'\u2022'} {series.episodios_vistos} / {limit > 0 ? limit : '?'} EPS
               </span>
               <span className="text-brand-gold">{progressPercent}%</span>
             </div>
@@ -201,18 +346,45 @@ export default function SeriesCard({
               />
             </div>
 
-            <PlatformSelect
-              value={series.plataforma_slug}
-              onChange={(platformId) =>
-                onSaveProgress({ id: series.id, plataforma_slug: platformId })
-              }
-              disabled={!canEdit}
-            />
+            {showRating ? (
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-1 text-lg">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (canRate) void handleRate(star);
+                      }}
+                      disabled={!canRate}
+                      className={clsx(
+                        'leading-none transition',
+                        localRating >= star ? 'text-yellow-400' : 'text-[#444]',
+                        canRate && 'hover:text-yellow-300',
+                        !canRate && 'cursor-default',
+                      )}
+                      title={`${star} estrela(s)`}
+                    >
+                      <Star
+                        size={16}
+                        fill={localRating >= star ? 'currentColor' : 'none'}
+                        strokeWidth={2}
+                      />
+                    </button>
+                  ))}
+                  {canRate && ratingPending ? <Loader2 size={12} className="animate-spin text-brand-gold ml-1" /> : null}
+                </div>
+                {ratingError ? <p className="text-[10px] leading-relaxed text-red-300">{ratingError}</p> : null}
+              </div>
+            ) : null}
 
             <div className="relative" ref={providersRef}>
               <button
                 type="button"
-                onClick={() => {
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
                   const next = !showProviders;
                   setShowProviders(next);
                   if (next) void resolveProviders();
@@ -277,7 +449,29 @@ export default function SeriesCard({
                   type="number"
                   min="1"
                   value={localTemporada}
-                  onChange={(event) => setLocalTemporada(event.target.value)}
+                  onChange={(event) => {
+                    const next = event.target.value;
+                    setLocalTemporada(next);
+                    const seasonNumber = parseInt(next, 10);
+                    if (Number.isNaN(seasonNumber) || seasonNumber < 1) return;
+                    const selectedSeason = seasonMeta.find((item) => item.season_number === seasonNumber);
+                    if (selectedSeason?.episode_count && selectedSeason.episode_count > 0) {
+                      setLocalTotalEps(String(selectedSeason.episode_count));
+                      setLocalEps((current) =>
+                        String(
+                          Math.min(
+                            Math.max(parseInt(current, 10) || 0, 0),
+                            selectedSeason.episode_count,
+                          ),
+                        ),
+                      );
+                    }
+                    if (tmdbSeriesId) {
+                      void loadSeasonEpisodes(tmdbSeriesId, seasonNumber);
+                    } else {
+                      void hydrateSeriesContext(seasonNumber);
+                    }
+                  }}
                   className="w-full bg-[#0a0f1e] border border-[#222] text-brand-text p-2 rounded focus:outline-none focus:border-brand-gold text-right"
                 />
               </div>
@@ -291,25 +485,44 @@ export default function SeriesCard({
                   type="number"
                   min="1"
                   value={localTotalEps}
-                  onChange={(event) => setLocalTotalEps(event.target.value)}
-                  className="w-full bg-[#0a0f1e] border border-[#222] text-brand-text p-2 rounded focus:outline-none focus:border-brand-gold text-right"
+                  readOnly
+                  className="w-full bg-[#0a0f1e] border border-[#222] text-brand-text p-2 rounded text-right cursor-not-allowed opacity-80"
                 />
               </div>
 
               <div className="flex items-center gap-4">
-                <label htmlFor="eps" className="text-xs text-brand-text uppercase tracking-widest shrink-0 w-20">
-                  Episodios
+                <label className="text-xs text-brand-text uppercase tracking-widest shrink-0 w-20">
+                  Eps Vistos
                 </label>
-                <input
-                  id="eps"
-                  type="number"
-                  min="0"
-                  max={limit || 9999}
+                <div className="w-full bg-[#0a0f1e] border border-[#222] text-brand-text p-2 rounded text-right opacity-80">
+                  {derivedEpisodeCount}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <label htmlFor="ep-select" className="text-xs text-brand-text uppercase tracking-widest shrink-0 w-20">
+                  Ultimo Ep
+                </label>
+                <select
+                  id="ep-select"
                   value={localEps}
                   onChange={(event) => setLocalEps(event.target.value)}
-                  className="w-full bg-[#0a0f1e] border border-[#222] text-brand-text p-2 rounded focus:outline-none focus:border-brand-gold text-right"
-                />
+                  className="w-full bg-[#0a0f1e] border border-[#222] text-brand-text p-2 rounded focus:outline-none focus:border-brand-gold"
+                >
+                  <option value="0">Nenhum</option>
+                  {seasonEpisodes.map((episode) => (
+                    <option key={episode.episode_number} value={episode.episode_number}>
+                      E{episode.episode_number}: {episode.name}
+                    </option>
+                  ))}
+                </select>
               </div>
+              {episodesLoading ? (
+                <div className="text-[11px] text-brand-text-muted uppercase tracking-[0.12em] flex items-center gap-2">
+                  <Loader2 size={12} className="animate-spin" /> Carregando episodios...
+                </div>
+              ) : null}
+              {saveError ? <div className="text-[11px] text-red-300 leading-relaxed">{saveError}</div> : null}
 
               <div className="flex gap-3 justify-end mt-4">
                 <Dialog.Close asChild>
@@ -322,9 +535,10 @@ export default function SeriesCard({
                 </Dialog.Close>
                 <button
                   type="submit"
+                  disabled={isSaving}
                   className="px-6 py-2 text-xs uppercase tracking-widest bg-brand-gold text-brand-bg font-medium rounded transition-all hover:bg-opacity-90 active:scale-95"
                 >
-                  Salvar
+                  {isSaving ? 'Salvando...' : 'Salvar'}
                 </button>
               </div>
             </form>

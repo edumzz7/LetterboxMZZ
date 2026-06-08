@@ -13,10 +13,19 @@ import {
 interface SuggestMovieModalProps {
   currentUserId: string;
   users: AppUser[];
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export default function SuggestMovieModal({ currentUserId, users }: SuggestMovieModalProps) {
-  const [open, setOpen] = useState(false);
+export default function SuggestMovieModal({ currentUserId, users, open: controlledOpen, onOpenChange: controlledOnOpenChange }: SuggestMovieModalProps) {
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : uncontrolledOpen;
+
+  const handleOpenChange = (newOpen: boolean) => {
+    if (!isControlled) setUncontrolledOpen(newOpen);
+    controlledOnOpenChange?.(newOpen);
+  };
   const [friendId, setFriendId] = useState('');
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<TMDBMultiResult | null>(null);
@@ -53,7 +62,7 @@ export default function SuggestMovieModal({ currentUserId, users }: SuggestMovie
     setCapaUrl('');
     setStreamingData(null);
     setError(null);
-    setOpen(false);
+    handleOpenChange(false);
   };
 
   const handleSearch = (value: string) => {
@@ -133,12 +142,14 @@ export default function SuggestMovieModal({ currentUserId, users }: SuggestMovie
   };
 
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
-      <Dialog.Trigger asChild>
-        <button className="inline-flex items-center gap-2 px-3 py-2 border border-brand-gold/40 rounded-lg text-xs uppercase tracking-[0.14em] text-brand-gold hover:bg-brand-gold/10 transition">
-          <Plus size={14} /> Indicar
-        </button>
-      </Dialog.Trigger>
+    <Dialog.Root open={open} onOpenChange={handleOpenChange}>
+      {!isControlled && (
+        <Dialog.Trigger asChild>
+          <button className="inline-flex items-center gap-2 px-3 py-2 border border-brand-gold/40 rounded-lg text-xs uppercase tracking-[0.14em] text-brand-gold hover:bg-brand-gold/10 transition">
+            <Plus size={14} /> Indicar
+          </button>
+        </Dialog.Trigger>
+      )}
 
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40" />

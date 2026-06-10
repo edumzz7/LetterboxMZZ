@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { KeyRound, Loader2, X } from 'lucide-react';
+import { KeyRound, Loader2, X, CheckCircle2 } from 'lucide-react';
 
 interface ChangePasswordModalProps {
   userId: string;
@@ -73,8 +73,8 @@ export default function ChangePasswordModal({
           </Dialog.Description>
 
           {success ? (
-            <div className="mt-6 flex flex-col items-center gap-3 py-4">
-              <span className="text-3xl">✅</span>
+            <div className="mt-6 flex flex-col items-center gap-3 py-4 text-brand-gold">
+              <CheckCircle2 size={48} strokeWidth={2} />
               <p className="text-brand-gold text-sm uppercase tracking-widest">Senha alterada!</p>
             </div>
           ) : (

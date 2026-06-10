@@ -13,7 +13,9 @@ export interface UserMetadata {
   avatar_id: string;
   display_name?: string;
   favorite_movie?: string;
+  favorite_movie_2?: string;
   favorite_genre?: string;
+  favorite_series?: string;
   watch_preference?: 'home' | 'cinema';
 }
 

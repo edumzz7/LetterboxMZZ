@@ -363,7 +363,7 @@ function App() {
             ) : !viewedUser ? null : (
               <main className="flex flex-col gap-16 min-h-[50vh]">
                 {activeTab === 'dashboard' ? (
-                  <DashboardTab user={viewedUser!} />
+                  <DashboardTab user={viewedUser!} isOwnDashboard={isOwnDashboard} />
                 ) : activeTab === 'oscars' ? (
                   <div className="animate-in fade-in duration-500">
                     <OscarPredictionsSection

@@ -37,7 +37,9 @@ type StoredUser = AppUser & {
   avatar_id: string;
   display_name?: string;
   favorite_movie?: string;
+  favorite_movie_2?: string;
   favorite_genre?: string;
+  favorite_series?: string;
   watch_preference?: 'home' | 'cinema';
 };
 
@@ -390,7 +392,9 @@ export async function listRankedUsers() {
       avatar_id: item.avatar_id,
       display_name: item.display_name,
       favorite_movie: item.favorite_movie,
+      favorite_movie_2: item.favorite_movie_2,
       favorite_genre: item.favorite_genre,
+      favorite_series: item.favorite_series,
       watch_preference: item.watch_preference,
       rank: index + 1,
     })) as RankedUser[];
@@ -439,7 +443,9 @@ export async function updateUserProfile(
   data: {
     display_name?: string;
     favorite_movie?: string;
+    favorite_movie_2?: string;
     favorite_genre?: string;
+    favorite_series?: string;
     watch_preference?: 'home' | 'cinema';
   }
 ) {

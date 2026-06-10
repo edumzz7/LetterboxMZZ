@@ -86,7 +86,9 @@ type AppwriteMetadataDoc = Models.Document & {
   avatar_id: string;
   display_name?: string;
   favorite_movie?: string;
+  favorite_movie_2?: string;
   favorite_genre?: string;
+  favorite_series?: string;
   watch_preference?: 'home' | 'cinema';
 };
 
@@ -1034,7 +1036,9 @@ export async function listRankedUsers() {
             avatar_id: dbAvatarId,
             display_name: dbDisplayName || undefined,
             favorite_movie: userMeta?.favorite_movie ?? undefined,
+            favorite_movie_2: userMeta?.favorite_movie_2 ?? undefined,
             favorite_genre: userMeta?.favorite_genre ?? undefined,
+            favorite_series: userMeta?.favorite_series ?? undefined,
             watch_preference: userMeta?.watch_preference ?? undefined,
           };
         })
@@ -1246,7 +1250,9 @@ export async function updateUserProfile(
   data: {
     display_name?: string;
     favorite_movie?: string;
+    favorite_movie_2?: string;
     favorite_genre?: string;
+    favorite_series?: string;
     watch_preference?: 'home' | 'cinema';
   }
 ) {
@@ -1285,8 +1291,14 @@ export async function updateUserProfile(
       if (data.favorite_movie !== undefined && data.favorite_movie !== metadata.favorite_movie) {
         updates.favorite_movie = data.favorite_movie;
       }
+      if (data.favorite_movie_2 !== undefined && data.favorite_movie_2 !== metadata.favorite_movie_2) {
+        updates.favorite_movie_2 = data.favorite_movie_2;
+      }
       if (data.favorite_genre !== undefined && data.favorite_genre !== metadata.favorite_genre) {
         updates.favorite_genre = data.favorite_genre;
+      }
+      if (data.favorite_series !== undefined && data.favorite_series !== metadata.favorite_series) {
+        updates.favorite_series = data.favorite_series;
       }
       if (data.watch_preference !== undefined && data.watch_preference !== metadata.watch_preference) {
         updates.watch_preference = data.watch_preference;

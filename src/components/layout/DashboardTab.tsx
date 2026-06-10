@@ -1,11 +1,12 @@
 import { useMemo } from 'react';
-import { Star, Tv, Clapperboard, Heart } from 'lucide-react';
+import { Star, Tv, Clapperboard, Heart, Film } from 'lucide-react';
 import { usePersonalMovies } from '../../hooks/usePersonalMovies';
 import { useSeries } from '../../hooks/useSeries';
 import type { RankedUser } from '../../types/app';
 
 interface DashboardTabProps {
   user: RankedUser;
+  isOwnDashboard?: boolean;
 }
 
 function getEmojiForRating(rating: number) {
@@ -27,7 +28,7 @@ function formatDate(dateStr?: string) {
   }
 }
 
-export default function DashboardTab({ user }: DashboardTabProps) {
+export default function DashboardTab({ user, isOwnDashboard }: DashboardTabProps) {
   const { moviesQuery } = usePersonalMovies(user.id);
   const { seriesQuery } = useSeries(user.id);
 
@@ -87,16 +88,49 @@ export default function DashboardTab({ user }: DashboardTabProps) {
       .slice(0, 6);
   }, [moviesQuery.data, seriesQuery.data]);
 
+  const EmptyStateShortcut = () => (
+    isOwnDashboard ? (
+      <button 
+        onClick={() => window.dispatchEvent(new Event('open-edit-profile'))}
+        className="text-brand-gold hover:underline text-sm font-medium mt-1 text-left w-fit"
+      >
+        + Adicionar
+      </button>
+    ) : (
+      <span className="text-brand-text-muted text-sm mt-1">Não definido</span>
+    )
+  );
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-in fade-in duration-500">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-500">
       <div className="bg-[#111] border border-[#222] rounded-2xl p-6 flex flex-col gap-2">
         <div className="flex items-center gap-2 text-brand-gold-alt mb-2">
           <Heart size={18} />
-          <h3 className="text-xs tracking-widest uppercase">Filme Favorito</h3>
+          <h3 className="text-xs tracking-widest uppercase">Filme Favorito (1)</h3>
         </div>
-        <p className="text-lg font-light text-brand-text">
-          {user.favorite_movie || 'Não definido'}
-        </p>
+        {user.favorite_movie ? (
+          <p className="text-lg font-light text-brand-text">{user.favorite_movie}</p>
+        ) : <EmptyStateShortcut />}
+      </div>
+
+      <div className="bg-[#111] border border-[#222] rounded-2xl p-6 flex flex-col gap-2">
+        <div className="flex items-center gap-2 text-brand-gold-alt mb-2">
+          <Heart size={18} />
+          <h3 className="text-xs tracking-widest uppercase">Filme Favorito (2)</h3>
+        </div>
+        {user.favorite_movie_2 ? (
+          <p className="text-lg font-light text-brand-text">{user.favorite_movie_2}</p>
+        ) : <EmptyStateShortcut />}
+      </div>
+
+      <div className="bg-[#111] border border-[#222] rounded-2xl p-6 flex flex-col gap-2">
+        <div className="flex items-center gap-2 text-brand-gold-alt mb-2">
+          <Film size={18} />
+          <h3 className="text-xs tracking-widest uppercase">Série Favorita</h3>
+        </div>
+        {user.favorite_series ? (
+          <p className="text-lg font-light text-brand-text">{user.favorite_series}</p>
+        ) : <EmptyStateShortcut />}
       </div>
 
       <div className="bg-[#111] border border-[#222] rounded-2xl p-6 flex flex-col gap-2">
@@ -104,9 +138,9 @@ export default function DashboardTab({ user }: DashboardTabProps) {
           <Clapperboard size={18} />
           <h3 className="text-xs tracking-widest uppercase">Gênero Favorito</h3>
         </div>
-        <p className="text-lg font-light text-brand-text">
-          {user.favorite_genre || 'Não definido'}
-        </p>
+        {user.favorite_genre ? (
+          <p className="text-lg font-light text-brand-text">{user.favorite_genre}</p>
+        ) : <EmptyStateShortcut />}
       </div>
 
       <div className="bg-[#111] border border-[#222] rounded-2xl p-6 flex flex-col gap-2">
@@ -114,9 +148,11 @@ export default function DashboardTab({ user }: DashboardTabProps) {
           <Tv size={18} />
           <h3 className="text-xs tracking-widest uppercase">Onde Assiste</h3>
         </div>
-        <p className="text-lg font-light text-brand-text capitalize">
-          {user.watch_preference === 'cinema' ? 'No Cinema' : user.watch_preference === 'home' ? 'Em Casa' : 'Não definido'}
-        </p>
+        {user.watch_preference ? (
+          <p className="text-lg font-light text-brand-text capitalize">
+            {user.watch_preference === 'cinema' ? 'No Cinema' : 'Em Casa'}
+          </p>
+        ) : <EmptyStateShortcut />}
       </div>
 
       <div className="bg-[#111] border border-[#222] rounded-2xl p-6 flex flex-col gap-2">
@@ -125,12 +161,12 @@ export default function DashboardTab({ user }: DashboardTabProps) {
           <h3 className="text-xs tracking-widest uppercase">Média de Avaliação</h3>
         </div>
         <p className="text-lg font-light text-brand-text">
-          {averageRating ? `${averageRating} / 5.0` : 'Sem avaliações ainda'}
+          {averageRating ? `${averageRating} / 5.0` : <span className="text-brand-text-muted text-sm mt-1">Sem avaliações</span>}
         </p>
       </div>
 
       {/* Seção de Resenhas */}
-      <div className="col-span-1 md:col-span-2 lg:col-span-4 mt-6 flex flex-col gap-6">
+      <div className="col-span-1 md:col-span-2 lg:col-span-3 mt-6 flex flex-col gap-6">
         <h2 className="text-sm font-semibold tracking-[0.25em] uppercase text-brand-gold">
           Últimas Resenhas
         </h2>

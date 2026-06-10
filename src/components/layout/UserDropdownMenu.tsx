@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { KeyRound, LogOut, Plus, Shield, Shuffle, UserRound, Image as ImageIcon } from 'lucide-react';
 import type { SessionUser, RankedUser } from '../../types/app';
@@ -43,6 +43,12 @@ export default function UserDropdownMenu({
   const [activeModal, setActiveModal] = useState<
     'editProfile' | 'avatar' | 'suggest' | 'cineMatch' | 'changePassword' | 'adminPanel' | null
   >(null);
+
+  useEffect(() => {
+    const handleOpenEditProfile = () => setActiveModal('editProfile');
+    window.addEventListener('open-edit-profile', handleOpenEditProfile);
+    return () => window.removeEventListener('open-edit-profile', handleOpenEditProfile);
+  }, []);
 
   const displayAvatar = currentRankedUser?.avatar_id || 'U1F464';
   const isAdmin = adminUsername && session.username === adminUsername;

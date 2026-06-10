@@ -326,8 +326,44 @@ export async function registerUser(username: string, password: string) {
   users.push(user);
   writeUsers(users);
   writeSessionUserId(user.id);
-  addActivity(user.id, `${user.username} entrou no LetterboxZZO.`, 0);
+  addActivity(user.id, `${user.username} entrou no Cinerats.`, 0);
   return { id: user.id, username: user.username };
+}
+
+export async function changePassword(
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+) {
+  const users = readUsers();
+  const user = users.find((item) => item.id === userId);
+  if (!user) throw new Error('Usuario nao encontrado.');
+
+  const currentHash = await hashPassword(currentPassword);
+  if (user.password_hash !== currentHash) {
+    throw new Error('Senha atual incorreta.');
+  }
+
+  const newHash = await hashPassword(newPassword);
+  const next = users.map((item) =>
+    item.id === userId ? { ...item, password_hash: newHash } : item,
+  );
+  writeUsers(next);
+}
+
+export async function adminResetPassword(
+  targetUsername: string,
+  newPassword: string,
+) {
+  const normalized = normalizeUsername(targetUsername);
+  const users = readUsers();
+  const target = users.find((item) => item.username === normalized);
+  if (!target) throw new Error(`Usuario "${targetUsername}" nao encontrado.`);
+
+  const newHash = await hashPassword(newPassword);
+  writeUsers(users.map((item) =>
+    item.id === target.id ? { ...item, password_hash: newHash } : item,
+  ));
 }
 
 export async function listUsers() {

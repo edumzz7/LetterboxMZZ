@@ -18,6 +18,8 @@ import UserAchievements from './components/ui/UserAchievements';
 import clsx from 'clsx';
 import {
   bootstrapApp,
+  changePassword,
+  adminResetPassword,
   getCurrentSessionUser,
   importLegacyDataForUser,
   loginUser,
@@ -28,6 +30,7 @@ import {
 import type { SessionUser } from './types/app';
 
 const SESSION_KEY = 'letterboxmzz_session_v1';
+const ADMIN_USERNAME = import.meta.env.VITE_OSCAR_ADMIN_USERNAME as string | undefined;
 
 function readStoredSession(): SessionUser | null {
   if (typeof window === 'undefined') return null;
@@ -151,7 +154,7 @@ function App() {
 
     if (!viewedUser) {
       return {
-        title: 'LetterboxZZO',
+        title: 'Cinerats',
       };
     }
 
@@ -239,6 +242,14 @@ function App() {
     setAuthError(null);
   };
 
+  const handleChangePassword = async (userId: string, current: string, next: string) => {
+    await changePassword(userId, current, next);
+  };
+
+  const handleAdminReset = async (targetUsername: string, newPassword: string) => {
+    await adminResetPassword(targetUsername, newPassword);
+  };
+
   if (isBootstrapping) {
     return (
       <div className="min-h-screen bg-brand-bg text-brand-text flex items-center justify-center">
@@ -311,6 +322,9 @@ function App() {
                     users={users}
                     onLogout={handleLogout}
                     avatarMutationPending={avatarMutation.isPending}
+                    adminUsername={ADMIN_USERNAME}
+                    onChangePassword={handleChangePassword}
+                    onAdminReset={handleAdminReset}
                     onSaveAvatar={async (avatarId, displayName) => {
                       await avatarMutation.mutateAsync({ userId: session.id, avatarId });
                       if (displayName !== currentRankedUser?.display_name) {
@@ -379,7 +393,7 @@ function App() {
         <footer className="mt-auto py-8 text-center text-sm text-brand-text-muted border-t border-[#111] border-opacity-50">
           <p className="flex items-center justify-center gap-2">
             <Film size={16} className="text-brand-gold-alt" />
-            LetterboxZZO • {currentUser?.username || 'Sessao ativa'}
+            Cinerats • {currentUser?.username || 'Sessao ativa'}
           </p>
         </footer>
       </div>

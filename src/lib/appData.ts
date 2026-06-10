@@ -125,10 +125,13 @@ const COLLECTION_USER_FAVORITES = import.meta.env.VITE_APPWRITE_COLLECTION_USER_
 const COLLECTION_USER_OSCAR_PREDICTIONS = import.meta.env.VITE_APPWRITE_COLLECTION_USER_OSCAR_PREDICTIONS ?? 'user_oscar_predictions';
 const MANAGED_PASSWORD_PLACEHOLDER = 'managed-by-appwrite';
 const MANAGED_PASSWORD_PREFIX = 'letterboxzzo::managed::';
-const PUBLIC_APP_URL = (import.meta.env.VITE_PUBLIC_APP_URL ?? 'https://letterbox-mzz.vercel.app').replace(
+/** Base URL used for sharing links. Override with VITE_PUBLIC_APP_URL env var. */
+const BASE_URL = (import.meta.env.VITE_PUBLIC_APP_URL ?? 'https://cinerats.vercel.app').replace(
   /\/$/,
   '',
 );
+/** @deprecated Use BASE_URL */
+const PUBLIC_APP_URL = BASE_URL;
 const FALLBACK_POSTER_URL = 'https://placehold.co/600x900/png';
 const AVATAR_IDS = ['avatar_clapper', 'avatar_popcorn', 'avatar_projector', 'avatar_girl', 'avatar_robot'];
 const LOCAL_MODE_KEY = 'letterboxmzz_force_local_v1';
@@ -918,7 +921,7 @@ export async function registerUser(username: string, password: string) {
         }
 
         await ensureUserMetadata(data.$id);
-        await addActivity(data.$id, `${data.username} entrou no LetterboxZZO.`, 0);
+        await addActivity(data.$id, `${data.username} entrou no Cinerats.`, 0);
 
         return { id: data.$id, username: data.username as string };
       } catch (error) {
@@ -929,6 +932,54 @@ export async function registerUser(username: string, password: string) {
       }
     },
     () => localData.registerUser(username, password),
+  );
+}
+
+export async function changePassword(
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+) {
+  return withFallback(
+    async () => {
+      // Validate current password by attempting a fresh session
+      const currentAccount = await getCurrentAccount();
+      if (!currentAccount) throw new Error('Nenhuma sessao ativa.');
+
+      // Re-authenticate with current password to confirm identity
+      const username = currentAccount.prefs?.username as string | undefined;
+      if (!username) throw new Error('Nao foi possivel identificar o usuario.');
+
+      try {
+        await ensureAppwriteSession(username, currentPassword);
+      } catch {
+        throw new Error('Senha atual incorreta.');
+      }
+
+      // Update password on Appwrite account
+      await account.updatePassword(
+        createManagedPassword(newPassword),
+        createManagedPassword(currentPassword),
+      );
+    },
+    () => localData.changePassword(userId, currentPassword, newPassword),
+  );
+}
+
+export async function adminResetPassword(
+  targetUsername: string,
+  newPassword: string,
+) {
+  return withFallback(
+    async () => {
+      // Appwrite client SDK cannot reset another user's password —
+      // only server-side Admin API can. In Appwrite mode we throw a
+      // descriptive error so the UI can surface a helpful message.
+      throw new Error(
+        `Para resetar a senha de "${targetUsername}" no Appwrite, acesse o console em cloud.appwrite.io → Auth → Users → ${targetUsername} → Update password.`,
+      );
+    },
+    () => localData.adminResetPassword(targetUsername, newPassword),
   );
 }
 

@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { LogOut, Plus, Shuffle, UserRound, Image as ImageIcon } from 'lucide-react';
+import { KeyRound, LogOut, Plus, Shield, Shuffle, UserRound, Image as ImageIcon } from 'lucide-react';
 import type { SessionUser, RankedUser } from '../../types/app';
 import AvatarDisplay from './AvatarDisplay';
 import EditProfileModal from './EditProfileModal';
 import ProfileAvatarModal from './ProfileAvatarModal';
 import SuggestMovieModal from './SuggestMovieModal';
 import CineMatchModal from './CineMatchModal';
+import ChangePasswordModal from './ChangePasswordModal';
+import AdminPanel from './AdminPanel';
 
 interface UserDropdownMenuProps {
   session: SessionUser;
@@ -21,6 +23,9 @@ interface UserDropdownMenuProps {
     favorite_genre?: string;
     watch_preference?: 'home' | 'cinema';
   }) => Promise<unknown>;
+  onChangePassword: (userId: string, current: string, next: string) => Promise<void>;
+  onAdminReset: (targetUsername: string, newPassword: string) => Promise<void>;
+  adminUsername?: string;
 }
 
 export default function UserDropdownMenu({
@@ -31,12 +36,16 @@ export default function UserDropdownMenu({
   avatarMutationPending,
   onSaveAvatar,
   onSaveProfile,
+  onChangePassword,
+  onAdminReset,
+  adminUsername,
 }: UserDropdownMenuProps) {
   const [activeModal, setActiveModal] = useState<
-    'editProfile' | 'avatar' | 'suggest' | 'cineMatch' | null
+    'editProfile' | 'avatar' | 'suggest' | 'cineMatch' | 'changePassword' | 'adminPanel' | null
   >(null);
 
   const displayAvatar = currentRankedUser?.avatar_id || 'U1F464';
+  const isAdmin = adminUsername && session.username === adminUsername;
 
   return (
     <>
@@ -73,6 +82,13 @@ export default function UserDropdownMenu({
             </DropdownMenu.Item>
 
             <DropdownMenu.Item
+              onSelect={() => setTimeout(() => setActiveModal('changePassword'), 50)}
+              className="flex items-center gap-2 px-2 py-2 outline-none cursor-pointer rounded hover:bg-brand-gold/10 hover:text-brand-gold transition"
+            >
+              <KeyRound size={16} /> Alterar Senha
+            </DropdownMenu.Item>
+
+            <DropdownMenu.Item
               onSelect={() => setTimeout(() => setActiveModal('suggest'), 50)}
               className="flex items-center gap-2 px-2 py-2 outline-none cursor-pointer rounded hover:bg-brand-gold/10 hover:text-brand-gold transition"
             >
@@ -85,6 +101,18 @@ export default function UserDropdownMenu({
             >
               <Shuffle size={16} /> Cine-Match
             </DropdownMenu.Item>
+
+            {isAdmin && (
+              <>
+                <DropdownMenu.Separator className="h-[1px] bg-[#222] my-1" />
+                <DropdownMenu.Item
+                  onSelect={() => setTimeout(() => setActiveModal('adminPanel'), 50)}
+                  className="flex items-center gap-2 px-2 py-2 outline-none cursor-pointer rounded hover:bg-brand-gold/10 hover:text-brand-gold transition"
+                >
+                  <Shield size={16} /> Painel Admin
+                </DropdownMenu.Item>
+              </>
+            )}
 
             <DropdownMenu.Separator className="h-[1px] bg-[#222] my-1" />
 
@@ -119,6 +147,13 @@ export default function UserDropdownMenu({
         />
       )}
 
+      <ChangePasswordModal
+        userId={session.id}
+        open={activeModal === 'changePassword'}
+        onOpenChange={(open) => setActiveModal(open ? 'changePassword' : null)}
+        onChangePassword={onChangePassword}
+      />
+
       <SuggestMovieModal
         currentUserId={session.id}
         users={users}
@@ -132,6 +167,16 @@ export default function UserDropdownMenu({
         open={activeModal === 'cineMatch'}
         onOpenChange={(open) => setActiveModal(open ? 'cineMatch' : null)}
       />
+
+      {isAdmin && (
+        <AdminPanel
+          users={users}
+          currentUserId={session.id}
+          open={activeModal === 'adminPanel'}
+          onOpenChange={(open) => setActiveModal(open ? 'adminPanel' : null)}
+          onAdminReset={onAdminReset}
+        />
+      )}
     </>
   );
 }

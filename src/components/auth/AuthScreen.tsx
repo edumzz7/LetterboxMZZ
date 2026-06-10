@@ -39,7 +39,7 @@ export default function AuthScreen({
           <div className="space-y-6">
             <div className="inline-flex items-center gap-3 text-brand-gold uppercase tracking-[0.35em] text-xs">
               <Film size={16} />
-              LetterboxZZO
+              Cinerats
             </div>
 
             <div className="space-y-4 max-w-xl">

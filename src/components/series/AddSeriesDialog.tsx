@@ -29,6 +29,7 @@ export default function AddSeriesDialog({
   const [seasonMeta, setSeasonMeta] = useState<TMDBTvSeasonMeta[]>([]);
   const [totalSeasons, setTotalSeasons] = useState(0);
   const [streamingData, setStreamingData] = useState<string | null>(null);
+  const [isRetroactive, setIsRetroactive] = useState(false);
   const searchTimeout = useRef<number | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -56,6 +57,7 @@ export default function AddSeriesDialog({
     setSeasonMeta([]);
     setTotalSeasons(0);
     setStreamingData(null);
+    setIsRetroactive(false);
   };
 
   const handleTitleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -138,6 +140,7 @@ export default function AddSeriesDialog({
         plataforma_slug: 'stremio',
         rating: selectedSeries?.vote_average ?? null,
         streaming_data: streamingData,
+        is_retroactive: isRetroactive,
       });
 
       resetForm();
@@ -282,6 +285,36 @@ export default function AddSeriesDialog({
                 />
               </div>
             </div>
+
+            {defaultStatus !== 'watchlist' ? (
+              <div className="flex flex-col gap-2">
+                <label className="text-xs text-brand-text uppercase tracking-widest">
+                  Quando voce assistiu?
+                </label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm font-light text-brand-text hover:text-brand-gold transition-colors">
+                    <input 
+                      type="radio" 
+                      name="retroactive_series"
+                      checked={!isRetroactive} 
+                      onChange={() => setIsRetroactive(false)} 
+                      className="accent-brand-gold" 
+                    />
+                    Recentemente (Ganha pontos)
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer text-sm font-light text-brand-text hover:text-brand-gold transition-colors">
+                    <input 
+                      type="radio" 
+                      name="retroactive_series"
+                      checked={isRetroactive} 
+                      onChange={() => setIsRetroactive(true)} 
+                      className="accent-brand-gold" 
+                    />
+                    Há mais tempo (Sem pontos)
+                  </label>
+                </div>
+              </div>
+            ) : null}
 
             {submitError ? (
               <div className="text-xs text-red-300 border border-red-500/40 rounded p-2 bg-red-500/10">

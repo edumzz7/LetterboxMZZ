@@ -54,6 +54,7 @@ export interface PersonalMovie {
   review?: string | null;
   streaming_data?: string | null;
   created_at: string;
+  is_retroactive?: boolean;
 }
 
 export interface SeriesEntry {
@@ -72,6 +73,7 @@ export interface SeriesEntry {
   review?: string | null;
   streaming_data?: string | null;
   created_at: string;
+  is_retroactive?: boolean;
 }
 
 export interface SessionUser {

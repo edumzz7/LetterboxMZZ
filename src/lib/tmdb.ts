@@ -143,6 +143,20 @@ export async function getMovieWatchProviders(
     }
 }
 
+export async function getMovieDetails(movieId: string | number) {
+    if (!TMDB_API_KEY || !movieId) return null;
+    try {
+        const response = await fetch(
+            `${TMDB_BASE_URL}/movie/${movieId}?api_key=${TMDB_API_KEY}&language=pt-BR`
+        );
+        if (!response.ok) return null;
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching movie details:', error);
+        return null;
+    }
+}
+
 export async function getTvWatchProviders(
     tvId: number,
     region = 'BR'

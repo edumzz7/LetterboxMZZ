@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Bell, Loader2 } from 'lucide-react';
+import { useLocation } from 'wouter';
+import clsx from 'clsx';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useUserActivity } from '../../hooks/useUserActivity';
 
@@ -42,6 +44,15 @@ export default function UserEventBell({
   const notificationsQuery = useNotifications(currentUserId);
   const activityQuery = useUserActivity(viewedUserId);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const [, setLocation] = useLocation();
+
+  const handleNotificationClick = (message: string) => {
+    const match = message.match(/Novo membro! @([\w.-]+)/);
+    if (match && match[1]) {
+      setLocation(`/${match[1]}`);
+      setOpen(false);
+    }
+  };
 
   useEffect(() => {
     setSeenTimestamp(readSeenTimestamp(currentUserId));
@@ -124,14 +135,24 @@ export default function UserEventBell({
             </div>
           ) : (
             <ul className="max-h-[420px] overflow-y-auto">
-              {items.map((item) => (
-                <li key={item.id} className="px-4 py-3 border-b border-[#121212] last:border-b-0">
-                  <p className="text-sm leading-relaxed text-brand-text">{item.message}</p>
-                  <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-brand-text-muted">
-                    {formatTimestamp(item.created_at)}
-                  </p>
-                </li>
-              ))}
+              {items.map((item) => {
+                const isNewMember = item.message.startsWith('Novo membro!');
+                return (
+                  <li 
+                    key={item.id} 
+                    className={clsx(
+                      "px-4 py-3 border-b border-[#121212] last:border-b-0",
+                      isNewMember && "cursor-pointer hover:bg-white/5 transition-colors"
+                    )}
+                    onClick={() => isNewMember && handleNotificationClick(item.message)}
+                  >
+                    <p className="text-sm leading-relaxed text-brand-text">{item.message}</p>
+                    <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-brand-text-muted">
+                      {formatTimestamp(item.created_at)}
+                    </p>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

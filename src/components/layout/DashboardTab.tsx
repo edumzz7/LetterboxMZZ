@@ -35,7 +35,7 @@ export default function DashboardTab({ user, isOwnDashboard }: DashboardTabProps
   const averageRating = useMemo(() => {
     const movies = moviesQuery.data || [];
     const series = seriesQuery.data || [];
-    
+
     let totalScore = 0;
     let count = 0;
 
@@ -45,7 +45,7 @@ export default function DashboardTab({ user, isOwnDashboard }: DashboardTabProps
         count++;
       }
     }
-    
+
     for (const s of series) {
       if (typeof s.avaliacao === 'number' && s.avaliacao > 0) {
         totalScore += s.avaliacao;
@@ -90,7 +90,7 @@ export default function DashboardTab({ user, isOwnDashboard }: DashboardTabProps
 
   const EmptyStateShortcut = () => (
     isOwnDashboard ? (
-      <button 
+      <button
         onClick={() => window.dispatchEvent(new Event('open-edit-profile'))}
         className="text-brand-gold hover:underline text-sm font-medium mt-1 text-left w-fit"
       >
@@ -106,7 +106,7 @@ export default function DashboardTab({ user, isOwnDashboard }: DashboardTabProps
       <div className="bg-[#111] border border-[#222] rounded-2xl p-6 flex flex-col gap-2">
         <div className="flex items-center gap-2 text-brand-gold-alt mb-2">
           <Heart size={18} />
-          <h3 className="text-xs tracking-widest uppercase">Filme Favorito (1)</h3>
+          <h3 className="text-xs tracking-widest uppercase">Filme Favorito</h3>
         </div>
         {user.favorite_movie ? (
           <p className="text-lg font-light text-brand-text">{user.favorite_movie}</p>
@@ -116,7 +116,7 @@ export default function DashboardTab({ user, isOwnDashboard }: DashboardTabProps
       <div className="bg-[#111] border border-[#222] rounded-2xl p-6 flex flex-col gap-2">
         <div className="flex items-center gap-2 text-brand-gold-alt mb-2">
           <Heart size={18} />
-          <h3 className="text-xs tracking-widest uppercase">Filme Favorito (2)</h3>
+          <h3 className="text-xs tracking-widest uppercase">Melhor Filme Que Viu</h3>
         </div>
         {user.favorite_movie_2 ? (
           <p className="text-lg font-light text-brand-text">{user.favorite_movie_2}</p>

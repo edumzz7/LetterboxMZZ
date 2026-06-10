@@ -1,12 +1,100 @@
 import { useState } from 'react';
 import clsx from 'clsx';
-import { Star, Flame, ChevronDown, ChevronUp, Loader2, Film } from 'lucide-react';
+import { Star, Flame, ChevronDown, ChevronUp, Loader2, Film, Plus } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import type { RankedUser } from '../../types/app';
+import type { RankedUser, TrendingMovie, AnticipatedMovie } from '../../types/app';
 import AvatarDisplay from './AvatarDisplay';
 import { useFavorites } from '../../hooks/useFavorites';
+import { usePersonalMovies } from '../../hooks/usePersonalMovies';
 import { getTrendingMovies, getAnticipatedMovies } from '../../lib/appData';
+import { getMovieDetails } from '../../lib/tmdb';
 import { generateImagePath } from '../../lib/imageUtils';
+
+function SidebarMovieItem({ 
+  movie, 
+  currentUserId 
+}: { 
+  movie: TrendingMovie | AnticipatedMovie; 
+  currentUserId: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const { addMovieMutation } = usePersonalMovies(currentUserId);
+  const [addedToWatchlist, setAddedToWatchlist] = useState(false);
+
+  const { data: details, isLoading } = useQuery({
+    queryKey: ['movie-details', movie.tmdbId],
+    queryFn: () => movie.tmdbId ? getMovieDetails(movie.tmdbId) : null,
+    enabled: expanded && !!movie.tmdbId,
+  });
+
+  const handleAddToWatchlist = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (addedToWatchlist) return;
+    addMovieMutation.mutate({
+      titulo: movie.title,
+      capa_url: movie.coverUrl,
+      source_movie_id: movie.tmdbId,
+      status: 'watchlist',
+    });
+    setAddedToWatchlist(true);
+  };
+
+  return (
+    <div className="flex flex-col gap-2 bg-black/15 border border-[#171717] hover:border-[#333] transition-all rounded-xl p-2 cursor-pointer" onClick={() => setExpanded(!expanded)}>
+      <div className="flex items-center gap-2.5">
+        {/* Tiny Cover */}
+        <div className="w-8 aspect-[2/3] rounded-md overflow-hidden border border-[#222] shrink-0 bg-brand-card">
+          {movie.coverUrl ? (
+            <img
+              src={generateImagePath(movie.title, movie.coverUrl)}
+              alt={movie.title}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <Film size={12} className="text-[#333]" />
+            </div>
+          )}
+        </div>
+        {/* Details */}
+        <div className="flex flex-col min-w-0 flex-1 relative">
+          <span
+            className="text-xs font-light text-brand-text truncate leading-tight pr-6"
+            title={movie.title}
+          >
+            {movie.title}
+          </span>
+          <div className="flex items-center justify-between mt-0.5">
+            <span className="text-[9px] uppercase tracking-wider text-brand-gold-alt font-light">
+              {movie.userCount} {movie.userCount === 1 ? 'visto/interessado' : 'vistos/interessados'}
+            </span>
+            <button 
+              onClick={handleAddToWatchlist}
+              disabled={addedToWatchlist || addMovieMutation.isPending}
+              className="text-brand-gold-alt hover:text-brand-gold disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Adicionar à watchlist"
+            >
+              <Plus size={12} />
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      {/* Synopsis Expansion */}
+      {expanded && (
+        <div className="text-xs font-light text-brand-text-muted px-1 mt-1 border-t border-[#222] pt-2 pb-1">
+          {isLoading ? (
+            <div className="flex justify-center py-2"><Loader2 size={12} className="animate-spin" /></div>
+          ) : details?.overview ? (
+            <p className="line-clamp-4 leading-relaxed">{details.overview}</p>
+          ) : (
+            <p className="italic">Sinopse não disponível.</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface UserSidebarProps {
   users: RankedUser[];
@@ -281,37 +369,7 @@ export default function UserSidebar({
                 </div>
               ) : trendingMovies && trendingMovies.length > 0 ? (
                 trendingMovies.map((movie, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center gap-2.5 bg-black/15 border border-[#171717] hover:border-[#333] transition-all rounded-xl p-2"
-                  >
-                    {/* Tiny Cover */}
-                    <div className="w-8 aspect-[2/3] rounded-md overflow-hidden border border-[#222] shrink-0 bg-brand-card">
-                      {movie.coverUrl ? (
-                        <img
-                          src={generateImagePath(movie.title, movie.coverUrl)}
-                          alt={movie.title}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Film size={12} className="text-[#333]" />
-                        </div>
-                      )}
-                    </div>
-                    {/* Details */}
-                    <div className="flex flex-col min-w-0 flex-1">
-                      <span
-                        className="text-xs font-light text-brand-text truncate leading-tight"
-                        title={movie.title}
-                      >
-                        {movie.title}
-                      </span>
-                      <span className="text-[9px] uppercase tracking-wider text-brand-gold-alt mt-0.5 font-light">
-                        {movie.userCount} {movie.userCount === 1 ? 'visto' : 'vistos'}
-                      </span>
-                    </div>
-                  </div>
+                  <SidebarMovieItem key={index} movie={movie} currentUserId={currentUserId} />
                 ))
               ) : (
                 <div className="text-[10px] text-brand-text-muted font-light text-center py-4">
@@ -355,37 +413,7 @@ export default function UserSidebar({
                 </div>
               ) : anticipatedMovies && anticipatedMovies.length > 0 ? (
                 anticipatedMovies.map((movie, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center gap-2.5 bg-black/15 border border-[#171717] hover:border-[#333] transition-all rounded-xl p-2"
-                  >
-                    {/* Tiny Cover */}
-                    <div className="w-8 aspect-[2/3] rounded-md overflow-hidden border border-[#222] shrink-0 bg-brand-card">
-                      {movie.coverUrl ? (
-                        <img
-                          src={generateImagePath(movie.title, movie.coverUrl)}
-                          alt={movie.title}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Film size={12} className="text-[#333]" />
-                        </div>
-                      )}
-                    </div>
-                    {/* Details */}
-                    <div className="flex flex-col min-w-0 flex-1">
-                      <span
-                        className="text-xs font-light text-brand-text truncate leading-tight"
-                        title={movie.title}
-                      >
-                        {movie.title}
-                      </span>
-                      <span className="text-[9px] uppercase tracking-wider text-brand-gold-alt mt-0.5 font-light">
-                        {movie.userCount} {movie.userCount === 1 ? 'interessado' : 'interessados'}
-                      </span>
-                    </div>
-                  </div>
+                  <SidebarMovieItem key={index} movie={movie} currentUserId={currentUserId} />
                 ))
               ) : (
                 <div className="text-[10px] text-brand-text-muted font-light text-center py-4">

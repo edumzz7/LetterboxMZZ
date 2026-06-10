@@ -401,7 +401,7 @@ function mapSeries(doc: AppwriteSeriesDoc): SeriesEntry {
 
 function isIncomingNotificationMessage(message: string) {
   const normalized = message.toLowerCase();
-  return normalized.includes('para voce') || normalized.includes('ao seu filme');
+  return normalized.includes('para voce') || normalized.includes('ao seu filme') || normalized.includes('novo membro');
 }
 
 function parseRecommendedSource(sourceMovieId: string | null | undefined) {
@@ -428,9 +428,53 @@ function mapOscarPrediction(doc: AppwriteUserOscarPredictionDoc): UserOscarPredi
     category: doc.category,
     tmdb_id: doc.tmdb_id,
     title: doc.title,
-    poster_path: doc.poster_path,
-    created_at: doc.created_at || doc.$createdAt,
+    cover_url: doc.cover_url,
+    updated_at: doc.$updatedAt,
   };
+}
+
+export async function addActivity(userId: string, message: string, mcoinsDelta: number) {
+  return withFallback(
+    async () => {
+      await createDocument(COLLECTION_ATIVIDADES, {
+        user_id: userId,
+        message,
+        mcoins_delta: mcoinsDelta,
+      });
+    },
+    () => localData.addActivity(userId, message, mcoinsDelta),
+  );
+}
+
+export async function listActivities(limit = 30) {
+  return withFallback(
+    async () => {
+      const data = await listDocuments<AppwriteActivityDoc>(COLLECTION_ATIVIDADES, [
+        Query.orderDesc('$createdAt'),
+        Query.limit(limit),
+      ]);
+
+      return data.map(mapActivity);
+    },
+    () => localData.listActivities(limit),
+  );
+}
+
+export async function listNotifications(userId: string, limit = 20) {
+  return withFallback(
+    async () => {
+      const data = await listDocuments<AppwriteActivityDoc>(COLLECTION_ATIVIDADES, [
+        Query.equal('user_id', [userId, 'global']),
+        Query.orderDesc('$createdAt'),
+        Query.limit(limit),
+      ]);
+
+      return data
+        .map(mapActivity)
+        .filter((item) => isIncomingNotificationMessage(item.message));
+    },
+    () => localData.listNotifications(userId, limit),
+  );
 }
 
 async function listDocuments<T extends Models.Document>(collectionId: string, queries: string[] = []) {
@@ -923,7 +967,9 @@ export async function registerUser(username: string, password: string) {
         }
 
         await ensureUserMetadata(data.$id);
-        await addActivity(data.$id, `${data.username} entrou no Cinerats.`, 0);
+        
+        // Add activity to global timeline
+        await addActivity('global', `Novo membro! @${data.username} entrou no Cinerats.`, 0);
 
         return { id: data.$id, username: data.username as string };
       } catch (error) {
@@ -1992,7 +2038,7 @@ export async function getTrendingMovies(): Promise<TrendingMovie[]> {
         Query.greaterThanEqual('$createdAt', thirtyDaysAgo.toISOString()),
       ]);
 
-      const watcherSets = new Map<string, { title: string; coverUrl: string | null; watchers: Set<string>; lastWatchedAt: string }>();
+      const watcherSets = new Map<string, { title: string; coverUrl: string | null; tmdbId?: string; watchers: Set<string>; lastWatchedAt: string }>();
 
       for (const doc of docs) {
         const key = doc.source_movie_id || doc.titulo.toLowerCase().trim();
@@ -2001,6 +2047,7 @@ export async function getTrendingMovies(): Promise<TrendingMovie[]> {
           group = {
             title: doc.titulo,
             coverUrl: doc.capa_url ?? null,
+            tmdbId: doc.source_movie_id,
             watchers: new Set<string>(),
             lastWatchedAt: doc.$createdAt,
           };
@@ -2015,6 +2062,7 @@ export async function getTrendingMovies(): Promise<TrendingMovie[]> {
       const grouped = Array.from(watcherSets.values()).map((g) => ({
         title: g.title,
         coverUrl: g.coverUrl,
+        tmdbId: g.tmdbId,
         userCount: g.watchers.size,
         lastWatchedAt: g.lastWatchedAt,
       }));
@@ -2108,7 +2156,7 @@ export async function getAnticipatedMovies(): Promise<AnticipatedMovie[]> {
         Query.equal('status', 'watchlist'),
       ]);
 
-      const watcherSets = new Map<string, { title: string; coverUrl: string | null; watchers: Set<string> }>();
+      const watcherSets = new Map<string, { title: string; coverUrl: string | null; tmdbId?: string; watchers: Set<string> }>();
 
       for (const doc of docs) {
         const key = doc.source_movie_id || doc.titulo.toLowerCase().trim();
@@ -2117,6 +2165,7 @@ export async function getAnticipatedMovies(): Promise<AnticipatedMovie[]> {
           group = {
             title: doc.titulo,
             coverUrl: doc.capa_url ?? null,
+            tmdbId: doc.source_movie_id,
             watchers: new Set<string>(),
           };
           watcherSets.set(key, group);
@@ -2127,6 +2176,7 @@ export async function getAnticipatedMovies(): Promise<AnticipatedMovie[]> {
       const grouped = Array.from(watcherSets.values()).map((g) => ({
         title: g.title,
         coverUrl: g.coverUrl,
+        tmdbId: g.tmdbId,
         userCount: g.watchers.size,
       }));
 

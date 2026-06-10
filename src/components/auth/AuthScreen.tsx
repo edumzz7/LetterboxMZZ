@@ -39,34 +39,38 @@ export default function AuthScreen({
           <div className="space-y-6">
             <div className="inline-flex items-center gap-3 text-brand-gold uppercase tracking-[0.35em] text-xs">
               <Film size={16} />
-              Cinerats
+              CineRats
             </div>
 
             <div className="space-y-4 max-w-xl">
               <h1 className="text-4xl md:text-5xl font-light leading-tight tracking-[0.08em] uppercase">
-                Filmes, series e Oscar em uma dashboard por usuario
+                SEU CLUBE DE CINEMA PARTICULAR.
               </h1>
               <p className="text-brand-text-muted leading-relaxed max-w-lg">
-                Cada pessoa entra com seu proprio login, acompanha a propria lista e ainda pode
-                visitar o perfil dos outros para ver o que cada um anda assistindo.
+                Monte sua biblioteca particular, compartilhe seu gosto com os amigos e ganhe pontos a cada filme ou série assistido
+                Seu hobby favorito ainda mais interessante!
               </p>
             </div>
           </div>
 
           <div className="grid sm:grid-cols-3 gap-3 text-xs uppercase tracking-[0.22em]">
             <div className="border border-[#1c1c1c] rounded-2xl p-4 bg-black/30">
-              Catalogo Oscar compartilhado
+              Seu feed, do seu jeito!
             </div>
             <div className="border border-[#1c1c1c] rounded-2xl p-4 bg-black/30">
-              Perfil pessoal por usuario
+              Palpite, indique e interaja
             </div>
             <div className="border border-[#1c1c1c] rounded-2xl p-4 bg-black/30">
-              Busca via API para filmes e series
+              Suba no ranking a cada play ou apenas monte sua coleção.
             </div>
           </div>
         </section>
 
         <section className="p-8 md:p-12 flex flex-col justify-center">
+          <div className="flex justify-center mb-10">
+            <img src="/logo-cn.png" alt="CineRats Logo" className="w-32 sm:w-40 drop-shadow-2xl opacity-90 hover:opacity-100 hover:scale-105 transition-all duration-300" />
+          </div>
+
           <div className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-brand-text-muted mb-6">
             <button
               type="button"

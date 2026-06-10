@@ -32,9 +32,12 @@ function SidebarMovieItem({
     if (addedToWatchlist) return;
     addMovieMutation.mutate({
       titulo: movie.title,
-      capa_url: movie.coverUrl,
-      source_movie_id: movie.tmdbId,
+      capa_url: movie.coverUrl || null,
+      source_movie_id: movie.tmdbId || null,
       status: 'watchlist',
+      plataforma_slug: null,
+      ano_lancamento: null,
+      source: 'manual',
     });
     setAddedToWatchlist(true);
   };

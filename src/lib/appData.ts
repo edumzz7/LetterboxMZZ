@@ -428,53 +428,9 @@ function mapOscarPrediction(doc: AppwriteUserOscarPredictionDoc): UserOscarPredi
     category: doc.category,
     tmdb_id: doc.tmdb_id,
     title: doc.title,
-    cover_url: doc.cover_url,
-    updated_at: doc.$updatedAt,
+    poster_path: doc.poster_path,
+    created_at: doc.created_at || doc.$createdAt,
   };
-}
-
-export async function addActivity(userId: string, message: string, mcoinsDelta: number) {
-  return withFallback(
-    async () => {
-      await createDocument(COLLECTION_ATIVIDADES, {
-        user_id: userId,
-        message,
-        mcoins_delta: mcoinsDelta,
-      });
-    },
-    () => localData.addActivity(userId, message, mcoinsDelta),
-  );
-}
-
-export async function listActivities(limit = 30) {
-  return withFallback(
-    async () => {
-      const data = await listDocuments<AppwriteActivityDoc>(COLLECTION_ATIVIDADES, [
-        Query.orderDesc('$createdAt'),
-        Query.limit(limit),
-      ]);
-
-      return data.map(mapActivity);
-    },
-    () => localData.listActivities(limit),
-  );
-}
-
-export async function listNotifications(userId: string, limit = 20) {
-  return withFallback(
-    async () => {
-      const data = await listDocuments<AppwriteActivityDoc>(COLLECTION_ATIVIDADES, [
-        Query.equal('user_id', [userId, 'global']),
-        Query.orderDesc('$createdAt'),
-        Query.limit(limit),
-      ]);
-
-      return data
-        .map(mapActivity)
-        .filter((item) => isIncomingNotificationMessage(item.message));
-    },
-    () => localData.listNotifications(userId, limit),
-  );
 }
 
 async function listDocuments<T extends Models.Document>(collectionId: string, queries: string[] = []) {
@@ -1114,7 +1070,7 @@ export async function listNotifications(userId: string, limit = 20) {
   return withFallback(
     async () => {
       const data = await listDocuments<AppwriteActivityDoc>(COLLECTION_ATIVIDADES, [
-        Query.equal('user_id', [userId]),
+        Query.equal('user_id', [userId, 'global']),
         Query.orderDesc('$createdAt'),
         Query.limit(limit),
       ]);
@@ -2038,7 +1994,7 @@ export async function getTrendingMovies(): Promise<TrendingMovie[]> {
         Query.greaterThanEqual('$createdAt', thirtyDaysAgo.toISOString()),
       ]);
 
-      const watcherSets = new Map<string, { title: string; coverUrl: string | null; tmdbId?: string; watchers: Set<string>; lastWatchedAt: string }>();
+      const watcherSets = new Map<string, { title: string; coverUrl: string | null; tmdbId?: string | null; watchers: Set<string>; lastWatchedAt: string }>();
 
       for (const doc of docs) {
         const key = doc.source_movie_id || doc.titulo.toLowerCase().trim();
@@ -2156,7 +2112,7 @@ export async function getAnticipatedMovies(): Promise<AnticipatedMovie[]> {
         Query.equal('status', 'watchlist'),
       ]);
 
-      const watcherSets = new Map<string, { title: string; coverUrl: string | null; tmdbId?: string; watchers: Set<string> }>();
+      const watcherSets = new Map<string, { title: string; coverUrl: string | null; tmdbId?: string | null; watchers: Set<string> }>();
 
       for (const doc of docs) {
         const key = doc.source_movie_id || doc.titulo.toLowerCase().trim();

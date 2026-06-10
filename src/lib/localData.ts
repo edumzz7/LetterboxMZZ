@@ -834,7 +834,7 @@ export async function getTrendingMovies(): Promise<Array<{ title: string; coverU
       new Date(m.created_at).getTime() >= thirtyDaysAgoMs
   );
 
-  const watcherSets = new Map<string, { title: string; coverUrl: string | null; tmdbId?: string; watchers: Set<string>; lastWatchedAt: string }>();
+  const watcherSets = new Map<string, { title: string; coverUrl: string | null; tmdbId?: string | null; watchers: Set<string>; lastWatchedAt: string }>();
 
   for (const m of watchedInLast30) {
     const key = m.source_movie_id || m.titulo.toLowerCase().trim();
@@ -912,7 +912,7 @@ export async function getAnticipatedMovies(): Promise<AnticipatedMovie[]> {
   const allMovies = readPersonalMovies();
   const watchlistMovies = allMovies.filter((m) => m.status === 'watchlist');
 
-  const watcherSets = new Map<string, { title: string; coverUrl: string | null; tmdbId?: string; watchers: Set<string> }>();
+  const watcherSets = new Map<string, { title: string; coverUrl: string | null; tmdbId?: string | null; watchers: Set<string> }>();
 
   for (const m of watchlistMovies) {
     const key = m.source_movie_id || m.titulo.toLowerCase().trim();

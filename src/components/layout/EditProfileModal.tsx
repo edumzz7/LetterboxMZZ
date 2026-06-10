@@ -244,7 +244,7 @@ export default function EditProfileModal({
             </div>
 
             <SearchInput
-              label="Filme Favorito da Vida (1)"
+              label="Filme Favorito"
               placeholder="Ex: O Poderoso Chefão"
               value={favoriteMovie}
               onChange={setFavoriteMovie}
@@ -252,7 +252,7 @@ export default function EditProfileModal({
             />
 
             <SearchInput
-              label="Filme Favorito da Vida (2)"
+              label="Melhor Filme Que Viu"
               placeholder="Ex: Matrix"
               value={favoriteMovie2}
               onChange={setFavoriteMovie2}

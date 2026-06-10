@@ -146,7 +146,7 @@ export default function DashboardTab({ user, isOwnDashboard }: DashboardTabProps
       <div className="bg-[#111] border border-[#222] rounded-2xl p-6 flex flex-col gap-2">
         <div className="flex items-center gap-2 text-brand-gold-alt mb-2">
           <Tv size={18} />
-          <h3 className="text-xs tracking-widest uppercase">Onde Assiste</h3>
+          <h3 className="text-xs tracking-widest uppercase">Onde prefere Assistir</h3>
         </div>
         {user.watch_preference ? (
           <p className="text-lg font-light text-brand-text capitalize">

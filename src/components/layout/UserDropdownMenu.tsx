@@ -20,7 +20,9 @@ interface UserDropdownMenuProps {
   onSaveProfile: (data: {
     display_name?: string;
     favorite_movie?: string;
+    favorite_movie_2?: string;
     favorite_genre?: string;
+    favorite_series?: string;
     watch_preference?: 'home' | 'cinema';
   }) => Promise<unknown>;
   onChangePassword: (userId: string, current: string, next: string) => Promise<void>;

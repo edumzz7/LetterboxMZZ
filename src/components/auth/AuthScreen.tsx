@@ -47,21 +47,20 @@ export default function AuthScreen({
                 SEU CLUBE DE CINEMA PARTICULAR.
               </h1>
               <p className="text-brand-text-muted leading-relaxed max-w-lg">
-                Monte sua biblioteca particular, compartilhe seu gosto com os amigos e ganhe pontos a cada filme ou série assistido
-                Seu hobby favorito ainda mais interessante!
+                Monte sua biblioteca particular, compartilhe seu gosto com os amigos e ganhe pontos a cada filme ou série assistido. Seu hobby favorito ainda mais interessante!
               </p>
             </div>
           </div>
 
           <div className="grid sm:grid-cols-3 gap-3 text-xs uppercase tracking-[0.22em]">
             <div className="border border-[#1c1c1c] rounded-2xl p-4 bg-black/30">
-              Seu feed, do seu jeito!
+              Suba no ranking a cada play ou apenas monte sua coleção.
             </div>
             <div className="border border-[#1c1c1c] rounded-2xl p-4 bg-black/30">
               Palpite, indique e interaja
             </div>
             <div className="border border-[#1c1c1c] rounded-2xl p-4 bg-black/30">
-              Suba no ranking a cada play ou apenas monte sua coleção.
+              Seu feed, do seu jeito!
             </div>
           </div>
         </section>

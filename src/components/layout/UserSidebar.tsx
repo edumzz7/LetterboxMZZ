@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
 import clsx from 'clsx';
 import { Star, Flame, ChevronDown, ChevronUp, Loader2, Film, Plus } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -43,59 +44,99 @@ function SidebarMovieItem({
   };
 
   return (
-    <div className="flex flex-col gap-2 bg-black/15 border border-[#171717] hover:border-[#333] transition-all rounded-xl p-2 cursor-pointer" onClick={() => setExpanded(!expanded)}>
-      <div className="flex items-center gap-2.5">
-        {/* Tiny Cover */}
-        <div className="w-8 aspect-[2/3] rounded-md overflow-hidden border border-[#222] shrink-0 bg-brand-card">
-          {movie.coverUrl ? (
-            <img
-              src={generateImagePath(movie.title, movie.coverUrl)}
-              alt={movie.title}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <Film size={12} className="text-[#333]" />
+    <Dialog.Root open={expanded} onOpenChange={setExpanded}>
+      <Dialog.Trigger asChild>
+        <div className="flex flex-col gap-2 bg-black/15 border border-[#171717] hover:border-[#333] transition-all rounded-xl p-2 cursor-pointer group">
+          <div className="flex items-center gap-2.5">
+            {/* Tiny Cover */}
+            <div className="w-8 aspect-[2/3] rounded-md overflow-hidden border border-[#222] shrink-0 bg-brand-card">
+              {movie.coverUrl ? (
+                <img
+                  src={generateImagePath(movie.title, movie.coverUrl)}
+                  alt={movie.title}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Film size={12} className="text-[#333]" />
+                </div>
+              )}
             </div>
-          )}
-        </div>
-        {/* Details */}
-        <div className="flex flex-col min-w-0 flex-1 relative">
-          <span
-            className="text-xs font-light text-brand-text truncate leading-tight pr-6"
-            title={movie.title}
-          >
-            {movie.title}
-          </span>
-          <div className="flex items-center justify-between mt-0.5">
-            <span className="text-[9px] uppercase tracking-wider text-brand-gold-alt font-light">
-              {movie.userCount} {movie.userCount === 1 ? 'visto/interessado' : 'vistos/interessados'}
-            </span>
-            <button 
-              onClick={handleAddToWatchlist}
-              disabled={addedToWatchlist || addMovieMutation.isPending}
-              className="text-brand-gold-alt hover:text-brand-gold disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Adicionar à watchlist"
-            >
-              <Plus size={12} />
-            </button>
+            {/* Details */}
+            <div className="flex flex-col min-w-0 flex-1 relative">
+              <span
+                className="text-xs font-light text-brand-text truncate leading-tight pr-6"
+                title={movie.title}
+              >
+                {movie.title}
+              </span>
+              <div className="flex items-center justify-between mt-0.5">
+                <span className="text-[9px] uppercase tracking-wider text-brand-gold-alt font-light">
+                  {movie.userCount} {movie.userCount === 1 ? 'visto' : 'vistos'}
+                </span>
+                <button 
+                  onClick={handleAddToWatchlist}
+                  disabled={addedToWatchlist || addMovieMutation.isPending}
+                  className="text-brand-gold-alt hover:text-brand-gold hover:scale-125 hover:bg-white/10 p-1 rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Adicionar à watchlist"
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      </Dialog.Trigger>
       
-      {/* Synopsis Expansion */}
-      {expanded && (
-        <div className="text-xs font-light text-brand-text-muted px-1 mt-1 border-t border-[#222] pt-2 pb-1">
-          {isLoading ? (
-            <div className="flex justify-center py-2"><Loader2 size={12} className="animate-spin" /></div>
-          ) : details?.overview ? (
-            <p className="line-clamp-4 leading-relaxed">{details.overview}</p>
-          ) : (
-            <p className="italic">Sinopse não disponível.</p>
-          )}
-        </div>
-      )}
-    </div>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60]" />
+        <Dialog.Content className="fixed left-[50%] top-[50%] z-[70] w-[90vw] max-w-sm translate-x-[-50%] translate-y-[-50%] border border-[#222] bg-[#111] p-5 shadow-2xl rounded-xl">
+          <div className="flex gap-4">
+            <div className="w-24 aspect-[2/3] shrink-0 rounded overflow-hidden border border-[#222] bg-black">
+              {movie.coverUrl ? (
+                <img
+                  src={generateImagePath(movie.title, movie.coverUrl)}
+                  alt={movie.title}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Film size={24} className="text-[#333]" />
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col flex-1">
+              <Dialog.Title className="text-lg font-medium text-brand-text mb-1 leading-tight">
+                {movie.title}
+              </Dialog.Title>
+              <span className="text-xs uppercase tracking-wider text-brand-gold-alt mb-3">
+                {movie.userCount} {movie.userCount === 1 ? 'visto' : 'vistos'}
+              </span>
+              <button
+                onClick={handleAddToWatchlist}
+                disabled={addedToWatchlist || addMovieMutation.isPending}
+                className="flex items-center justify-center gap-2 py-2 px-3 bg-brand-gold/10 text-brand-gold hover:bg-brand-gold hover:text-black transition-colors rounded-lg text-xs font-semibold uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Plus size={14} /> 
+                {addedToWatchlist ? 'Adicionado' : 'Watchlist'}
+              </button>
+            </div>
+          </div>
+          <div className="mt-4 pt-4 border-t border-[#222]">
+            <h4 className="text-[10px] uppercase tracking-widest text-brand-text-muted mb-2">Sinopse</h4>
+            <div className="text-sm font-light text-brand-text/90 leading-relaxed max-h-[40vh] overflow-y-auto pr-1">
+              {isLoading ? (
+                <div className="flex justify-center py-6"><Loader2 size={24} className="animate-spin text-brand-gold" /></div>
+              ) : details?.overview ? (
+                <p>{details.overview}</p>
+              ) : (
+                <p className="italic text-brand-text-muted">Sinopse não disponível no momento.</p>
+              )}
+            </div>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
 

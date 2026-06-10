@@ -951,16 +951,18 @@ export async function changePassword(
       if (!username) throw new Error('Nao foi possivel identificar o usuario.');
 
       try {
-        await ensureAppwriteSession(username, currentPassword);
-      } catch {
-        throw new Error('Senha atual incorreta.');
+        // Update password on Appwrite account
+        // This inherently validates the current password
+        await account.updatePassword(
+          createManagedPassword(newPassword),
+          createManagedPassword(currentPassword),
+        );
+      } catch (error: any) {
+        if (error.code === 401) {
+          throw new Error('Senha atual incorreta.');
+        }
+        throw new Error('Falha ao atualizar a senha no servidor.');
       }
-
-      // Update password on Appwrite account
-      await account.updatePassword(
-        createManagedPassword(newPassword),
-        createManagedPassword(currentPassword),
-      );
     },
     () => localData.changePassword(userId, currentPassword, newPassword),
   );

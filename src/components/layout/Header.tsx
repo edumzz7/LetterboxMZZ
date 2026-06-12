@@ -25,16 +25,16 @@ const Header = ({
     <header className="flex flex-col gap-6">
       <div className="w-24 h-[1px] bg-brand-gold opacity-50" />
 
-      <div className="space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <h1 className="text-3xl md:text-4xl font-light tracking-widest text-brand-text uppercase">
+      <div className="space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <h1 className="text-3xl md:text-4xl font-light tracking-widest text-brand-text uppercase break-words">
             {title}
           </h1>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
             {rightSlot}
             <button
               onClick={onToggleSidebar}
-              className="xl:hidden inline-flex items-center gap-2 px-3 py-2 border border-[#222] rounded-lg text-xs uppercase tracking-[0.14em] text-brand-text-muted hover:text-brand-gold"
+              className="xl:hidden inline-flex items-center shrink-0 gap-2 px-3 py-2 border border-[#222] rounded-lg text-xs uppercase tracking-[0.14em] text-brand-text-muted hover:text-brand-gold"
             >
               <Menu size={14} /> Ranking
             </button>

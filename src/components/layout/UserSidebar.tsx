@@ -207,7 +207,7 @@ export default function UserSidebar({
 
       <aside
         className={clsx(
-          'z-50 xl:z-auto w-[280px] xl:w-[258px] shrink-0 border border-[#151515] rounded-[24px] bg-[linear-gradient(180deg,_rgba(8,10,16,0.96),_rgba(3,3,3,0.98))] p-3 h-[calc(100vh-2rem)] xl:h-fit overflow-y-auto xl:sticky xl:top-8 fixed xl:relative left-4 xl:left-auto top-4 xl:top-auto transition-transform',
+          'z-50 xl:z-auto w-[280px] xl:w-[258px] max-w-[calc(100vw-2rem)] shrink-0 border border-[#151515] rounded-[24px] bg-[linear-gradient(180deg,_rgba(8,10,16,0.96),_rgba(3,3,3,0.98))] p-3 h-[calc(100vh-2rem)] xl:h-fit overflow-y-auto xl:sticky xl:top-8 fixed xl:relative left-4 xl:left-auto top-4 xl:top-auto transition-transform',
           isOpen ? 'translate-x-0' : '-translate-x-[120%] xl:translate-x-0',
         )}
       >

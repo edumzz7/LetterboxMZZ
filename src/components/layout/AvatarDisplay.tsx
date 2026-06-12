@@ -18,11 +18,15 @@ export default function AvatarDisplay({
       <img
         src={imageSrc}
         alt="Avatar"
-        className={`${className} rounded-full object-cover`}
+        className={`${className} rounded-full object-cover shrink-0`}
         loading="lazy"
       />
     );
   }
 
-  return <span className={`${emojiClassName} leading-none`}>{avatarEmoji(avatarId)}</span>;
+  return (
+    <div className={`${className} shrink-0 rounded-full flex items-center justify-center bg-[#151515]`}>
+      <span className={`${emojiClassName} leading-none`}>{avatarEmoji(avatarId)}</span>
+    </div>
+  );
 }

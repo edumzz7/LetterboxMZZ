@@ -9,6 +9,7 @@ import SuggestMovieModal from './SuggestMovieModal';
 import CineMatchModal from './CineMatchModal';
 import ChangePasswordModal from './ChangePasswordModal';
 import AdminPanel from './AdminPanel';
+import ShareReviewModal from './ShareReviewModal';
 
 interface UserDropdownMenuProps {
   session: SessionUser;
@@ -43,7 +44,7 @@ export default function UserDropdownMenu({
   adminUsername,
 }: UserDropdownMenuProps) {
   const [activeModal, setActiveModal] = useState<
-    'editProfile' | 'avatar' | 'suggest' | 'cineMatch' | 'changePassword' | 'adminPanel' | null
+    'editProfile' | 'avatar' | 'suggest' | 'cineMatch' | 'changePassword' | 'adminPanel' | 'shareReview' | null
   >(null);
 
   useEffect(() => {
@@ -87,6 +88,13 @@ export default function UserDropdownMenu({
               className="flex items-center gap-2 px-2 py-2 outline-none cursor-pointer rounded hover:bg-brand-gold/10 hover:text-brand-gold transition"
             >
               <ImageIcon size={16} /> Alterar Avatar
+            </DropdownMenu.Item>
+
+            <DropdownMenu.Item
+              onSelect={() => setTimeout(() => setActiveModal('shareReview'), 50)}
+              className="flex items-center gap-2 px-2 py-2 outline-none cursor-pointer rounded hover:bg-brand-gold/10 hover:text-brand-gold transition"
+            >
+              <ImageIcon size={16} /> Compartilhar Resenha
             </DropdownMenu.Item>
 
             <DropdownMenu.Item
@@ -160,6 +168,13 @@ export default function UserDropdownMenu({
         open={activeModal === 'changePassword'}
         onOpenChange={(open) => setActiveModal(open ? 'changePassword' : null)}
         onChangePassword={onChangePassword}
+      />
+
+      <ShareReviewModal
+        currentUserId={session.id}
+        currentDisplayName={currentRankedUser?.display_name || session.username}
+        open={activeModal === 'shareReview'}
+        onOpenChange={(open) => setActiveModal(open ? 'shareReview' : null)}
       />
 
       <SuggestMovieModal

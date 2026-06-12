@@ -18,6 +18,7 @@
     "appwrite": "^23.0.0",
     "clsx": "^2.1.1",
     "embla-carousel-react": "^8.6.0",
+    "html2canvas": "^1.4.1",
     "lucide-react": "^0.577.0",
     "playwright": "^1.58.2",
     "react": "^19.2.4",

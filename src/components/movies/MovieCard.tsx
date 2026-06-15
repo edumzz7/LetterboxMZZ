@@ -291,7 +291,10 @@ export default function MovieCard({
                 )}
 
                 <DropdownMenu.Item
-                  onSelect={handleOpenSynopsis}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    setTimeout(() => handleOpenSynopsis(), 50);
+                  }}
                   className="flex items-center gap-2 px-2 py-2 text-xs text-brand-text rounded-md cursor-pointer outline-none hover:bg-brand-gold/10 hover:text-brand-gold transition-colors focus:bg-brand-gold/10 focus:text-brand-gold"
                 >
                   <BookOpen size={14} />

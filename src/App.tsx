@@ -124,6 +124,28 @@ function App() {
     if (location === '/') setLocation(`/${session.username}`);
   }, [session, location, setLocation]);
 
+  // Fix Radix UI overlay lock issues globally when Dialogs or Menus close
+  useEffect(() => {
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.attributeName === 'style') {
+          const pointerEvents = document.body.style.pointerEvents;
+          if (pointerEvents === 'none') {
+            const hasOpenModal = document.querySelector(
+              '[role="dialog"], [role="menu"], [data-state="open"], .fixed.inset-0.bg-black\\/80'
+            );
+            if (!hasOpenModal) {
+              document.body.style.pointerEvents = '';
+            }
+          }
+        }
+      });
+    });
+
+    observer.observe(document.body, { attributes: true, attributeFilter: ['style'] });
+    return () => observer.disconnect();
+  }, []);
+
   const users = usersQuery.data || [];
   const urlUsername = match ? params.username : null;
   const viewedUser = urlUsername

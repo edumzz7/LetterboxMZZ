@@ -444,13 +444,64 @@ export default function UserSidebar({
           }
         }
 
+        const mapTvGenreToMovie = (gId: number): number => {
+          switch (gId) {
+            case 10759: // Action & Adventure
+              return 28; // Action
+            case 10765: // Sci-Fi & Fantasy
+              return 878; // Science Fiction
+            case 10768: // War & Politics
+              return 10752; // War
+            case 10762: // Kids
+              return 10751; // Family fallback
+            case 10763: // News
+            case 10764: // Reality
+            case 10767: // Talk
+              return 99; // Documentary fallback
+            case 10766: // Soap
+              return 18; // Drama fallback
+            default:
+              return gId;
+          }
+        };
+
+        const mapMovieGenreToTv = (gId: number): number => {
+          switch (gId) {
+            case 28: // Action
+            case 12: // Adventure
+              return 10759; // Action & Adventure
+            case 14: // Fantasy
+            case 878: // Science Fiction
+              return 10765; // Sci-Fi & Fantasy
+            case 53: // Thriller
+              return 80; // Crime
+            case 27: // Horror
+              return 9648; // Mystery fallback
+            case 10402: // Music
+              return 35; // Comedy fallback
+            case 10770: // TV Movie
+              return 18; // Drama fallback
+            case 36: // History
+            case 10752: // War
+              return 10768; // War & Politics
+            default:
+              return gId;
+          }
+        };
+
+        const movieGenreId = mapTvGenreToMovie(favoriteGenreId);
+        const tvGenreId = mapMovieGenreToTv(favoriteGenreId);
+
         let recommendedMovies: any[] = [];
         
-        const genreMoviesRes = await fetch(`${TMDB_BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&with_genres=${favoriteGenreId}&language=pt-BR&sort_by=popularity.desc`);
+        const genreMoviesRes = await fetch(`${TMDB_BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&with_genres=${movieGenreId}&language=pt-BR&sort_by=popularity.desc`);
         if (genreMoviesRes.ok) {
           const gData = await genreMoviesRes.json();
           let candidates = gData.results || [];
-          candidates = candidates.filter((c: any) => !userMovies.some((m) => m.titulo.toLowerCase().trim() === c.title.toLowerCase().trim()));
+          candidates = candidates.filter((c: any) => {
+            const candidateTitle = (c.title || '').toLowerCase().trim();
+            return !userMovies.some((m) => (m.titulo || '').toLowerCase().trim() === candidateTitle);
+          });
           candidates.sort(() => 0.5 - Math.random());
           recommendedMovies = candidates.slice(0, 2);
         }
@@ -461,7 +512,10 @@ export default function UserSidebar({
           if (dirMoviesRes.ok) {
             const dData = await dirMoviesRes.json();
             let candidates = dData.results || [];
-            candidates = candidates.filter((c: any) => !userMovies.some((m) => m.titulo.toLowerCase().trim() === c.title.toLowerCase().trim()));
+            candidates = candidates.filter((c: any) => {
+              const candidateTitle = (c.title || '').toLowerCase().trim();
+              return !userMovies.some((m) => (m.titulo || '').toLowerCase().trim() === candidateTitle);
+            });
             candidates.sort(() => 0.5 - Math.random());
             if (candidates.length > 0) {
               recommendedMovies.push(candidates[0]);
@@ -471,14 +525,17 @@ export default function UserSidebar({
         }
 
         if (!directorMoviePicked) {
-          const genreMoviesRes = await fetch(`${TMDB_BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&with_genres=${favoriteGenreId}&language=pt-BR&sort_by=popularity.desc`);
+          const genreMoviesRes = await fetch(`${TMDB_BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&with_genres=${movieGenreId}&language=pt-BR&sort_by=popularity.desc`);
           if (genreMoviesRes.ok) {
             const gData = await genreMoviesRes.json();
             let candidates = gData.results || [];
-            candidates = candidates.filter((c: any) => 
-              !userMovies.some((m) => m.titulo.toLowerCase().trim() === c.title.toLowerCase().trim()) &&
-              !recommendedMovies.some((rm) => rm.id === c.id)
-            );
+            candidates = candidates.filter((c: any) => {
+              const candidateTitle = (c.title || '').toLowerCase().trim();
+              return (
+                !userMovies.some((m) => (m.titulo || '').toLowerCase().trim() === candidateTitle) &&
+                !recommendedMovies.some((rm) => rm.id === c.id)
+              );
+            });
             candidates.sort(() => 0.5 - Math.random());
             if (candidates.length > 0) {
               recommendedMovies.push(candidates[0]);
@@ -487,11 +544,14 @@ export default function UserSidebar({
         }
 
         let recommendedSeries: any[] = [];
-        const genreSeriesRes = await fetch(`${TMDB_BASE_URL}/discover/tv?api_key=${TMDB_API_KEY}&with_genres=${favoriteGenreId}&language=pt-BR&sort_by=popularity.desc`);
+        const genreSeriesRes = await fetch(`${TMDB_BASE_URL}/discover/tv?api_key=${TMDB_API_KEY}&with_genres=${tvGenreId}&language=pt-BR&sort_by=popularity.desc`);
         if (genreSeriesRes.ok) {
           const sData = await genreSeriesRes.json();
           let candidates = sData.results || [];
-          candidates = candidates.filter((c: any) => !userSeries.some((s) => s.titulo.toLowerCase().trim() === c.name.toLowerCase().trim()));
+          candidates = candidates.filter((c: any) => {
+            const candidateName = (c.name || '').toLowerCase().trim();
+            return !userSeries.some((s) => (s.titulo || '').toLowerCase().trim() === candidateName);
+          });
           candidates.sort(() => 0.5 - Math.random());
           recommendedSeries = candidates.slice(0, 3);
         }

@@ -2057,7 +2057,7 @@ export async function getTrendingMovies(): Promise<TrendingMovie[]> {
         return new Date(b.lastWatchedAt).getTime() - new Date(a.lastWatchedAt).getTime();
       });
 
-      return grouped.slice(0, 10);
+      return grouped.slice(0, 5);
     },
     () => localData.getTrendingMovies(),
   );
@@ -2166,7 +2166,7 @@ export async function getAnticipatedMovies(): Promise<AnticipatedMovie[]> {
 
       grouped.sort((a, b) => b.userCount - a.userCount);
 
-      return grouped.slice(0, 10);
+      return grouped.slice(0, 5);
     },
     () => localData.getAnticipatedMovies(),
   );

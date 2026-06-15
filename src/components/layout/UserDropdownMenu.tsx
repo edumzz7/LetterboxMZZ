@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import { useLocation } from 'wouter';
 import { KeyRound, LogOut, Plus, Shield, Shuffle, UserRound, Image as ImageIcon } from 'lucide-react';
 import type { SessionUser, RankedUser } from '../../types/app';
 import AvatarDisplay from './AvatarDisplay';
@@ -43,6 +44,7 @@ export default function UserDropdownMenu({
   onAdminReset,
   adminUsername,
 }: UserDropdownMenuProps) {
+  const [, setLocation] = useLocation();
   const [activeModal, setActiveModal] = useState<
     'editProfile' | 'avatar' | 'suggest' | 'cineMatch' | 'changePassword' | 'adminPanel' | 'shareReview' | null
   >(null);
@@ -69,7 +71,13 @@ export default function UserDropdownMenu({
             sideOffset={8}
             align="end"
           >
-            <div className="px-2 py-2 mb-1 border-b border-[#222]">
+            <div 
+              onClick={() => {
+                setLocation(`/${session.username}`);
+              }}
+              className="px-2 py-2 mb-1 border-b border-[#222] cursor-pointer hover:bg-brand-gold/10 hover:text-brand-gold transition rounded"
+              title="Ir para minha dashboard"
+            >
               <p className="font-semibold">{currentRankedUser?.display_name || session.username}</p>
               <p className="text-xs text-brand-text-muted mt-0.5 opacity-70">
                 @{session.username} • {currentRankedUser?.mcoins || 0} MC

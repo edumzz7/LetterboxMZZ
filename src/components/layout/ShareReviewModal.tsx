@@ -199,24 +199,30 @@ export default function ShareReviewModal({
             <div className="flex flex-col items-center gap-6 mt-4">
               <p className="text-xs uppercase tracking-[0.14em] text-brand-text-muted">Preview da Imagem</p>
               
-              <div className="relative w-[270px] h-[480px] rounded-lg overflow-hidden border border-brand-gold/30 shadow-2xl flex items-center justify-center group">
+              <div className="flex items-center gap-3 w-full justify-center">
                 {generatedImages.length > 1 && (
-                  <>
-                    <button
-                      onClick={() => setCurrentImageIndex((prev) => (prev === 0 ? generatedImages.length - 1 : prev - 1))}
-                      className="absolute left-2 z-10 p-2 bg-black/60 rounded-full text-white hover:bg-brand-gold hover:text-black transition opacity-0 group-hover:opacity-100"
-                    >
-                      &#8592;
-                    </button>
-                    <button
-                      onClick={() => setCurrentImageIndex((prev) => (prev === generatedImages.length - 1 ? 0 : prev + 1))}
-                      className="absolute right-2 z-10 p-2 bg-black/60 rounded-full text-white hover:bg-brand-gold hover:text-black transition opacity-0 group-hover:opacity-100"
-                    >
-                      &#8594;
-                    </button>
-                  </>
+                  <button
+                    onClick={() => setCurrentImageIndex((prev) => (prev === 0 ? generatedImages.length - 1 : prev - 1))}
+                    className="p-3 bg-[#151515] border border-[#222] hover:border-brand-gold/40 hover:text-brand-gold rounded-full text-white transition shrink-0 flex items-center justify-center w-10 h-10 active:scale-95"
+                    title="Versão anterior"
+                  >
+                    &#8592;
+                  </button>
                 )}
-                <img src={generatedImages[currentImageIndex]} alt="Preview" className="w-full h-full object-contain bg-black" />
+                
+                <div className="relative w-[270px] h-[480px] rounded-lg overflow-hidden border border-brand-gold/30 shadow-2xl flex items-center justify-center bg-black">
+                  <img src={generatedImages[currentImageIndex]} alt="Preview" className="w-full h-full object-contain" />
+                </div>
+
+                {generatedImages.length > 1 && (
+                  <button
+                    onClick={() => setCurrentImageIndex((prev) => (prev === generatedImages.length - 1 ? 0 : prev + 1))}
+                    className="p-3 bg-[#151515] border border-[#222] hover:border-brand-gold/40 hover:text-brand-gold rounded-full text-white transition shrink-0 flex items-center justify-center w-10 h-10 active:scale-95"
+                    title="Próxima versão"
+                  >
+                    &#8594;
+                  </button>
+                )}
               </div>
 
               <div className="flex items-center gap-2 justify-center w-full">

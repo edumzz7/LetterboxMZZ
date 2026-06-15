@@ -23,9 +23,14 @@ export default function PersonalMoviesSection({
   const { rateMutation, reactMutation } = useSocialActions();
   const [filter, setFilter] = useState<'watchlist' | 'watched'>('watchlist');
   const [optimisticMovies, setOptimisticMovies] = useState<PersonalMovie[]>([]);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const mergedMovies = [...optimisticMovies, ...(moviesQuery.data || [])];
   const filteredMovies = mergedMovies.filter((movie) => movie.status === filter);
+
+  const maxInitialItems = canEdit ? 11 : 12;
+  const hasMore = filteredMovies.length > maxInitialItems;
+  const displayedMovies = isExpanded ? filteredMovies : filteredMovies.slice(0, maxInitialItems);
 
   const handleToggleStatus = (movie: PersonalMovie, nextStatus: 'watchlist' | 'watched') => {
     updateStatusMutation.mutate({ id: movie.id, status: nextStatus });
@@ -85,58 +90,71 @@ export default function PersonalMoviesSection({
           <Loader2 className="animate-spin" size={32} />
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-x-6 md:gap-y-8">
-          {filteredMovies.map((movie) => (
-            <div key={movie.id} className="min-w-0 w-full">
-              <MovieCard
-                movie={movie}
-                layout="grid"
-                canEdit={canEdit}
-                showPlatformSelector
-                currentUserId={currentUserId}
-                onToggleStatus={(selectedMovie, nextStatus) => {
-                  if ('user_id' in selectedMovie) {
-                    handleToggleStatus(selectedMovie, nextStatus);
-                  }
-                }}
-                onDelete={(selectedMovie) => deleteMovieMutation.mutate(selectedMovie.id)}
-                onPlatformChange={(selectedMovie, platformId) =>
-                  updatePlatformMutation.mutate({ id: selectedMovie.id, platform: platformId })
-                }
-                onRate={async (selectedMovie, stars, review) => {
-                  await rateMutation.mutateAsync({
-                    actorUserId: currentUserId,
-                    movieId: selectedMovie.id,
-                    movieTitle: selectedMovie.titulo,
-                    stars,
-                    review,
-                  });
-                }}
-                onReact={async (selectedMovie, reaction) => {
-                  await reactMutation.mutateAsync({
-                    actorUserId: currentUserId,
-                    targetUserId: selectedMovie.user_id,
-                    movieTitle: selectedMovie.titulo,
-                    reaction,
-                  });
-                }}
-                isPending={movie.id.startsWith('optimistic-')}
-              />
-            </div>
-          ))}
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-x-6 md:gap-y-8">
+            {canEdit ? (
+              <div className="flex">
+                <AddMovieDialog
+                  mode="personal"
+                  layout="grid"
+                  isPending={addMovieMutation.isPending}
+                  defaultStatus={filter}
+                  onSubmit={handleAddMovie}
+                />
+              </div>
+            ) : null}
 
-          {canEdit ? (
-            <div className="flex">
-              <AddMovieDialog
-                mode="personal"
-                layout="grid"
-                isPending={addMovieMutation.isPending}
-                defaultStatus={filter}
-                onSubmit={handleAddMovie}
-              />
+            {displayedMovies.map((movie) => (
+              <div key={movie.id} className="min-w-0 w-full">
+                <MovieCard
+                  movie={movie}
+                  layout="grid"
+                  canEdit={canEdit}
+                  showPlatformSelector
+                  currentUserId={currentUserId}
+                  onToggleStatus={(selectedMovie, nextStatus) => {
+                    if ('user_id' in selectedMovie) {
+                      handleToggleStatus(selectedMovie, nextStatus);
+                    }
+                  }}
+                  onDelete={(selectedMovie) => deleteMovieMutation.mutate(selectedMovie.id)}
+                  onPlatformChange={(selectedMovie, platformId) =>
+                    updatePlatformMutation.mutate({ id: selectedMovie.id, platform: platformId })
+                  }
+                  onRate={async (selectedMovie, stars, review) => {
+                    await rateMutation.mutateAsync({
+                      actorUserId: currentUserId,
+                      movieId: selectedMovie.id,
+                      movieTitle: selectedMovie.titulo,
+                      stars,
+                      review,
+                    });
+                  }}
+                  onReact={async (selectedMovie, reaction) => {
+                    await reactMutation.mutateAsync({
+                      actorUserId: currentUserId,
+                      targetUserId: selectedMovie.user_id,
+                      movieTitle: selectedMovie.titulo,
+                      reaction,
+                    });
+                  }}
+                  isPending={movie.id.startsWith('optimistic-')}
+                />
+              </div>
+            ))}
+          </div>
+
+          {hasMore && (
+            <div className="flex justify-center mt-6">
+              <button
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="text-xs uppercase tracking-widest text-brand-text-muted hover:text-brand-gold transition-colors py-2 px-4 bg-transparent border-none cursor-pointer focus:outline-none"
+              >
+                {isExpanded ? 'recolher' : 'mostrar todos'}
+              </button>
             </div>
-          ) : null}
-        </div>
+          )}
+        </>
       )}
     </section>
   );

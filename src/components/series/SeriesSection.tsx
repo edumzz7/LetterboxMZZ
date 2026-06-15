@@ -16,8 +16,13 @@ export default function SeriesSection({ userId, canEdit, currentUserId }: Series
   const { seriesQuery, updateProgressMutation, addSeriesMutation, deleteSeriesMutation, rateSeriesMutation } =
     useSeries(userId);
   const [filter, setFilter] = useState<SeriesStatus>('watched');
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const filteredSeries = (seriesQuery.data || []).filter((series) => series.status === filter);
+
+  const maxInitialItems = canEdit ? 11 : 12;
+  const hasMore = filteredSeries.length > maxInitialItems;
+  const displayedSeries = isExpanded ? filteredSeries : filteredSeries.slice(0, maxInitialItems);
 
   return (
     <section className="flex flex-col gap-6">
@@ -68,36 +73,49 @@ export default function SeriesSection({ userId, canEdit, currentUserId }: Series
           <Loader2 className="animate-spin" size={32} />
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-y-8 md:gap-x-6">
-          {filteredSeries.map((series) => (
-            <SeriesCard
-              key={series.id}
-              series={series}
-              canEdit={canEdit}
-              currentUserId={currentUserId}
-              onSaveProgress={(payload) => updateProgressMutation.mutateAsync(payload)}
-              onDelete={(seriesId) => deleteSeriesMutation.mutate(seriesId)}
-              onRate={(seriesId, stars, review) =>
-                rateSeriesMutation.mutateAsync({
-                  actorUserId: currentUserId,
-                  seriesId,
-                  stars,
-                  review,
-                })
-              }
-            />
-          ))}
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-y-8 md:gap-x-6">
+            {canEdit ? (
+              <div className="flex">
+                <AddSeriesDialog
+                  defaultStatus={filter}
+                  onSubmit={(series) => addSeriesMutation.mutateAsync(series)}
+                  isPending={addSeriesMutation.isPending}
+                />
+              </div>
+            ) : null}
 
-          {canEdit ? (
-            <div className="flex">
-              <AddSeriesDialog
-                defaultStatus={filter}
-                onSubmit={(series) => addSeriesMutation.mutateAsync(series)}
-                isPending={addSeriesMutation.isPending}
+            {displayedSeries.map((series) => (
+              <SeriesCard
+                key={series.id}
+                series={series}
+                canEdit={canEdit}
+                currentUserId={currentUserId}
+                onSaveProgress={(payload) => updateProgressMutation.mutateAsync(payload)}
+                onDelete={(seriesId) => deleteSeriesMutation.mutate(seriesId)}
+                onRate={(seriesId, stars, review) =>
+                  rateSeriesMutation.mutateAsync({
+                    actorUserId: currentUserId,
+                    seriesId,
+                    stars,
+                    review,
+                  })
+                }
               />
+            ))}
+          </div>
+
+          {hasMore && (
+            <div className="flex justify-center mt-6">
+              <button
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="text-xs uppercase tracking-widest text-brand-text-muted hover:text-brand-gold transition-colors py-2 px-4 bg-transparent border-none cursor-pointer focus:outline-none"
+              >
+                {isExpanded ? 'recolher' : 'mostrar todos'}
+              </button>
             </div>
-          ) : null}
-        </div>
+          )}
+        </>
       )}
     </section>
   );

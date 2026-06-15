@@ -1,15 +1,166 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import clsx from 'clsx';
-import { Star, Flame, ChevronDown, ChevronUp, Loader2, Film, Plus } from 'lucide-react';
+import { Star, Flame, ChevronDown, ChevronUp, Loader2, Film, Plus, Award } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import type { RankedUser, TrendingMovie, AnticipatedMovie } from '../../types/app';
 import AvatarDisplay from './AvatarDisplay';
 import { useFavorites } from '../../hooks/useFavorites';
 import { usePersonalMovies } from '../../hooks/usePersonalMovies';
+import { useSeries } from '../../hooks/useSeries';
 import { getTrendingMovies, getAnticipatedMovies } from '../../lib/appData';
 import { getMovieDetails } from '../../lib/tmdb';
 import { generateImagePath } from '../../lib/imageUtils';
+
+const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY;
+const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
+
+function SidebarRecommendationItem({ 
+  item, 
+  currentUserId 
+}: { 
+  item: { tmdbId: number; title: string; coverUrl: string | null; type: 'movie' | 'tv' }; 
+  currentUserId: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const { addMovieMutation } = usePersonalMovies(currentUserId);
+  const { addSeriesMutation } = useSeries(currentUserId);
+  const [addedToWatchlist, setAddedToWatchlist] = useState(false);
+
+  const { data: details, isLoading } = useQuery({
+    queryKey: ['rec-details', item.type, item.tmdbId],
+    queryFn: async () => {
+      const res = await fetch(`${TMDB_BASE_URL}/${item.type}/${item.tmdbId}?api_key=${TMDB_API_KEY}&language=pt-BR`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: expanded && !!item.tmdbId,
+  });
+
+  const handleAddToWatchlist = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (addedToWatchlist) return;
+
+    if (item.type === 'movie') {
+      addMovieMutation.mutate({
+        titulo: item.title,
+        capa_url: item.coverUrl,
+        source_movie_id: String(item.tmdbId),
+        status: 'watchlist',
+        plataforma_slug: null,
+        ano_lancamento: details?.release_date ? parseInt(details.release_date.split('-')[0], 10) : null,
+        source: 'manual',
+      });
+    } else {
+      addSeriesMutation.mutate({
+        titulo: item.title,
+        capa_url: item.coverUrl,
+        status: 'watchlist',
+        temporada: 1,
+        total_episodios: details?.number_of_episodes || 0,
+        episodios_vistos: 0,
+        plataforma_slug: null,
+      });
+    }
+    setAddedToWatchlist(true);
+  };
+
+  return (
+    <Dialog.Root open={expanded} onOpenChange={setExpanded}>
+      <Dialog.Trigger asChild>
+        <div className="flex flex-col gap-2 bg-black/15 border border-[#171717] hover:border-[#333] transition-all rounded-xl p-2 cursor-pointer group">
+          <div className="flex items-center gap-2.5">
+            {/* Tiny Cover */}
+            <div className="w-8 aspect-[2/3] rounded-md overflow-hidden border border-[#222] shrink-0 bg-brand-card">
+              {item.coverUrl ? (
+                <img
+                  src={item.coverUrl}
+                  alt={item.title}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Film size={12} className="text-[#333]" />
+                </div>
+              )}
+            </div>
+            {/* Details */}
+            <div className="flex flex-col min-w-0 flex-1 relative">
+              <span
+                className="text-xs font-light text-brand-text truncate leading-tight pr-6"
+                title={item.title}
+              >
+                {item.title}
+              </span>
+              <div className="flex items-center justify-between mt-0.5">
+                <span className="text-[9px] uppercase tracking-wider text-brand-gold-alt font-light">
+                  Recomendado
+                </span>
+                <button 
+                  onClick={handleAddToWatchlist}
+                  disabled={addedToWatchlist || addMovieMutation.isPending || addSeriesMutation.isPending}
+                  className="text-brand-gold-alt hover:text-brand-gold hover:scale-125 hover:bg-white/10 p-1 rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Adicionar à watchlist"
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Dialog.Trigger>
+      
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60]" />
+        <Dialog.Content className="fixed left-[50%] top-[50%] z-[70] w-[90vw] max-w-sm translate-x-[-50%] translate-y-[-50%] border border-[#222] bg-[#111] p-5 shadow-2xl rounded-xl">
+          <div className="flex gap-4">
+            <div className="w-24 aspect-[2/3] shrink-0 rounded overflow-hidden border border-[#222] bg-black">
+              {item.coverUrl ? (
+                <img
+                  src={item.coverUrl}
+                  alt={item.title}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Film size={24} className="text-[#333]" />
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col flex-1">
+              <Dialog.Title className="text-lg font-medium text-brand-text mb-1 leading-tight">
+                {item.title}
+              </Dialog.Title>
+              <span className="text-[10px] uppercase tracking-wider text-brand-gold-alt mb-3 block">
+                {item.type === 'movie' ? 'Filme Recomendado' : 'Série Recomendada'}
+              </span>
+              <button
+                onClick={handleAddToWatchlist}
+                disabled={addedToWatchlist || addMovieMutation.isPending || addSeriesMutation.isPending}
+                className="flex items-center justify-center gap-2 py-2 px-3 bg-brand-gold/10 text-brand-gold hover:bg-brand-gold hover:text-black transition-colors rounded-lg text-xs font-semibold uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Plus size={14} /> 
+                {addedToWatchlist ? 'Adicionado' : 'Watchlist'}
+              </button>
+            </div>
+          </div>
+          <div className="mt-4 pt-4 border-t border-[#222]">
+            <h4 className="text-[10px] uppercase tracking-widest text-brand-text-muted mb-2">Sinopse</h4>
+            <div className="text-sm font-light text-brand-text/90 leading-relaxed max-h-[40vh] overflow-y-auto pr-1">
+              {isLoading ? (
+                <div className="flex justify-center py-6"><Loader2 size={24} className="animate-spin text-brand-gold" /></div>
+              ) : details?.overview ? (
+                <p>{details.overview}</p>
+              ) : (
+                <p className="italic text-brand-text-muted">Sinopse não disponível no momento.</p>
+              )}
+            </div>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
 
 function SidebarMovieItem({ 
   movie, 
@@ -197,6 +348,181 @@ export default function UserSidebar({
   const { isUserFavorited, toggleFavorite } = useFavorites(currentUserId);
   const [isTrendingOpen, setIsTrendingOpen] = useState(false);
   const [isAnticipatedOpen, setIsAnticipatedOpen] = useState(false);
+  const [isRecomendadosOpen, setIsRecomendadosOpen] = useState(false);
+  const [recomendadosTab, setRecomendadosTab] = useState<'filmes' | 'series'>('filmes');
+
+  const { moviesQuery } = usePersonalMovies(currentUserId);
+  const { seriesQuery } = useSeries(currentUserId);
+
+  const [recommendations, setRecommendations] = useState<{
+    movies: Array<{ tmdbId: number; title: string; coverUrl: string | null; type: 'movie' }>;
+    series: Array<{ tmdbId: number; title: string; coverUrl: string | null; type: 'tv' }>;
+  } | null>(null);
+  const [recLoading, setRecLoading] = useState(false);
+  const generatedForUserRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!currentUserId) {
+      setRecommendations(null);
+      generatedForUserRef.current = null;
+      return;
+    }
+
+    if (moviesQuery.isLoading || seriesQuery.isLoading) return;
+    if (generatedForUserRef.current === currentUserId) return;
+
+    const generate = async () => {
+      setRecLoading(true);
+      generatedForUserRef.current = currentUserId;
+      try {
+        const userMovies = moviesQuery.data || [];
+        const userSeries = seriesQuery.data || [];
+
+        const recentTitles = [
+          ...userMovies.map(m => m.titulo),
+          ...userSeries.map(s => s.titulo)
+        ].slice(0, 5);
+
+        let favoriteGenreId = 28; // Action default
+        let favoriteDirectorId: number | null = null;
+
+        if (recentTitles.length > 0) {
+          const genreCounts: Record<number, number> = {};
+          const directorCounts: Record<number, { name: string; count: number }> = {};
+
+          const detailResults = await Promise.all(
+            recentTitles.map(async (title) => {
+              try {
+                const searchRes = await fetch(`${TMDB_BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(title)}&language=pt-BR&page=1`);
+                if (searchRes.ok) {
+                  const sData = await searchRes.json();
+                  const first = sData.results?.[0];
+                  if (first) {
+                    const detailsRes = await fetch(`${TMDB_BASE_URL}/${first.media_type}/${first.id}?api_key=${TMDB_API_KEY}&append_to_response=credits&language=pt-BR`);
+                    if (detailsRes.ok) {
+                      return { details: await detailsRes.json(), type: first.media_type };
+                    }
+                  }
+                }
+              } catch (e) {
+                console.error(e);
+              }
+              return null;
+            })
+          );
+
+          for (const res of detailResults) {
+            if (!res) continue;
+            const genres = res.details.genres || [];
+            for (const g of genres) {
+              genreCounts[g.id] = (genreCounts[g.id] || 0) + 1;
+            }
+
+            if (res.type === 'movie') {
+              const crew = res.details.credits?.crew || [];
+              const directors = crew.filter((c: any) => c.job === 'Director');
+              for (const d of directors) {
+                directorCounts[d.id] = { name: d.name, count: (directorCounts[d.id]?.count || 0) + 1 };
+              }
+            }
+          }
+
+          let maxGenreCount = 0;
+          for (const [gId, count] of Object.entries(genreCounts)) {
+            if (count > maxGenreCount) {
+              maxGenreCount = count;
+              favoriteGenreId = Number(gId);
+            }
+          }
+
+          let maxDirCount = 0;
+          for (const [dId, info] of Object.entries(directorCounts)) {
+            if (info.count > maxDirCount) {
+              maxDirCount = info.count;
+              favoriteDirectorId = Number(dId);
+            }
+          }
+        }
+
+        let recommendedMovies: any[] = [];
+        
+        const genreMoviesRes = await fetch(`${TMDB_BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&with_genres=${favoriteGenreId}&language=pt-BR&sort_by=popularity.desc`);
+        if (genreMoviesRes.ok) {
+          const gData = await genreMoviesRes.json();
+          let candidates = gData.results || [];
+          candidates = candidates.filter((c: any) => !userMovies.some((m) => m.titulo.toLowerCase().trim() === c.title.toLowerCase().trim()));
+          candidates.sort(() => 0.5 - Math.random());
+          recommendedMovies = candidates.slice(0, 2);
+        }
+
+        let directorMoviePicked = false;
+        if (favoriteDirectorId) {
+          const dirMoviesRes = await fetch(`${TMDB_BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&with_people=${favoriteDirectorId}&language=pt-BR&sort_by=popularity.desc`);
+          if (dirMoviesRes.ok) {
+            const dData = await dirMoviesRes.json();
+            let candidates = dData.results || [];
+            candidates = candidates.filter((c: any) => !userMovies.some((m) => m.titulo.toLowerCase().trim() === c.title.toLowerCase().trim()));
+            candidates.sort(() => 0.5 - Math.random());
+            if (candidates.length > 0) {
+              recommendedMovies.push(candidates[0]);
+              directorMoviePicked = true;
+            }
+          }
+        }
+
+        if (!directorMoviePicked) {
+          const genreMoviesRes = await fetch(`${TMDB_BASE_URL}/discover/movie?api_key=${TMDB_API_KEY}&with_genres=${favoriteGenreId}&language=pt-BR&sort_by=popularity.desc`);
+          if (genreMoviesRes.ok) {
+            const gData = await genreMoviesRes.json();
+            let candidates = gData.results || [];
+            candidates = candidates.filter((c: any) => 
+              !userMovies.some((m) => m.titulo.toLowerCase().trim() === c.title.toLowerCase().trim()) &&
+              !recommendedMovies.some((rm) => rm.id === c.id)
+            );
+            candidates.sort(() => 0.5 - Math.random());
+            if (candidates.length > 0) {
+              recommendedMovies.push(candidates[0]);
+            }
+          }
+        }
+
+        let recommendedSeries: any[] = [];
+        const genreSeriesRes = await fetch(`${TMDB_BASE_URL}/discover/tv?api_key=${TMDB_API_KEY}&with_genres=${favoriteGenreId}&language=pt-BR&sort_by=popularity.desc`);
+        if (genreSeriesRes.ok) {
+          const sData = await genreSeriesRes.json();
+          let candidates = sData.results || [];
+          candidates = candidates.filter((c: any) => !userSeries.some((s) => s.titulo.toLowerCase().trim() === c.name.toLowerCase().trim()));
+          candidates.sort(() => 0.5 - Math.random());
+          recommendedSeries = candidates.slice(0, 3);
+        }
+
+        const finalMovies = recommendedMovies.slice(0, 3).map((m: any) => ({
+          tmdbId: m.id,
+          title: m.title,
+          coverUrl: m.poster_path ? `https://image.tmdb.org/t/p/w500${m.poster_path}` : null,
+          type: 'movie' as const
+        }));
+
+        const finalSeries = recommendedSeries.slice(0, 3).map((s: any) => ({
+          tmdbId: s.id,
+          title: s.name,
+          coverUrl: s.poster_path ? `https://image.tmdb.org/t/p/w500${s.poster_path}` : null,
+          type: 'tv' as const
+        }));
+
+        setRecommendations({
+          movies: finalMovies,
+          series: finalSeries
+        });
+      } catch (err) {
+        console.error('Error generating recommendations:', err);
+      } finally {
+        setRecLoading(false);
+      }
+    };
+
+    void generate();
+  }, [currentUserId, moviesQuery.data, seriesQuery.data, moviesQuery.isLoading, seriesQuery.isLoading]);
 
   const { data: trendingMovies, isLoading: trendingLoading, error: trendingError } = useQuery({
     queryKey: ['trending-movies'],
@@ -510,6 +836,93 @@ export default function UserSidebar({
               ) : (
                 <div className="text-[10px] text-brand-text-muted font-light text-center py-4">
                   Nenhum filme nos mais aguardados.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Collapsible Recomendados section */}
+        <div className="mt-4 pt-3 border-t border-[#171717]">
+          <button
+            type="button"
+            onClick={() => setIsRecomendadosOpen((prev) => !prev)}
+            className="w-full flex items-center justify-between text-left group px-2 py-1"
+          >
+            <div className="flex items-center gap-2">
+              <Award size={14} className="text-brand-gold animate-pulse" />
+              <span className="text-xs uppercase tracking-[0.2em] font-medium text-brand-text-muted group-hover:text-brand-text transition-colors">
+                Recomendados pra você
+              </span>
+            </div>
+            {isRecomendadosOpen ? (
+              <ChevronUp size={14} className="text-brand-text-muted group-hover:text-brand-text" />
+            ) : (
+              <ChevronDown size={14} className="text-brand-text-muted group-hover:text-brand-text" />
+            )}
+          </button>
+
+          {isRecomendadosOpen && (
+            <div className="mt-2.5 flex flex-col gap-2 transition-all animate-in fade-in duration-200">
+              <div className="flex rounded-xl border border-[#171717] bg-[#0a0f1e] p-1 mb-2">
+                <button
+                  type="button"
+                  onClick={() => setRecomendadosTab('filmes')}
+                  className={clsx(
+                    'flex-1 rounded-lg py-1 text-[9px] font-medium uppercase tracking-[0.1em] transition',
+                    recomendadosTab === 'filmes' ? 'bg-[#151515] text-brand-gold' : 'text-brand-text-muted hover:text-brand-text'
+                  )}
+                >
+                  Filmes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRecomendadosTab('series')}
+                  className={clsx(
+                    'flex-1 rounded-lg py-1 text-[9px] font-medium uppercase tracking-[0.1em] transition',
+                    recomendadosTab === 'series' ? 'bg-[#151515] text-brand-gold' : 'text-brand-text-muted hover:text-brand-text'
+                  )}
+                >
+                  Séries
+                </button>
+              </div>
+
+              {recLoading ? (
+                <div className="flex items-center justify-center py-4 text-xs text-brand-text-muted gap-2">
+                  <Loader2 size={12} className="animate-spin text-brand-gold" />
+                  Gerando recomendações...
+                </div>
+              ) : recommendations ? (
+                <>
+                  {recomendadosTab === 'filmes' && (
+                    <div className="flex flex-col gap-2">
+                      {recommendations.movies.map((item) => (
+                        <SidebarRecommendationItem key={item.tmdbId} item={item} currentUserId={currentUserId} />
+                      ))}
+                      {recommendations.movies.length === 0 && (
+                        <div className="text-[10px] text-brand-text-muted font-light text-center py-4">
+                          Nenhum filme recomendado no momento.
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {recomendadosTab === 'series' && (
+                    <div className="flex flex-col gap-2">
+                      {recommendations.series.map((item) => (
+                        <SidebarRecommendationItem key={item.tmdbId} item={item} currentUserId={currentUserId} />
+                      ))}
+                      {recommendations.series.length === 0 && (
+                        <div className="text-[10px] text-brand-text-muted font-light text-center py-4">
+                          Nenhuma série recomendada no momento.
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-[10px] text-brand-text-muted font-light text-center py-4">
+                  Adicione filmes/séries para ver recomendações personalizadas.
                 </div>
               )}
             </div>

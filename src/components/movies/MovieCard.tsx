@@ -485,14 +485,12 @@ export default function MovieCard({
         />
       )}
 
-      {synopsisModalOpen && (
-        <SynopsisModal
-          isOpen={synopsisModalOpen}
-          onOpenChange={setSynopsisModalOpen}
-          title={movie.titulo}
-          movieId={resolvedTmdbId}
-        />
-      )}
+      <SynopsisModal
+        isOpen={synopsisModalOpen}
+        onOpenChange={setSynopsisModalOpen}
+        title={movie.titulo}
+        movieId={resolvedTmdbId}
+      />
     </div>
   );
 }

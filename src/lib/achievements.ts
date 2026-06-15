@@ -572,7 +572,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Escreveu 10 resenhas.',
     icon: 'FileText',
     secret: false,
-    level: 2,
+    level: 3,
     check: (movies, series) => {
       const mCount = movies.filter((m) => m.review && m.review.trim().length > 0).length;
       const sCount = series.filter((s) => s.review && s.review.trim().length > 0).length;
@@ -865,6 +865,34 @@ export function getUnlockedAchievements(
 
   if (unlocked.some((ach) => ach.id === 'infantil_2')) {
     idsToExclude.add('infantil_1');
+  }
+
+  // Series exclusions
+  if (unlocked.some((ach) => ach.id === 'no_social_life')) {
+    idsToExclude.add('dedicated_series');
+    idsToExclude.add('first_series');
+  } else if (unlocked.some((ach) => ach.id === 'dedicated_series')) {
+    idsToExclude.add('first_series');
+  }
+
+  // Critic exclusions
+  if (unlocked.some((ach) => ach.id === 'critic_50')) {
+    idsToExclude.add('critic_30');
+    idsToExclude.add('critic_15');
+  } else if (unlocked.some((ach) => ach.id === 'critic_30')) {
+    idsToExclude.add('critic_15');
+  }
+
+  // Review exclusions
+  if (unlocked.some((ach) => ach.id === 'review_20')) {
+    idsToExclude.add('review_10');
+    idsToExclude.add('review_5');
+    idsToExclude.add('review_abc');
+  } else if (unlocked.some((ach) => ach.id === 'review_10')) {
+    idsToExclude.add('review_5');
+    idsToExclude.add('review_abc');
+  } else if (unlocked.some((ach) => ach.id === 'review_5')) {
+    idsToExclude.add('review_abc');
   }
 
   return unlocked.filter((ach) => !idsToExclude.has(ach.id));

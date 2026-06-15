@@ -852,5 +852,20 @@ export function getUnlockedAchievements(
     idsToExclude.add('je_parlo_mucho');
   }
 
+  if (unlocked.some((ach) => ach.id === 'director')) {
+    idsToExclude.add('cinephile');
+    idsToExclude.add('first_movie');
+  } else if (unlocked.some((ach) => ach.id === 'cinephile')) {
+    idsToExclude.add('first_movie');
+  }
+
+  if (unlocked.some((ach) => ach.id === 'haja_tempo')) {
+    idsToExclude.add('curious');
+  }
+
+  if (unlocked.some((ach) => ach.id === 'infantil_2')) {
+    idsToExclude.add('infantil_1');
+  }
+
   return unlocked.filter((ach) => !idsToExclude.has(ach.id));
 }

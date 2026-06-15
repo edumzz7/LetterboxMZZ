@@ -150,9 +150,12 @@ export default function UserAchievements({
 
   if (unlocked.length === 0) return null;
 
+  // Sort by rarity: level 3 (Épica/Secreta) first, then level 2 (Rara), then level 1 (Simples)
+  const sorted = [...unlocked].sort((a, b) => b.level - a.level);
+
   return (
     <div className="flex flex-wrap items-center gap-2 py-1">
-      {unlocked.map((ach) => (
+      {sorted.map((ach) => (
         <AchievementBadge key={ach.id} achievement={ach} />
       ))}
     </div>

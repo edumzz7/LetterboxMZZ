@@ -230,6 +230,35 @@ export async function bootstrapApp() {
   } catch (e) {
     console.error(e);
   }
+
+  try {
+    const deductionsKey = 'deductions_applied_v1';
+    if (!localStorage.getItem(deductionsKey)) {
+      const usersToDeduct = [
+        { username: 'marcelojanssen', amount: 200 },
+        { username: 'luizascopel', amount: 190 },
+        { username: 'igro', amount: 30 },
+        { username: 'edumzz', amount: 50 },
+      ];
+
+      const users = readUsers();
+      let changed = false;
+      for (const { username, amount } of usersToDeduct) {
+        const uIdx = users.findIndex((u) => u.username === username);
+        if (uIdx !== -1) {
+          users[uIdx].mcoins = Math.max(0, users[uIdx].mcoins - amount);
+          addActivity(users[uIdx].id, `pontos reajustados para correcao (-${amount} MC)`, -amount);
+          changed = true;
+        }
+      }
+      if (changed) {
+        writeUsers(users);
+      }
+      localStorage.setItem(deductionsKey, '1');
+    }
+  } catch (e) {
+    console.error('Failed to apply local deductions:', e);
+  }
 }
 
 export async function importLegacyDataForUser(userId: string) {
@@ -739,6 +768,22 @@ export async function rateMovie(
   if (current.user_id !== actorUserId) {
     throw new Error('Avaliacao permitida apenas para o dono do filme.');
   }
+
+  const isWatched = current.status === 'watched';
+  if (isWatched) {
+    const prevRating = current.rating ?? current.avaliacao ?? null;
+    const prevReview = current.review ?? null;
+
+    if (stars > 0 && (prevRating === null || prevRating === 0)) {
+      updateUserMcoins(actorUserId, 5);
+      addActivity(actorUserId, `avaliou o filme ${current.titulo}.`, 5);
+    }
+    if (review && review.trim() !== '' && (prevReview === null || prevReview.trim() === '')) {
+      updateUserMcoins(actorUserId, 5);
+      addActivity(actorUserId, `escreveu uma resenha para o filme ${current.titulo}.`, 5);
+    }
+  }
+
   writePersonalMovies(items.map((item) => (item.id === movieId ? { ...item, rating: stars, review: review ?? null } : item)));
 }
 
@@ -755,6 +800,22 @@ export async function rateSeries(
   if (current.user_id !== actorUserId) {
     throw new Error('Avaliacao permitida apenas para o dono da serie.');
   }
+
+  const isWatched = current.status === 'watched';
+  if (isWatched) {
+    const prevRating = current.rating ?? current.avaliacao ?? null;
+    const prevReview = current.review ?? null;
+
+    if (stars > 0 && (prevRating === null || prevRating === 0)) {
+      updateUserMcoins(actorUserId, 5);
+      addActivity(actorUserId, `avaliou a serie ${current.titulo}.`, 5);
+    }
+    if (review && review.trim() !== '' && (prevReview === null || prevReview.trim() === '')) {
+      updateUserMcoins(actorUserId, 5);
+      addActivity(actorUserId, `escreveu uma resenha para a serie ${current.titulo}.`, 5);
+    }
+  }
+
   writeSeries(items.map((item) => (item.id === seriesId ? { ...item, rating: stars, review: review ?? null } : item)));
 }
 

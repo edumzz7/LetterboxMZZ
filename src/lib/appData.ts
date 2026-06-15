@@ -152,11 +152,12 @@ const TRIGGER_POINTS = {
   ASSISTIU_FILME: 30,
   INICIOU_SERIE: 20,
   SERIE_100: 50,
-  BONUS_EPISODIOS_COMPLETOS: 30,
   INDICOU_FILME: 5,
   FILME_INDICADO_ASSISTIDO: 40,
   SERIE_INDICADA_100: 60,
   BONUS_CURADOR: 30,
+  AVALIOU_ITEM: 5,
+  RESENHOU_ITEM: 5,
 } as const;
 
 type TriggerKey = keyof typeof TRIGGER_POINTS;
@@ -865,6 +866,53 @@ async function upsertPersonalOscarMovie(userId: string, movie: OscarMovie, statu
   await createDocument(COLLECTION_PERSONAL_MOVIES, payload);
 }
 
+async function runOneTimeDeductions() {
+  const usersToDeduct = [
+    { username: 'marcelojanssen', amount: 200 },
+    { username: 'luizascopel', amount: 190 },
+    { username: 'igro', amount: 30 },
+    { username: 'edumzz', amount: 50 },
+  ];
+
+  for (const { username, amount } of usersToDeduct) {
+    try {
+      const user = await firstDocument<AppwriteUserDoc>(COLLECTION_APP_USERS, [
+        Query.equal('username', [username]),
+      ]);
+      if (!user) continue;
+
+      const metadata = await ensureUserMetadata(user.$id);
+      const dbAvatarId = metadata.avatar_id || '';
+      let parsed: any = {};
+      if (dbAvatarId.startsWith('{')) {
+        try {
+          parsed = JSON.parse(dbAvatarId);
+        } catch {}
+      }
+
+      if (!parsed.deductions_applied_v1) {
+        let currentMcoins = metadata.mcoins ?? 0;
+        const newMcoins = Math.max(0, currentMcoins - amount);
+        parsed.deductions_applied_v1 = true;
+        
+        const payload = {
+          ...parsed,
+          avatarId: parsed.avatarId || (dbAvatarId.startsWith('{') ? undefined : dbAvatarId),
+        };
+
+        await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, {
+          mcoins: newMcoins,
+          avatar_id: JSON.stringify(payload)
+        });
+
+        await addActivity(user.$id, `pontos reajustados para correcao (-${amount} MC)`, -amount);
+      }
+    } catch (err) {
+      console.error(`Failed to deduct for ${username}:`, err);
+    }
+  }
+}
+
 export async function bootstrapApp() {
   return withFallback(
     async () => {
@@ -889,6 +937,12 @@ export async function bootstrapApp() {
             }),
           ),
         );
+      }
+
+      try {
+        await runOneTimeDeductions();
+      } catch (err) {
+        console.error('Failed to run one-time deductions:', err);
       }
 
       sessionStorage.setItem(BOOTSTRAP_KEY, '1');
@@ -1659,9 +1713,6 @@ export async function updateSeries(
         throw new Error("A coluna 'temporada' precisa existir em 'series_pessoais' para salvar a temporada atual.");
       }
 
-      const crossedCompletion =
-        (current.episodiosVistos ?? 0) < (current.totalEpisodios ?? 1) &&
-        (data.episodiosVistos ?? 0) >= (data.totalEpisodios ?? 1);
       const previousSeriesStatus = fromAppwriteSeriesStatus(current.status);
       const nextSeriesStatus = fromAppwriteSeriesStatus(data.status);
 
@@ -1669,17 +1720,6 @@ export async function updateSeries(
         const viewerId = (current as { user_id?: string }).user_id ?? '';
         if (viewerId) {
           await awardMCoins(viewerId, 'INICIOU_SERIE', `Iniciou a serie ${data.titulo}.`);
-        }
-      }
-
-      if (crossedCompletion) {
-        const viewerId = (current as { user_id?: string }).user_id ?? '';
-        if (viewerId) {
-          await awardMCoins(
-            viewerId,
-            'BONUS_EPISODIOS_COMPLETOS',
-            `bateu 100% dos episodios de ${data.titulo}.`,
-          );
         }
       }
 
@@ -1862,6 +1902,10 @@ export async function rateMovie(
       if (current.user_id !== actorUserId) {
         throw new Error('Avaliacao permitida apenas para o dono do filme.');
       }
+      const isWatched = current.status === 'watched';
+      const prevRating = current.rating ?? current.avaliacao ?? null;
+      const prevReview = current.review ?? null;
+
       const writableDoc = await repairPersonalMovieDoc(current);
       try {
         const updated = (await updateDocument(COLLECTION_PERSONAL_MOVIES, writableDoc.$id, {
@@ -1870,6 +1914,15 @@ export async function rateMovie(
         })) as unknown as AppwritePersonalMovieDoc;
         if ((updated.rating ?? updated.avaliacao ?? null) !== stars) {
           throw new Error("A coluna 'rating' (Double) precisa ser criada em 'personal_movies' para salvar avaliações com decimais.");
+        }
+
+        if (isWatched) {
+          if (stars > 0 && (prevRating === null || prevRating === 0)) {
+            await awardMCoins(actorUserId, 'AVALIOU_ITEM', `avaliou o filme ${current.titulo}.`);
+          }
+          if (review && review.trim() !== '' && (prevReview === null || prevReview.trim() === '')) {
+            await awardMCoins(actorUserId, 'RESENHOU_ITEM', `escreveu uma resenha para o filme ${current.titulo}.`);
+          }
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : '';
@@ -1903,6 +1956,10 @@ export async function rateSeries(
       if (current.user_id !== actorUserId) {
         throw new Error('Avaliacao permitida apenas para o dono da serie.');
       }
+      const isWatched = current.status === 'watched';
+      const prevRating = current.rating ?? current.avaliacao ?? null;
+      const prevReview = current.review ?? null;
+
       const writableDoc = await repairSeriesDoc(current);
       try {
         const updated = (await updateDocument(COLLECTION_PERSONAL_SERIES, writableDoc.$id, {
@@ -1911,6 +1968,15 @@ export async function rateSeries(
         })) as unknown as AppwriteSeriesDoc;
         if ((updated.rating ?? updated.avaliacao ?? null) !== stars) {
           throw new Error("A coluna 'rating' (Double) precisa ser criada em 'personal_series' para salvar avaliações com decimais.");
+        }
+
+        if (isWatched) {
+          if (stars > 0 && (prevRating === null || prevRating === 0)) {
+            await awardMCoins(actorUserId, 'AVALIOU_ITEM', `avaliou a serie ${current.titulo}.`);
+          }
+          if (review && review.trim() !== '' && (prevReview === null || prevReview.trim() === '')) {
+            await awardMCoins(actorUserId, 'RESENHOU_ITEM', `escreveu uma resenha para a serie ${current.titulo}.`);
+          }
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : '';

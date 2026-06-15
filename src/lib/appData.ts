@@ -2172,6 +2172,81 @@ export async function getAnticipatedMovies(): Promise<AnticipatedMovie[]> {
   );
 }
 
+export async function countFavoritedBy(userId: string): Promise<number> {
+  return withFallback(
+    async () => {
+      const response = await databases.listDocuments(DATABASE_ID, COLLECTION_USER_FAVORITES, [
+        Query.equal('favorite_user_id', userId),
+        Query.limit(1),
+      ]);
+      return response.total;
+    },
+    () => localData.countFavoritedBy(userId),
+  );
+}
+
+export async function resetUserMcoinsForMonth(userId: string, currentMonth: string): Promise<void> {
+  return withFallback(
+    async () => {
+      const metadata = await ensureUserMetadata(userId);
+      const dbAvatarId = metadata.avatar_id || '';
+      let parsed: any = {};
+      if (dbAvatarId.startsWith('{')) {
+        try {
+          parsed = JSON.parse(dbAvatarId);
+        } catch {}
+      }
+      parsed.last_reset_month = currentMonth;
+      await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, {
+        mcoins: 0,
+        avatar_id: JSON.stringify(parsed),
+      });
+    },
+    () => localData.resetUserMcoinsForMonth(userId, currentMonth),
+  );
+}
+
+export async function checkAndRunMonthlyReset(): Promise<void> {
+  const currentMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+  
+  // Start from July 2026
+  if (currentMonth < '2026-07') return;
+
+  const activities = await listActivities(50);
+  const resetPrefix = `[Reset Mensal - ${currentMonth}]`;
+  const alreadyReset = activities.some((act) => act.message.includes(resetPrefix));
+  if (alreadyReset) return;
+
+  const users = await listRankedUsers();
+  if (users.length === 0) return;
+
+  // Filter out any system/test accounts if they exist
+  const validUsers = users.filter((u) => u.username.toLowerCase() !== 'testoscar');
+  if (validUsers.length === 0) return;
+
+  // Find the winner (highest mcoins)
+  let winner = validUsers[0];
+  for (const u of validUsers) {
+    if (u.mcoins > winner.mcoins) {
+      winner = u;
+    }
+  }
+
+  // Format winner announcement
+  const date = new Date();
+  date.setMonth(date.getMonth() - 1);
+  const prevMonthName = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  const message = `${resetPrefix} O usuário @${winner.username} venceu o mês de ${prevMonthName} com ${winner.mcoins} MC! Parabéns! As pontuações foram zeradas para o início de um novo mês.`;
+
+  // Reset mcoins of all users to 0
+  for (const user of users) {
+    await resetUserMcoinsForMonth(user.id, currentMonth);
+  }
+
+  // Post the announcement activity for all users
+  await addActivity(winner.id, message, 0);
+}
+
 
 
 

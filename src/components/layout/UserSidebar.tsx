@@ -989,25 +989,6 @@ export default function UserSidebar({
           )}
         </div>
 
-        {/* Crítica Especializada (Desabilitada temporariamente)
-        <div className="mt-4 pt-3 border-t border-[#171717]">
-          <a
-            href="/critica"
-            className="w-full flex items-center justify-between text-left group px-2 py-1"
-            onClick={() => {
-              if (onClose) onClose();
-            }}
-          >
-            <div className="flex items-center gap-2">
-              <Award size={14} className="text-brand-gold" />
-              <span className="text-xs uppercase tracking-[0.2em] font-medium text-brand-text-muted group-hover:text-brand-text transition-colors">
-                Crítica Especializada
-              </span>
-            </div>
-            <ChevronRight size={14} className="text-brand-text-muted group-hover:text-brand-text" />
-          </a>
-        </div>
-        */}
       </aside>
     </>
   );

@@ -976,3 +976,26 @@ export async function removeFavorite(documentId: string): Promise<void> {
   writeFavorites(items.filter((f) => f.id !== documentId));
 }
 
+export async function resetUserMcoinsForMonth(userId: string, currentMonth: string) {
+  const users = readUsers();
+  const index = users.findIndex((u) => u.id === userId);
+  if (index >= 0) {
+    const dbAvatarId = users[index].avatar_id || '';
+    let parsed: any = {};
+    if (dbAvatarId.startsWith('{')) {
+      try {
+        parsed = JSON.parse(dbAvatarId);
+      } catch {}
+    }
+    parsed.last_reset_month = currentMonth;
+    users[index].mcoins = 0;
+    users[index].avatar_id = JSON.stringify(parsed);
+    writeUsers(users);
+  }
+}
+
+export async function countFavoritedBy(userId: string): Promise<number> {
+  const items = readFavorites();
+  return items.filter((f) => f.favorite_user_id === userId).length;
+}
+

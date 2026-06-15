@@ -28,6 +28,7 @@ import {
   logoutUser,
   registerUser,
   updateUserProfile,
+  checkAndRunMonthlyReset,
 } from './lib/appData';
 import type { SessionUser } from './types/app';
 
@@ -76,6 +77,7 @@ function App() {
     async function runBootstrap() {
       try {
         await bootstrapApp();
+        await checkAndRunMonthlyReset();
         const currentSession = await getCurrentSessionUser();
         if (currentSession) {
           const imported = await importLegacyDataForUser(currentSession.id);

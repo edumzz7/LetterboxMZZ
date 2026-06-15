@@ -174,7 +174,7 @@ function App() {
   const headerCopy = useMemo(() => {
     if (urlUsername === 'ranking') {
       return {
-        title: 'Ranking Global',
+        title: 'Ranking Geral',
       };
     }
 
@@ -388,6 +388,7 @@ function App() {
                 ) : null
               }
               hideTabs={urlUsername === 'ranking'}
+              onBack={!isOwnDashboard && viewedUser && urlUsername !== 'ranking' ? () => setLocation(`/${session.username}`) : undefined}
             />
 
             {usersQuery.isLoading ? (

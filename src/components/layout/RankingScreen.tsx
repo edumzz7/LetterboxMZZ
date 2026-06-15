@@ -29,7 +29,7 @@ export default function RankingScreen({
           </button>
         )}
         <div>
-          <h2 className="text-2xl font-bold uppercase tracking-widest text-brand-gold">Ranking Geral</h2>
+          <h2 className="text-2xl font-bold uppercase tracking-widest text-brand-gold">Conquistas Disponíveis</h2>
         </div>
       </div>
 

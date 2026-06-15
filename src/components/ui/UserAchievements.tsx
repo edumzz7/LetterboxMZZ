@@ -29,7 +29,7 @@ export function AchievementBadge({ achievement }: AchievementBadgeProps) {
   // Determine styles and labels based on level/secrecy
   let badgeClasses = "bg-brand-gold/10 border-brand-gold/30 text-brand-gold hover:border-brand-gold hover:shadow-[0_0_12px_rgba(212,175,55,0.25)]";
   let tooltipHeaderClass = "text-brand-gold";
-  let levelLabel = "Difícil (Nível 3)";
+  let levelLabel = "Épica";
 
   if (achievement.secret) {
     badgeClasses = "bg-purple-950/20 border-purple-500/30 text-purple-400 hover:border-purple-400 hover:shadow-[0_0_12px_rgba(168,85,247,0.25)]";
@@ -38,11 +38,11 @@ export function AchievementBadge({ achievement }: AchievementBadgeProps) {
   } else if (achievement.level === 1) {
     badgeClasses = "bg-slate-800/20 border-slate-500/30 text-slate-100 hover:border-slate-300 hover:shadow-[0_0_12px_rgba(255,255,255,0.15)]";
     tooltipHeaderClass = "text-slate-100";
-    levelLabel = "Simples (Nível 1)";
+    levelLabel = "Simples";
   } else if (achievement.level === 2) {
     badgeClasses = "bg-sky-950/20 border-sky-500/30 text-sky-400 hover:border-sky-400 hover:shadow-[0_0_12px_rgba(56,189,248,0.25)]";
     tooltipHeaderClass = "text-sky-300";
-    levelLabel = "Média (Nível 2)";
+    levelLabel = "Rara";
   }
 
   return (

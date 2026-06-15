@@ -409,24 +409,42 @@ export async function listUsers() {
 }
 
 export async function listRankedUsers() {
-  return readUsers()
+  const deductionsKey = 'deductions_applied_v1';
+  const localDeductionsApplied = localStorage.getItem(deductionsKey) === '1';
+
+  const mapped = readUsers()
     .slice()
-    .sort((a, b) => b.mcoins - a.mcoins || a.username.localeCompare(b.username))
-    .map((item, index) => ({
-      id: item.id,
-      username: item.username,
-      created_at: item.created_at,
-      user_id: item.id,
-      mcoins: item.mcoins,
-      avatar_id: item.avatar_id,
-      display_name: item.display_name,
-      favorite_movie: item.favorite_movie,
-      favorite_movie_2: item.favorite_movie_2,
-      favorite_genre: item.favorite_genre,
-      favorite_series: item.favorite_series,
-      watch_preference: item.watch_preference,
-      rank: index + 1,
-    })) as RankedUser[];
+    .map((item) => {
+      let mcoins = item.mcoins;
+      if (!localDeductionsApplied) {
+        let deductAmount = 0;
+        const normalized = normalizeUsername(item.username);
+        if (normalized === 'marcelojanssen') deductAmount = 200;
+        else if (normalized === 'luizascopel') deductAmount = 190;
+        else if (normalized === 'igro') deductAmount = 30;
+        else if (normalized === 'edumzz') deductAmount = 50;
+        mcoins = Math.max(0, mcoins - deductAmount);
+      }
+      return { ...item, mcoins };
+    });
+
+  mapped.sort((a, b) => b.mcoins - a.mcoins || a.username.localeCompare(b.username));
+
+  return mapped.map((item, index) => ({
+    id: item.id,
+    username: item.username,
+    created_at: item.created_at,
+    user_id: item.id,
+    mcoins: item.mcoins,
+    avatar_id: item.avatar_id,
+    display_name: item.display_name,
+    favorite_movie: item.favorite_movie,
+    favorite_movie_2: item.favorite_movie_2,
+    favorite_genre: item.favorite_genre,
+    favorite_series: item.favorite_series,
+    watch_preference: item.watch_preference,
+    rank: index + 1,
+  })) as RankedUser[];
 }
 
 export async function listActivities(limit = 30) {

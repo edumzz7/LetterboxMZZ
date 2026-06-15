@@ -620,6 +620,45 @@ export async function removeFavorite(documentId: string): Promise<void> {
   );
 }
 
+async function checkAndApplySelfDeduction(userId: string, username: string) {
+  const usersToDeduct = [
+    { username: 'marcelojanssen', amount: 200 },
+    { username: 'luizascopel', amount: 190 },
+    { username: 'igro', amount: 30 },
+    { username: 'edumzz', amount: 50 },
+  ];
+
+  const matched = usersToDeduct.find((u) => normalizeUsername(u.username) === normalizeUsername(username));
+  if (!matched) return;
+
+  const metadata = await ensureUserMetadata(userId);
+  const dbAvatarId = metadata.avatar_id || '';
+  let parsed: any = {};
+  if (dbAvatarId.startsWith('{')) {
+    try {
+      parsed = JSON.parse(dbAvatarId);
+    } catch {}
+  }
+
+  if (!parsed.deductions_applied_v1) {
+    let currentMcoins = metadata.mcoins ?? 0;
+    const newMcoins = Math.max(0, currentMcoins - matched.amount);
+    parsed.deductions_applied_v1 = true;
+    
+    const payload = {
+      ...parsed,
+      avatarId: parsed.avatarId || (dbAvatarId.startsWith('{') ? undefined : dbAvatarId),
+    };
+
+    await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, {
+      mcoins: newMcoins,
+      avatar_id: JSON.stringify(payload)
+    });
+
+    await addActivity(userId, `pontos reajustados para correcao (-${matched.amount} MC)`, -matched.amount);
+  }
+}
+
 async function getSessionProfile() {
   const currentAccount = await getCurrentAccount();
   if (!currentAccount) return null;
@@ -681,6 +720,13 @@ async function getSessionProfile() {
   }
 
   await ensureUserMetadata(profile.$id);
+  
+  try {
+    await checkAndApplySelfDeduction(profile.$id, profile.username);
+  } catch (err) {
+    console.error('Failed self deduction check:', err);
+  }
+
   return { id: profile.$id, username: profile.username };
 }
 
@@ -1107,6 +1153,7 @@ export async function listRankedUsers() {
           let dbAvatarId = userMeta?.avatar_id ?? fallbackAvatar(user.id);
           let dbDisplayName: string | undefined = undefined;
           let userMcoins = userMeta?.mcoins ?? 0;
+          let deductionsApplied = false;
 
           const isResetActive = currentMonth >= '2026-07';
 
@@ -1118,12 +1165,26 @@ export async function listRankedUsers() {
               if (isResetActive && parsed.last_reset_month !== currentMonth) {
                 userMcoins = 0;
               }
+              if (parsed.deductions_applied_v1) {
+                deductionsApplied = true;
+              }
             } catch (e) {
               console.warn('Failed to parse avatar_id JSON:', e);
               if (isResetActive) userMcoins = 0;
             }
           } else {
             if (isResetActive) userMcoins = 0;
+          }
+
+          if (!deductionsApplied) {
+            let deductAmount = 0;
+            const normalizedUser = normalizeUsername(user.username);
+            if (normalizedUser === 'marcelojanssen') deductAmount = 200;
+            else if (normalizedUser === 'luizascopel') deductAmount = 190;
+            else if (normalizedUser === 'igro') deductAmount = 30;
+            else if (normalizedUser === 'edumzz') deductAmount = 50;
+
+            userMcoins = Math.max(0, userMcoins - deductAmount);
           }
 
           return {
@@ -1956,7 +2017,7 @@ export async function rateSeries(
       if (current.user_id !== actorUserId) {
         throw new Error('Avaliacao permitida apenas para o dono da serie.');
       }
-      const isWatched = current.status === 'watched';
+      const isWatched = current.status === 'concluido';
       const prevRating = current.rating ?? current.avaliacao ?? null;
       const prevReview = current.review ?? null;
 

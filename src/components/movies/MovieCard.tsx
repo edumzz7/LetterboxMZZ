@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Film, Eye, EyeOff, Trash2, Loader2, Pencil, MessageSquare } from 'lucide-react';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import { Film, Eye, EyeOff, Trash2, Loader2, Pencil, MessageSquare, MoreVertical, BookOpen, Plus } from 'lucide-react';
 import clsx from 'clsx';
 import { generateImagePath } from '../../lib/imageUtils';
 import {
@@ -11,8 +12,10 @@ import {
   updateOscarMovieStreaming,
   updatePersonalMovieStreaming,
 } from '../../lib/appData';
+import { usePersonalMovies } from '../../hooks/usePersonalMovies';
 import StarRatingInput from '../ui/StarRatingInput';
 import ReviewModal from '../ui/ReviewModal';
+import SynopsisModal from '../ui/SynopsisModal';
 import type { MovieStatus, OscarMovieWithStatus, PersonalMovie } from '../../types/app';
 
 type CardMovie = OscarMovieWithStatus | PersonalMovie;
@@ -89,8 +92,13 @@ export default function MovieCard({
   const [showProviders, setShowProviders] = useState(false);
   const [providersLoading, setProvidersLoading] = useState(false);
   const [reactionPending, setReactionPending] = useState<ReactionEmoji | null>(null);
-  const [reactionsOpen, setReactionsOpen] = useState(false);
+
+  const { addMovieMutation } = usePersonalMovies(currentUserId || '');
+  const [addedToWatchlist, setAddedToWatchlist] = useState(false);
+
   const [ratingPending, setRatingPending] = useState<number | null>(null);
+  const [synopsisModalOpen, setSynopsisModalOpen] = useState(false);
+  const [resolvedTmdbId, setResolvedTmdbId] = useState<number | null>(null);
   const [ratingError, setRatingError] = useState<string | null>(null);
   const [localRating, setLocalRating] = useState<number>(isPersonalMovie(movie) ? (movie.rating ?? movie.avaliacao ?? 0) : 0);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
@@ -118,16 +126,24 @@ export default function MovieCard({
     return () => document.removeEventListener('mousedown', onClickOutside);
   }, []);
 
-  const handleToggleStatus = (event: React.MouseEvent) => {
-    event.preventDefault();
-    event.stopPropagation();
+  const handleOpenSynopsis = async () => {
+    let id = isPersonalMovie(movie) ? parseTmdbFromSource(movie.source_movie_id) : null;
+    if (!id) {
+      id = await findMovieIdByTitle(
+        movie.titulo,
+        'ano_lancamento' in movie ? movie.ano_lancamento : movie.ano_oscar
+      );
+    }
+    setResolvedTmdbId(id);
+    setSynopsisModalOpen(true);
+  };
+
+  const handleToggleStatus = () => {
     if (!canEdit || !onToggleStatus) return;
     onToggleStatus(movie, isWatched ? 'watchlist' : 'watched');
   };
 
-  const handleDelete = (event: React.MouseEvent) => {
-    event.preventDefault();
-    event.stopPropagation();
+  const handleDelete = () => {
     if (!canEdit || !isPersonalMovie(movie) || !onDelete) return;
 
     if (movie.source === 'oscar') {
@@ -164,6 +180,20 @@ export default function MovieCard({
     } finally {
       setRatingPending(null);
     }
+  };
+
+  const handleAddToWishlist = () => {
+    if (!currentUserId || addedToWatchlist) return;
+    addMovieMutation.mutate({
+      titulo: movie.titulo,
+      capa_url: isPersonalMovie(movie) ? movie.capa_url : null,
+      source_movie_id: isPersonalMovie(movie) ? movie.source_movie_id : null,
+      status: 'watchlist',
+      plataforma_slug: isPersonalMovie(movie) ? movie.plataforma_slug : null,
+      ano_lancamento: 'ano_lancamento' in movie ? movie.ano_lancamento : movie.ano_oscar,
+      source: 'manual',
+    });
+    setAddedToWatchlist(true);
   };
 
   const resolveProviders = async () => {
@@ -205,7 +235,6 @@ export default function MovieCard({
     >
       <div
         className="relative aspect-[2/3] w-full rounded-md overflow-hidden bg-brand-card border border-[#222] transition-all hover:border-brand-gold-alt hover:shadow-[0_0_15px_rgba(212,175,55,0.15)] group cursor-pointer"
-        onClick={() => { if (isFriendCard) setReactionsOpen((prev) => !prev); }}
       >
         <img
           src={imageSrc}
@@ -222,33 +251,101 @@ export default function MovieCard({
           <span className="text-xs text-brand-text-muted">{movie.titulo}</span>
         </div>
 
-        <div
-          onClick={handleToggleStatus}
-          className={clsx(
-            'absolute top-2 left-2 p-1.5 rounded-full bg-brand-bg/80 backdrop-blur-sm transition-all z-10',
-            canEdit && 'hover:scale-110',
-            isWatched
-              ? 'text-brand-gold border border-brand-gold/30'
-              : 'text-brand-text-muted border border-[#333]/50 hover:text-brand-text',
-            !canEdit && 'opacity-80 cursor-default',
-          )}
-          title={isWatched ? 'Mudar para Watchlist' : 'Marcar como visto'}
-        >
-          {isWatched ? <Eye size={14} /> : <EyeOff size={14} />}
+        <div className="absolute top-2 right-2 z-30">
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger asChild>
+              <button
+                type="button"
+                className="p-1.5 rounded-full bg-brand-bg/80 backdrop-blur-sm border border-[#333]/50 text-brand-text-muted hover:text-brand-text hover:bg-brand-bg hover:border-brand-gold/50 transition-all outline-none"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MoreVertical size={14} />
+              </button>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content
+                side="bottom"
+                align="end"
+                className="min-w-[180px] bg-[#0a0f1e]/95 backdrop-blur-md border border-[#222] rounded-xl p-1.5 shadow-xl shadow-black/50 z-50 animate-in fade-in zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:zoom-out-95"
+              >
+                {isFriendCard && (
+                  <>
+                    <div className="px-2 py-1.5 text-xs text-brand-text-muted font-medium">Reagir</div>
+                    <div className="flex items-center justify-around px-2 py-1 mb-1">
+                      {REACTION_OPTIONS.map((reaction) => (
+                        <DropdownMenu.Item
+                          key={reaction.label}
+                          onSelect={() => void handleReaction(reaction.value)}
+                          className={clsx(
+                            'w-8 h-8 rounded-full flex items-center justify-center text-sm outline-none cursor-pointer hover:bg-brand-gold/20 hover:scale-110 transition-all focus:bg-brand-gold/20 focus:scale-110',
+                            reactionPending === reaction.value && 'opacity-50'
+                          )}
+                          title={reaction.label}
+                        >
+                          {reaction.value}
+                        </DropdownMenu.Item>
+                      ))}
+                    </div>
+                    <DropdownMenu.Separator className="h-[1px] bg-[#222] my-1" />
+                  </>
+                )}
+
+                <DropdownMenu.Item
+                  onSelect={handleOpenSynopsis}
+                  className="flex items-center gap-2 px-2 py-2 text-xs text-brand-text rounded-md cursor-pointer outline-none hover:bg-brand-gold/10 hover:text-brand-gold transition-colors focus:bg-brand-gold/10 focus:text-brand-gold"
+                >
+                  <BookOpen size={14} />
+                  Ver Sinopse
+                </DropdownMenu.Item>
+
+                {!canEdit && currentUserId && (
+                  <DropdownMenu.Item
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      handleAddToWishlist();
+                    }}
+                    disabled={addedToWatchlist || addMovieMutation.isPending}
+                    className={clsx(
+                      "flex items-center gap-2 px-2 py-2 text-xs text-brand-text rounded-md outline-none transition-colors",
+                      (addedToWatchlist || addMovieMutation.isPending)
+                        ? "opacity-50 cursor-not-allowed"
+                        : "cursor-pointer hover:bg-brand-gold/10 hover:text-brand-gold focus:bg-brand-gold/10 focus:text-brand-gold"
+                    )}
+                  >
+                    <Plus size={14} />
+                    {addedToWatchlist ? 'Adicionado à Wishlist' : 'Adicionar à Wishlist'}
+                  </DropdownMenu.Item>
+                )}
+
+                {canEdit && (
+                  <DropdownMenu.Item
+                    onSelect={handleToggleStatus}
+                    className="flex items-center gap-2 px-2 py-2 text-xs text-brand-text rounded-md cursor-pointer outline-none hover:bg-brand-gold/10 hover:text-brand-gold transition-colors focus:bg-brand-gold/10 focus:text-brand-gold"
+                  >
+                    {isWatched ? <Eye size={14} /> : <EyeOff size={14} />}
+                    {isWatched ? 'Mudar para Wishlist' : 'Marcar como visto'}
+                  </DropdownMenu.Item>
+                )}
+                
+                {canEdit && isPersonalMovie(movie) && (
+                  <>
+                    <DropdownMenu.Separator className="h-[1px] bg-[#222] my-1" />
+                    <DropdownMenu.Item
+                      onSelect={handleDelete}
+                      className="flex items-center gap-2 px-2 py-2 text-xs text-red-400 rounded-md cursor-pointer outline-none hover:bg-red-500/10 hover:text-red-500 transition-colors focus:bg-red-500/10 focus:text-red-500"
+                    >
+                      <Trash2 size={14} />
+                      Remover da Lista
+                    </DropdownMenu.Item>
+                  </>
+                )}
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
         </div>
 
-        {canEdit && isPersonalMovie(movie) ? (
-          <div
-            onClick={handleDelete}
-            className="absolute top-10 left-2 p-1.5 rounded-full bg-brand-bg/80 backdrop-blur-sm text-brand-text-muted border border-[#333]/50 hover:text-red-500 hover:border-red-500/30 transition-all hover:scale-110 z-10"
-            title="Remover"
-          >
-            <Trash2 size={14} />
-          </div>
-        ) : null}
-
         {isOscarMovie && movie.categoria_principal ? (
-          <div className="absolute top-2 right-2 bg-brand-bg/80 backdrop-blur-sm px-2 py-1 rounded text-[10px] uppercase text-brand-gold border border-brand-gold/30 line-clamp-1 max-w-[70%]">
+          <div className="absolute top-2 left-2 bg-brand-bg/80 backdrop-blur-sm px-2 py-1 rounded text-[10px] uppercase text-brand-gold border border-brand-gold/30 line-clamp-1 max-w-[70%]">
             {movie.categoria_principal}
           </div>
         ) : null}
@@ -262,39 +359,6 @@ export default function MovieCard({
         {suggestionBadge ? (
           <div className="absolute right-2 bottom-10 bg-brand-bg/85 border border-emerald-500/40 px-2 py-1 rounded text-[10px] uppercase tracking-[0.12em] text-emerald-300">
             Via Sugestao
-          </div>
-        ) : null}
-
-        {isFriendCard ? (
-          <div
-            className={clsx(
-              'absolute left-1/2 -translate-x-1/2 top-3 transition-opacity duration-200 z-20',
-              reactionsOpen
-                ? 'opacity-100 pointer-events-auto'
-                : 'opacity-0 pointer-events-none group-hover/card:opacity-100 group-hover/card:pointer-events-auto',
-            )}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="bg-black/80 border border-[#333] rounded-full px-2 py-1 flex items-center gap-1">
-              {REACTION_OPTIONS.map((reaction) => (
-                <button
-                  key={reaction.label}
-                  type="button"
-                  onClick={() => {
-                    void handleReaction(reaction.value);
-                    setReactionsOpen(false);
-                  }}
-                  className={clsx(
-                    'w-7 h-7 rounded-full border border-[#333] text-sm hover:border-brand-gold/40 bg-brand-bg/70',
-                    reactionPending === reaction.value && 'opacity-60',
-                  )}
-                  title={reaction.label}
-                >
-                  {reaction.value}
-                </button>
-              ))}
-              {reactionPending ? <Loader2 size={12} className="animate-spin text-brand-gold ml-1" /> : null}
-            </div>
           </div>
         ) : null}
 
@@ -418,6 +482,15 @@ export default function MovieCard({
           onSkip={async (stars) => {
             await handleRate(stars, movie.review);
           }}
+        />
+      )}
+
+      {synopsisModalOpen && (
+        <SynopsisModal
+          isOpen={synopsisModalOpen}
+          onOpenChange={setSynopsisModalOpen}
+          title={movie.titulo}
+          movieId={resolvedTmdbId}
         />
       )}
     </div>

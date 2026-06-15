@@ -13,12 +13,15 @@ import { generateImagePath } from '../../lib/imageUtils';
 
 function SidebarMovieItem({ 
   movie, 
-  currentUserId 
+  currentUserId,
+  allUsers
 }: { 
   movie: TrendingMovie | AnticipatedMovie; 
   currentUserId: string;
+  allUsers: RankedUser[];
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [showWatchers, setShowWatchers] = useState(false);
   const { addMovieMutation } = usePersonalMovies(currentUserId);
   const [addedToWatchlist, setAddedToWatchlist] = useState(false);
 
@@ -109,9 +112,12 @@ function SidebarMovieItem({
               <Dialog.Title className="text-lg font-medium text-brand-text mb-1 leading-tight">
                 {movie.title}
               </Dialog.Title>
-              <span className="text-xs uppercase tracking-wider text-brand-gold-alt mb-3">
+              <button 
+                onClick={() => setShowWatchers(true)}
+                className="text-xs uppercase tracking-wider text-brand-gold-alt mb-3 hover:underline text-left"
+              >
                 {movie.userCount} {movie.userCount === 1 ? 'visto' : 'vistos'}
-              </span>
+              </button>
               <button
                 onClick={handleAddToWatchlist}
                 disabled={addedToWatchlist || addMovieMutation.isPending}
@@ -136,6 +142,32 @@ function SidebarMovieItem({
           </div>
         </Dialog.Content>
       </Dialog.Portal>
+
+      <Dialog.Root open={showWatchers} onOpenChange={setShowWatchers}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[80]" />
+          <Dialog.Content className="fixed left-[50%] top-[50%] z-[90] w-[90vw] max-w-sm translate-x-[-50%] translate-y-[-50%] border border-[#222] bg-[#111] p-5 shadow-2xl rounded-xl">
+            <Dialog.Title className="text-sm font-medium text-brand-text mb-4 uppercase tracking-widest text-center">
+              Usuários que registraram
+            </Dialog.Title>
+            <div className="flex flex-col gap-3 max-h-[60vh] overflow-y-auto pr-2">
+              {allUsers.filter(u => movie.userIds.includes(u.id)).map(user => (
+                <div key={user.id} className="flex items-center gap-3">
+                  <a href={`/${user.username}`} className="shrink-0 transition-transform hover:scale-110 block">
+                    <AvatarDisplay avatarId={user.avatar_id} className="w-8 h-8 rounded-full border border-[#222] shadow shadow-black/50 bg-[#111] flex items-center justify-center shrink-0 overflow-hidden" emojiClassName="text-sm" />
+                  </a>
+                  <a href={`/${user.username}`} className="text-sm font-medium text-brand-text hover:text-brand-gold transition-colors truncate">
+                    {user.display_name || user.username}
+                  </a>
+                </div>
+              ))}
+              {allUsers.filter(u => movie.userIds.includes(u.id)).length === 0 && (
+                <p className="text-xs text-brand-text-muted text-center py-4">Nenhum usuário encontrado.</p>
+              )}
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </Dialog.Root>
   );
 }
@@ -145,6 +177,7 @@ interface UserSidebarProps {
   currentUserId: string;
   selectedUserId: string;
   onSelectUser: (userId: string) => void;
+  onViewAll?: () => void;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -154,6 +187,7 @@ export default function UserSidebar({
   currentUserId,
   selectedUserId,
   onSelectUser,
+  onViewAll,
   isOpen,
   onClose,
 }: UserSidebarProps) {
@@ -232,12 +266,14 @@ export default function UserSidebar({
                   <button
                     key={u.id}
                     className="w-full text-left px-2.5 py-2 hover:bg-[#151515] text-brand-text transition-colors flex items-center gap-2"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.preventDefault();
                       onSelectUser(u.id);
                       setSearchQuery('');
                       setIsSearchFocused(false);
                       onClose();
                     }}
+                    onMouseDown={(e) => e.preventDefault()}
                   >
                     <AvatarDisplay avatarId={u.avatar_id} className="w-5 h-5 shrink-0" />
                     <span className="text-xs truncate">{u.display_name || u.username}</span>
@@ -249,6 +285,18 @@ export default function UserSidebar({
               <div className="absolute top-full left-0 right-0 mt-1 bg-[#0a0a0a] border border-[#222] rounded-lg shadow-xl z-50 p-2 text-xs text-center text-brand-text-muted">
                 Nenhum usuário
               </div>
+            )}
+            {onViewAll && (
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  onViewAll();
+                  onClose();
+                }}
+                className="text-[9px] text-brand-gold hover:text-brand-gold-alt uppercase tracking-widest block w-full text-right mt-1.5 transition-colors"
+              >
+                Ver todos
+              </button>
             )}
           </div>
         </div>
@@ -413,7 +461,7 @@ export default function UserSidebar({
                 </div>
               ) : trendingMovies && trendingMovies.length > 0 ? (
                 trendingMovies.map((movie, index) => (
-                  <SidebarMovieItem key={index} movie={movie} currentUserId={currentUserId} />
+                  <SidebarMovieItem key={index} movie={movie} currentUserId={currentUserId} allUsers={users} />
                 ))
               ) : (
                 <div className="text-[10px] text-brand-text-muted font-light text-center py-4">
@@ -457,7 +505,7 @@ export default function UserSidebar({
                 </div>
               ) : anticipatedMovies && anticipatedMovies.length > 0 ? (
                 anticipatedMovies.map((movie, index) => (
-                  <SidebarMovieItem key={index} movie={movie} currentUserId={currentUserId} />
+                  <SidebarMovieItem key={index} movie={movie} currentUserId={currentUserId} allUsers={users} />
                 ))
               ) : (
                 <div className="text-[10px] text-brand-text-muted font-light text-center py-4">
@@ -467,6 +515,26 @@ export default function UserSidebar({
             </div>
           )}
         </div>
+
+        {/* Crítica Especializada (Desabilitada temporariamente)
+        <div className="mt-4 pt-3 border-t border-[#171717]">
+          <a
+            href="/critica"
+            className="w-full flex items-center justify-between text-left group px-2 py-1"
+            onClick={() => {
+              if (onClose) onClose();
+            }}
+          >
+            <div className="flex items-center gap-2">
+              <Award size={14} className="text-brand-gold" />
+              <span className="text-xs uppercase tracking-[0.2em] font-medium text-brand-text-muted group-hover:text-brand-text transition-colors">
+                Crítica Especializada
+              </span>
+            </div>
+            <ChevronRight size={14} className="text-brand-text-muted group-hover:text-brand-text" />
+          </a>
+        </div>
+        */}
       </aside>
     </>
   );

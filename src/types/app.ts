@@ -111,6 +111,7 @@ export interface TrendingMovie {
   userCount: number;
   lastWatchedAt: string;
   tmdbId?: string | null;
+  userIds: string[];
 }
 
 export interface AnticipatedMovie {
@@ -118,6 +119,7 @@ export interface AnticipatedMovie {
   coverUrl: string | null;
   userCount: number;
   tmdbId?: string | null;
+  userIds: string[];
 }
 export interface UserOscarPrediction {
   id: string;

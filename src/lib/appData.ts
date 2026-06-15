@@ -110,7 +110,7 @@ type AppwriteUserOscarPredictionDoc = Models.Document & {
 const BOOTSTRAP_KEY = 'letterboxmzz_bootstrap_v1';
 const QUERY_LIMIT = 5000;
 
-const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
+export const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
 const COLLECTION_APP_USERS = import.meta.env.VITE_APPWRITE_COLLECTION_APP_USERS ?? 'app_users';
 const COLLECTION_OSCAR_MOVIES =
   import.meta.env.VITE_APPWRITE_COLLECTION_OSCAR_MOVIES ?? 'filmes_oscar';
@@ -120,8 +120,7 @@ const COLLECTION_PERSONAL_MOVIES =
   import.meta.env.VITE_APPWRITE_COLLECTION_PERSONAL_MOVIES ?? 'personal_movies';
 const COLLECTION_PERSONAL_SERIES =
   import.meta.env.VITE_APPWRITE_COLLECTION_PERSONAL_SERIES ?? 'series_pessoais';
-const COLLECTION_USUARIOS_METADATA =
-  import.meta.env.VITE_APPWRITE_COLLECTION_USUARIOS_METADATA ?? 'usuarios_metadata';
+export const COLLECTION_USUARIOS_METADATA = import.meta.env.VITE_APPWRITE_COLLECTION_USUARIOS_METADATA ?? 'usuarios_metadata';
 const COLLECTION_ATIVIDADES = import.meta.env.VITE_APPWRITE_COLLECTION_ATIVIDADES ?? 'atividades';
 const COLLECTION_USER_FAVORITES = import.meta.env.VITE_APPWRITE_COLLECTION_USER_FAVORITES ?? 'user_favorites';
 const COLLECTION_USER_OSCAR_PREDICTIONS = import.meta.env.VITE_APPWRITE_COLLECTION_USER_OSCAR_PREDICTIONS ?? 'user_oscar_predictions';
@@ -252,7 +251,7 @@ async function withFallback<T>(remote: () => Promise<T>, local: () => Promise<T>
   }
 }
 
-async function createDocument<T extends Record<string, unknown>>(
+export async function createDocument<T extends Record<string, unknown>>(
   collectionId: string,
   data: T,
   permissions?: string[],
@@ -293,7 +292,7 @@ async function createDocumentWithId<T extends Record<string, unknown>>(
   return createDocumentInternal(collectionId, documentId, data, permissions);
 }
 
-async function updateDocument<T extends Record<string, unknown>>(collectionId: string, documentId: string, data: T) {
+export async function updateDocument<T extends Record<string, unknown>>(collectionId: string, documentId: string, data: T) {
   return updateDocumentWithPermissions(collectionId, documentId, data);
 }
 
@@ -399,7 +398,7 @@ function mapSeries(doc: AppwriteSeriesDoc): SeriesEntry {
   };
 }
 
-function isIncomingNotificationMessage(message: string) {
+export function isIncomingNotificationMessage(message: string) {
   const normalized = message.toLowerCase();
   return normalized.includes('para voce') || normalized.includes('ao seu filme') || normalized.includes('novo membro');
 }
@@ -433,7 +432,7 @@ function mapOscarPrediction(doc: AppwriteUserOscarPredictionDoc): UserOscarPredi
   };
 }
 
-async function listDocuments<T extends Models.Document>(collectionId: string, queries: string[] = []) {
+export async function listDocuments<T extends Models.Document>(collectionId: string, queries: string[] = []) {
   const result = await databases.listDocuments(DATABASE_ID, collectionId, [
     Query.limit(QUERY_LIMIT),
     ...queries,
@@ -506,7 +505,7 @@ async function addActivity(userId: string, message: string, mcoinsDelta: number)
   }, permissions);
 }
 
-async function ownerScopedPermissions(ownerUserId: string, readAny = true) {
+export async function ownerScopedPermissions(ownerUserId: string, readAny = true) {
   const currentAccount = await getCurrentAccount();
   const currentAppUserId =
     currentAccount && typeof currentAccount.prefs?.appUserId === 'string'
@@ -767,9 +766,41 @@ async function repairSeriesDoc(doc: AppwriteSeriesDoc) {
 async function grantMCoins(userId: string, trigger: TriggerKey) {
   const delta = TRIGGER_POINTS[trigger];
   const metadata = await ensureUserMetadata(userId);
+  
+  const dbAvatarId = metadata.avatar_id || '';
+  let parsed: any = {};
+  if (dbAvatarId.startsWith('{')) {
+    try {
+      parsed = JSON.parse(dbAvatarId);
+    } catch {}
+  }
+  
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  let newMcoins = metadata.mcoins ?? 0;
+  
+  const isResetActive = currentMonth >= '2026-07';
+  
+  if (isResetActive && parsed.last_reset_month !== currentMonth) {
+    // If we've crossed into a new month since the last recorded month AND we are past the initial grace period, reset!
+    newMcoins = 0;
+    parsed.last_reset_month = currentMonth;
+  } else if (!parsed.last_reset_month) {
+    // If it's the first time running this, just record the current month without resetting
+    parsed.last_reset_month = currentMonth;
+  }
+  
+  newMcoins = Math.max(0, newMcoins + delta);
+  
+  const payload = {
+    ...parsed,
+    avatarId: parsed.avatarId || (dbAvatarId.startsWith('{') ? undefined : dbAvatarId),
+  };
+  
   await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, {
-    mcoins: Math.max(0, (metadata.mcoins ?? 0) + delta),
+    mcoins: newMcoins,
+    avatar_id: JSON.stringify(payload)
   });
+  
   return delta;
 }
 
@@ -1015,26 +1046,36 @@ export async function listRankedUsers() {
         }
       }
 
+      const currentMonth = new Date().toISOString().slice(0, 7);
       const ranked = users
         .map((user) => {
           const userMeta = metadataByUser.get(user.id);
           let dbAvatarId = userMeta?.avatar_id ?? fallbackAvatar(user.id);
           let dbDisplayName: string | undefined = undefined;
+          let userMcoins = userMeta?.mcoins ?? 0;
+
+          const isResetActive = currentMonth >= '2026-07';
 
           if (dbAvatarId.startsWith('{')) {
             try {
               const parsed = JSON.parse(dbAvatarId);
               dbAvatarId = parsed.avatarId || fallbackAvatar(user.id);
               dbDisplayName = parsed.displayName || undefined;
+              if (isResetActive && parsed.last_reset_month !== currentMonth) {
+                userMcoins = 0;
+              }
             } catch (e) {
               console.warn('Failed to parse avatar_id JSON:', e);
+              if (isResetActive) userMcoins = 0;
             }
+          } else {
+            if (isResetActive) userMcoins = 0;
           }
 
           return {
             ...user,
             user_id: user.id,
-            mcoins: userMeta?.mcoins ?? 0,
+            mcoins: userMcoins,
             avatar_id: dbAvatarId,
             display_name: dbDisplayName || undefined,
             favorite_movie: userMeta?.favorite_movie ?? undefined,
@@ -1066,37 +1107,23 @@ export async function listActivities(limit = 30) {
   );
 }
 
-export async function listNotifications(userId: string, limit = 20) {
-  return withFallback(
-    async () => {
-      const data = await listDocuments<AppwriteActivityDoc>(COLLECTION_ATIVIDADES, [
-        Query.equal('user_id', [userId, 'global']),
-        Query.orderDesc('$createdAt'),
-        Query.limit(limit),
-      ]);
-
-      return data
-        .map(mapActivity)
-        .filter((item) => isIncomingNotificationMessage(item.message));
-    },
-    () => localData.listNotifications(userId, limit),
-  );
+export async function listNotifications(_userId: string, _limit = 20) {
+  // Deprecated, use listUserActivity directly instead.
+  return [];
 }
 
-export async function listUserActivity(userId: string, limit = 20) {
+export async function listUserActivity(userIds: string[], limit = 20) {
   return withFallback(
     async () => {
       const data = await listDocuments<AppwriteActivityDoc>(COLLECTION_ATIVIDADES, [
-        Query.equal('user_id', [userId]),
+        Query.equal('user_id', userIds),
         Query.orderDesc('$createdAt'),
         Query.limit(limit),
       ]);
 
-      return data
-        .map(mapActivity)
-        .filter((item) => !isIncomingNotificationMessage(item.message));
+      return data.map(mapActivity);
     },
-    () => localData.listUserActivity(userId, limit),
+    () => localData.listUserActivity(userIds[0], limit),
   );
 }
 
@@ -1221,18 +1248,17 @@ export async function updateUserAvatar(userId: string, avatarId: string) {
       await requireSessionUser(userId);
       const metadata = await ensureUserMetadata(userId);
       
-      let currentDisplayName: string | undefined = undefined;
+      let parsed: any = {};
       const currentDbAvatar = metadata.avatar_id;
       if (currentDbAvatar && currentDbAvatar.startsWith('{')) {
         try {
-          const parsed = JSON.parse(currentDbAvatar);
-          currentDisplayName = parsed.displayName;
+          parsed = JSON.parse(currentDbAvatar);
         } catch {}
       }
 
       const newDbAvatarValue = JSON.stringify({
+        ...parsed,
         avatarId,
-        displayName: currentDisplayName,
       });
 
       if (metadata.avatar_id === newDbAvatarValue) {
@@ -1264,12 +1290,11 @@ export async function updateUserProfile(
       const metadata = await ensureUserMetadata(userId);
       const updates: Record<string, unknown> = {};
 
-      let currentAvatarId = metadata.avatar_id || fallbackAvatar(userId);
-
-      if (currentAvatarId.startsWith('{')) {
+      let parsed: any = {};
+      const currentDbAvatar = metadata.avatar_id || '';
+      if (currentDbAvatar.startsWith('{')) {
         try {
-          const parsed = JSON.parse(currentAvatarId);
-          currentAvatarId = parsed.avatarId || fallbackAvatar(userId);
+          parsed = JSON.parse(currentDbAvatar);
         } catch {}
       }
 
@@ -1282,7 +1307,8 @@ export async function updateUserProfile(
         }
         
         const newDbAvatarValue = JSON.stringify({
-          avatarId: currentAvatarId,
+          ...parsed,
+          avatarId: parsed.avatarId || (currentDbAvatar.startsWith('{') ? undefined : currentDbAvatar),
           displayName: data.display_name,
         });
         if (metadata.avatar_id !== newDbAvatarValue) {
@@ -2020,6 +2046,7 @@ export async function getTrendingMovies(): Promise<TrendingMovie[]> {
         coverUrl: g.coverUrl,
         tmdbId: g.tmdbId,
         userCount: g.watchers.size,
+        userIds: Array.from(g.watchers),
         lastWatchedAt: g.lastWatchedAt,
       }));
 
@@ -2030,7 +2057,7 @@ export async function getTrendingMovies(): Promise<TrendingMovie[]> {
         return new Date(b.lastWatchedAt).getTime() - new Date(a.lastWatchedAt).getTime();
       });
 
-      return grouped.slice(0, 5);
+      return grouped.slice(0, 10);
     },
     () => localData.getTrendingMovies(),
   );
@@ -2134,11 +2161,12 @@ export async function getAnticipatedMovies(): Promise<AnticipatedMovie[]> {
         coverUrl: g.coverUrl,
         tmdbId: g.tmdbId,
         userCount: g.watchers.size,
+        userIds: Array.from(g.watchers),
       }));
 
       grouped.sort((a, b) => b.userCount - a.userCount);
 
-      return grouped.slice(0, 5);
+      return grouped.slice(0, 10);
     },
     () => localData.getAnticipatedMovies(),
   );

@@ -15,6 +15,8 @@ import { useFavorites } from './hooks/useFavorites';
 import { usePersonalMovies } from './hooks/usePersonalMovies';
 import { useSeries } from './hooks/useSeries';
 import UserAchievements from './components/ui/UserAchievements';
+import AllAchievements from './components/ui/AllAchievements';
+import RankingScreen from './components/layout/RankingScreen';
 import clsx from 'clsx';
 import {
   bootstrapApp,
@@ -54,7 +56,7 @@ function App() {
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const { isUserFavorited, toggleFavorite } = useFavorites(session?.id || '');
+  const { favorites, isUserFavorited, toggleFavorite } = useFavorites(session?.id || '');
 
   const usersQuery = useUsers();
   const avatarMutation = useAvatarMutation();
@@ -124,10 +126,10 @@ function App() {
 
   const users = usersQuery.data || [];
   const urlUsername = match ? params.username : null;
-  const viewedUser = urlUsername 
+  const viewedUser = urlUsername
     ? (users.find((user) => user.username === urlUsername) || null)
     : (users.find((user) => user.id === session?.id) || null);
-  
+
   const selectedUserId = viewedUser?.id || null;
   const { moviesQuery: personalMoviesQuery } = usePersonalMovies(selectedUserId);
   const { seriesQuery: userSeriesQuery } = useSeries(selectedUserId);
@@ -146,6 +148,13 @@ function App() {
   }, [activeTab, canAccessOscars]);
 
   const headerCopy = useMemo(() => {
+    if (urlUsername === 'ranking') {
+      return {
+        title: 'Ranking Global',
+      };
+    }
+
+
     if (urlUsername && !viewedUser) {
       return {
         title: 'Usuário não encontrado',
@@ -298,6 +307,7 @@ function App() {
               const u = users.find((x) => x.id === id);
               if (u) setLocation(`/${u.username}`);
             }}
+            onViewAll={() => setLocation('/ranking')}
             isOpen={sidebarOpen}
             onClose={() => setSidebarOpen(false)}
           />
@@ -315,6 +325,7 @@ function App() {
                     currentUserId={session.id}
                     viewedUserId={viewedUser?.id ?? session.id}
                     isOwnDashboard={isOwnDashboard}
+                    friendIds={favorites?.map((f) => f.favorite_user_id) || []}
                   />
                   <UserDropdownMenu
                     session={session}
@@ -340,7 +351,9 @@ function App() {
                 </div>
               )}
               subSlot={
-                selectedUserId && (
+                urlUsername === 'ranking' ? (
+                  <AllAchievements />
+                ) : selectedUserId ? (
                   <UserAchievements
                     movies={personalMovies}
                     series={userSeries}
@@ -348,14 +361,27 @@ function App() {
                     userId={selectedUserId}
                     isLoading={achievementsLoading}
                   />
-                )
+                ) : null
               }
+              hideTabs={urlUsername === 'ranking'}
             />
 
             {usersQuery.isLoading ? (
               <div className="flex justify-center items-center py-20 text-brand-gold-alt opacity-50">
                 <Loader2 className="animate-spin" size={32} />
               </div>
+            ) : urlUsername === 'ranking' ? (
+              <RankingScreen
+                users={users}
+                currentUserId={session.id}
+                favorites={favorites?.map(f => f.favorite_user_id) || []}
+                onToggleFavorite={toggleFavorite}
+                onSelectUser={(id) => {
+                  const u = users.find(x => x.id === id);
+                  if (u) setLocation(`/${u.username}`);
+                }}
+                onBack={() => setLocation('/')}
+              />
             ) : urlUsername && !viewedUser ? (
               <div className="flex justify-center items-center py-20 text-brand-text-muted">
                 <p>Usuário "{urlUsername}" não encontrado.</p>

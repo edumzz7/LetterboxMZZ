@@ -822,7 +822,7 @@ export function getSeriesStatus(episodiosVistos: number, totalEpisodios: number)
   return totalEpisodios > 0 && episodiosVistos >= totalEpisodios ? 'watched' : 'watching';
 }
 
-export async function getTrendingMovies(): Promise<Array<{ title: string; coverUrl: string | null; userCount: number; lastWatchedAt: string }>> {
+export async function getTrendingMovies(): Promise<Array<{ title: string; coverUrl: string | null; userCount: number; lastWatchedAt: string; userIds: string[] }>> {
   const movies = readPersonalMovies();
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -860,6 +860,7 @@ export async function getTrendingMovies(): Promise<Array<{ title: string; coverU
     coverUrl: g.coverUrl,
     tmdbId: g.tmdbId,
     userCount: g.watchers.size,
+    userIds: Array.from(g.watchers),
     lastWatchedAt: g.lastWatchedAt,
   }));
 
@@ -934,6 +935,7 @@ export async function getAnticipatedMovies(): Promise<AnticipatedMovie[]> {
     coverUrl: g.coverUrl,
     tmdbId: g.tmdbId,
     userCount: g.watchers.size,
+    userIds: Array.from(g.watchers),
   }));
 
   grouped.sort((a, b) => b.userCount - a.userCount);

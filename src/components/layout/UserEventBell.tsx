@@ -2,13 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Bell, Loader2 } from 'lucide-react';
 import { useLocation } from 'wouter';
 import clsx from 'clsx';
-import { useNotifications } from '../../hooks/useNotifications';
 import { useUserActivity } from '../../hooks/useUserActivity';
 
 interface UserEventBellProps {
   currentUserId: string;
   viewedUserId: string;
   isOwnDashboard: boolean;
+  friendIds?: string[];
 }
 
 const SEEN_KEY_PREFIX = 'letterboxmzz_seen_notifications_v1_';
@@ -38,11 +38,12 @@ export default function UserEventBell({
   currentUserId,
   viewedUserId,
   isOwnDashboard,
+  friendIds = [],
 }: UserEventBellProps) {
   const [open, setOpen] = useState(false);
   const [seenTimestamp, setSeenTimestamp] = useState(() => readSeenTimestamp(currentUserId));
-  const notificationsQuery = useNotifications(currentUserId);
-  const activityQuery = useUserActivity(viewedUserId);
+  const activityUserIds = useMemo(() => [viewedUserId, 'global', ...friendIds], [viewedUserId, friendIds]);
+  const activityQuery = useUserActivity(activityUserIds);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [, setLocation] = useLocation();
 
@@ -69,11 +70,8 @@ export default function UserEventBell({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const items = useMemo(
-    () => (isOwnDashboard ? (notificationsQuery.data ?? []) : (activityQuery.data ?? [])),
-    [activityQuery.data, isOwnDashboard, notificationsQuery.data],
-  );
-  const isLoading = isOwnDashboard ? notificationsQuery.isLoading : activityQuery.isLoading;
+  const items = useMemo(() => activityQuery.data ?? [], [activityQuery.data]);
+  const isLoading = activityQuery.isLoading;
 
   const unseenCount = useMemo(() => {
     if (!isOwnDashboard) return 0;
@@ -85,11 +83,9 @@ export default function UserEventBell({
     );
   }, [isOwnDashboard, items, seenTimestamp]);
 
-  const title = isOwnDashboard ? 'Notificacoes' : 'Atividade';
-  const buttonLabel = isOwnDashboard ? 'Avisos' : 'Atividade';
-  const emptyLabel = isOwnDashboard
-    ? 'Nenhuma notificacao por enquanto.'
-    : 'Nenhuma atividade recente por enquanto.';
+  const title = 'Atividade';
+  const buttonLabel = 'Atividade';
+  const emptyLabel = 'Nenhuma atividade recente por enquanto.';
 
   return (
     <div ref={containerRef} className="relative">
@@ -113,8 +109,8 @@ export default function UserEventBell({
         <Bell size={14} />
         {buttonLabel}
         {isOwnDashboard && unseenCount > 0 ? (
-          <span className="absolute -top-2 -right-2 min-w-5 h-5 px-1 rounded-full bg-brand-gold text-brand-bg text-[10px] font-semibold flex items-center justify-center">
-            {unseenCount}
+          <span className="absolute -top-2 -right-2 min-w-5 h-5 px-1 rounded-full bg-brand-gold text-[#0f172a] text-[10px] font-semibold flex items-center justify-center">
+            +{unseenCount}
           </span>
         ) : null}
       </button>

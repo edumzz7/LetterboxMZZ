@@ -100,6 +100,29 @@ export default function ShareReviewModal({
     document.body.removeChild(link);
   };
 
+  const handleShare = async () => {
+    if (generatedImages.length === 0 || !selectedMovie) return;
+    
+    try {
+      const response = await fetch(generatedImages[currentImageIndex]);
+      const blob = await response.blob();
+      const styleName = currentImageIndex === 0 ? 'foto' : 'escuro';
+      const file = new File([blob], `review-${selectedMovie.titulo.toLowerCase().replace(/\s+/g, '-')}-${styleName}.png`, { type: 'image/png' });
+      
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: 'Resenha Cinerats',
+          text: `Confira minha resenha de ${selectedMovie.titulo} no Cinerats!`,
+        });
+      } else {
+        alert("Compartilhamento direto com o Instagram não suportado no seu navegador/dispositivo atual. Por favor, baixe a imagem e poste manualmente.");
+      }
+    } catch (error) {
+      console.error('Error sharing', error);
+    }
+  };
+
   const renderStars = (rating?: number | null) => {
     if (!rating) return null;
     return (
@@ -215,9 +238,15 @@ export default function ShareReviewModal({
                 </button>
                 <button
                   onClick={handleDownload}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-brand-gold text-brand-bg rounded-lg text-xs uppercase font-bold tracking-[0.14em] hover:bg-brand-gold/90 transition"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-white/10 border border-[#333] text-brand-text rounded-lg text-xs uppercase font-bold tracking-[0.14em] hover:bg-white/20 transition"
                 >
                   <Download size={16} /> Baixar
+                </button>
+                <button
+                  onClick={handleShare}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-brand-gold text-brand-bg rounded-lg text-xs uppercase font-bold tracking-[0.14em] hover:bg-brand-gold/90 transition"
+                >
+                  <Instagram size={16} /> Postar
                 </button>
               </div>
             </div>

@@ -1,4 +1,10 @@
 {
+  "crons": [
+    {
+      "path": "/api/cron/reset-mcoins",
+      "schedule": "0 0 1 * *"
+    }
+  ],
   "rewrites": [
     {
       "source": "/tmdb-img/:path*",

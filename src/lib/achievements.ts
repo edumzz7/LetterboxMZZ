@@ -1,10 +1,18 @@
 import type { PersonalMovie, SeriesEntry, RankedUser, UserOscarPrediction, ActivityEntry } from '../types/app';
+import type React from 'react';
+import { GiBull, GiTigerHead, GiCigar, GiSawedOffShotgun, GiAssassinPocket } from 'react-icons/gi';
+import { PiEyesFill } from 'react-icons/pi';
+import { MdOutlineTimeline } from 'react-icons/md';
+import { FcDvdLogo } from 'react-icons/fc';
+import { FaGlassCheers, FaUserShield } from 'react-icons/fa';
+import { TbAbc } from 'react-icons/tb';
+import { FaChildReaching } from 'react-icons/fa6';
 
 export interface Achievement {
   id: string;
   name: string;
   description: string;
-  icon: string; // Lucide icon name
+  icon: string | React.ElementType; // Lucide icon name or React Component
   secret: boolean;
   level: 1 | 2 | 3;
   check: (
@@ -268,7 +276,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     id: 'curious',
     name: 'Curioso',
     description: 'Adicionou 15 filmes à watchlist.',
-    icon: 'Bookmark',
+    icon: PiEyesFill,
     secret: false,
     level: 1,
     check: (movies) => movies.filter((m) => m.status === 'watchlist').length >= 15,
@@ -288,7 +296,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     id: 'tarantino_1',
     name: 'Inglório',
     description: 'Assistiu a 3 filmes do Tarantino.',
-    icon: 'Film',
+    icon: GiSawedOffShotgun,
     secret: false,
     level: 1,
     check: (movies) => {
@@ -302,7 +310,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     id: 'del_toro_1',
     name: 'Olé!',
     description: 'Assistiu a 3 filmes do Guillermo del Toro.',
-    icon: 'Award',
+    icon: GiBull,
     secret: false,
     level: 1,
     check: (movies) => {
@@ -330,7 +338,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     id: 'nolan_1',
     name: 'Não Linear',
     description: 'Assistiu a 3 filmes do Nolan.',
-    icon: 'Clock',
+    icon: MdOutlineTimeline,
     secret: false,
     level: 1,
     check: (movies) => {
@@ -358,7 +366,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     id: 'spielberg_1',
     name: 'Blockbuster Clássico',
     description: 'Assistiu a 3 filmes do Spielberg.',
-    icon: 'Trophy',
+    icon: FcDvdLogo,
     secret: false,
     level: 1,
     check: (movies) => {
@@ -386,7 +394,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     id: 'scorsese_1',
     name: 'Godfella',
     description: 'Assistiu a 3 filmes do Scorsese.',
-    icon: 'User',
+    icon: FaGlassCheers,
     secret: false,
     level: 1,
     check: (movies) => {
@@ -400,7 +408,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     id: 'scorsese_2',
     name: 'Acende o charuto',
     description: 'Assistiu a 5 filmes do Martin Scorsese.',
-    icon: 'Flame',
+    icon: GiCigar,
     secret: false,
     level: 2,
     check: (movies) => {
@@ -416,7 +424,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     id: 'infantil_1',
     name: 'Sessão da Tarde',
     description: 'Assistiu ou tem na watchlist 5 filmes infantis.',
-    icon: 'Smile',
+    icon: FaChildReaching,
     secret: false,
     level: 1,
     check: (movies) => movies.filter((m) => FAMILY_MOVIES.has(m.titulo.toLowerCase().trim())).length >= 5,
@@ -448,9 +456,9 @@ export const ACHIEVEMENTS: Achievement[] = [
     level: 1,
     check: (movies) => {
       const comedyRated = movies.filter(
-        (m) => COMEDY_MOVIES.has(m.titulo.toLowerCase().trim()) && 
-        (m.rating ?? m.avaliacao ?? 0) > 0 && 
-        (m.rating ?? m.avaliacao ?? 0) <= 2
+        (m) => COMEDY_MOVIES.has(m.titulo.toLowerCase().trim()) &&
+          (m.rating ?? m.avaliacao ?? 0) > 0 &&
+          (m.rating ?? m.avaliacao ?? 0) <= 2
       );
       return comedyRated.length >= 3;
     },
@@ -544,7 +552,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     id: 'review_abc',
     name: 'ABC',
     description: 'Escreveu sua primeira resenha.',
-    icon: 'BookOpen',
+    icon: TbAbc,
     secret: false,
     level: 1,
     check: (movies, series) => {
@@ -607,7 +615,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     id: 'oscar_tigrinho',
     name: 'Tigrinho',
     description: 'Palpitou em todas as 5 categorias do Oscar.',
-    icon: 'Coins',
+    icon: GiTigerHead,
     secret: false,
     level: 2,
     check: (_movies, _series, _users, _userId, predictions) => predictions.length >= 5,
@@ -680,9 +688,9 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     id: 'je_parlo_mucho',
     name: 'Je parlo mucho',
-    description: 'Assistiu a 3 filmes de idiomas diferentes (inglês não conta).',
+    description: 'Assistiu a 3 filmes de idiomas diferentes, além do inglês',
     icon: 'Languages',
-    secret: true,
+    secret: false,
     level: 3,
     check: (movies) => {
       const languages = new Set<string>();
@@ -720,7 +728,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     id: 'universal',
     name: 'Universal',
-    description: 'Assistiu a 10 filmes de idiomas diferentes (inglês não conta).',
+    description: 'Assistiu a 7 filmes de idiomas diferentes (inglês não conta).',
     icon: 'Sparkles',
     secret: true,
     level: 3,
@@ -734,14 +742,14 @@ export const ACHIEVEMENTS: Achievement[] = [
             languages.add(lang);
           }
         });
-      return languages.size >= 10;
+      return languages.size >= 7;
     },
   },
   {
     id: 'serial_killer',
     name: 'Assassino em SÉRIE',
     description: 'Terminou 5 séries de terror.',
-    icon: 'Ghost',
+    icon: GiAssassinPocket,
     secret: true,
     level: 3,
     check: (_, series) => {
@@ -807,8 +815,8 @@ export const ACHIEVEMENTS: Achievement[] = [
     id: 'fiel_escudeiro',
     name: 'Fiel Escudeiro',
     description: 'Adicionou novos itens em 15 dias diferentes.',
-    icon: 'CalendarDays',
-    secret: true,
+    icon: FaUserShield,
+    secret: false,
     level: 3,
     check: (movies, series) => {
       const dates = new Set<string>();
@@ -839,12 +847,12 @@ export function getUnlockedAchievements(
 
   // Filter out lower tier achievements for directors and languages
   const idsToExclude = new Set<string>();
-  
+
   if (unlocked.some((ach) => ach.id === 'del_toro_2')) idsToExclude.add('del_toro_1');
   if (unlocked.some((ach) => ach.id === 'nolan_2')) idsToExclude.add('nolan_1');
   if (unlocked.some((ach) => ach.id === 'spielberg_2')) idsToExclude.add('spielberg_1');
   if (unlocked.some((ach) => ach.id === 'scorsese_2')) idsToExclude.add('scorsese_1');
-  
+
   if (unlocked.some((ach) => ach.id === 'universal')) {
     idsToExclude.add('poliglota');
     idsToExclude.add('je_parlo_mucho');

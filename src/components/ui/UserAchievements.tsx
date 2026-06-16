@@ -13,7 +13,9 @@ interface AchievementBadgeProps {
 
 export function AchievementBadge({ achievement }: AchievementBadgeProps) {
   const [showTooltip, setShowTooltip] = useState(false);
-  const IconComponent = (Icons as any)[achievement.icon] || Icons.Award;
+  const IconComponent = typeof achievement.icon === 'string' 
+    ? (Icons as any)[achievement.icon] || Icons.Award
+    : achievement.icon || Icons.Award;
   const badgeRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

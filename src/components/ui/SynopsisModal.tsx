@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X, Loader2 } from 'lucide-react';
-import { getMovieDetails } from '../../lib/tmdb';
+import { getMovieDetails, getTvDetailsRaw } from '../../lib/tmdb';
 
 interface SynopsisModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
   movieId: number | null;
+  mediaType?: 'movie' | 'tv';
 }
 
 export default function SynopsisModal({
@@ -15,6 +16,7 @@ export default function SynopsisModal({
   onOpenChange,
   title,
   movieId,
+  mediaType = 'movie',
 }: SynopsisModalProps) {
   const [synopsis, setSynopsis] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -24,7 +26,12 @@ export default function SynopsisModal({
     if (isOpen && movieId) {
       setIsLoading(true);
       setError(null);
-      getMovieDetails(movieId)
+      
+      const fetchPromise = mediaType === 'tv' 
+        ? getTvDetailsRaw(movieId) 
+        : getMovieDetails(movieId);
+
+      fetchPromise
         .then((data) => {
           if (data && data.overview) {
             setSynopsis(data.overview);
@@ -41,7 +48,7 @@ export default function SynopsisModal({
     } else if (isOpen && !movieId) {
       setSynopsis('Sinopse não disponível para este título.');
     }
-  }, [isOpen, movieId]);
+  }, [isOpen, movieId, mediaType]);
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={onOpenChange}>

@@ -461,6 +461,9 @@ function fallbackAvatar(userId: string) {
 }
 
 async function ensureUserMetadata(userId: string) {
+  if (metadataCache.has(userId)) {
+    return metadataCache.get(userId)!;
+  }
   const existingDocs = await listDocuments<AppwriteMetadataDoc>(COLLECTION_USUARIOS_METADATA, [
     Query.equal('user_id', [userId]),
     Query.orderDesc('$updatedAt'),
@@ -471,26 +474,32 @@ async function ensureUserMetadata(userId: string) {
     expectedUpdatePermission ? ((doc as Models.Document).$permissions ?? []).includes(expectedUpdatePermission) : false,
   );
 
-  if (writable) return writable;
-
-  if (existingDocs[0]) {
-    return (await createDocument(COLLECTION_USUARIOS_METADATA, {
+  let doc: AppwriteMetadataDoc;
+  if (writable) {
+    doc = writable;
+  } else if (existingDocs[0]) {
+    doc = (await createDocument(COLLECTION_USUARIOS_METADATA, {
       user_id: userId,
       mcoins: existingDocs[0].mcoins ?? 0,
       avatar_id: existingDocs[0].avatar_id ?? fallbackAvatar(userId),
     }, permissions)) as unknown as AppwriteMetadataDoc;
+  } else {
+    doc = (await createDocument(COLLECTION_USUARIOS_METADATA, {
+      user_id: userId,
+      mcoins: 0,
+      avatar_id: fallbackAvatar(userId),
+    }, permissions)) as unknown as AppwriteMetadataDoc;
   }
 
-  return (await createDocument(COLLECTION_USUARIOS_METADATA, {
-    user_id: userId,
-    mcoins: 0,
-    avatar_id: fallbackAvatar(userId),
-  }, permissions)) as unknown as AppwriteMetadataDoc;
+  metadataCache.set(userId, doc);
+  return doc;
 }
 
 async function getUsernameById(userId: string) {
+  if (usernameCache.has(userId)) return usernameCache.get(userId)!;
   try {
     const doc = (await databases.getDocument(DATABASE_ID, COLLECTION_APP_USERS, userId)) as unknown as AppwriteUserDoc;
+    usernameCache.set(userId, doc.username);
     return doc.username;
   } catch {
     return 'Usuario';
@@ -529,15 +538,28 @@ function createManagedPassword(password: string) {
   return `${MANAGED_PASSWORD_PREFIX}${password}::v1`;
 }
 
+let cachedAccount: AppwriteAccountDoc | undefined = undefined;
+const usernameCache = new Map<string, string>();
+const metadataCache = new Map<string, AppwriteMetadataDoc>();
+
+export function clearAppDataCache() {
+  cachedAccount = undefined;
+  usernameCache.clear();
+  metadataCache.clear();
+}
+
 async function ensureAppwriteSession(username: string, password: string) {
   const email = createSessionEmail(username);
   await account.createEmailPasswordSession(email, createManagedPassword(password));
-  return (await account.get()) as unknown as AppwriteAccountDoc;
+  cachedAccount = (await account.get()) as unknown as AppwriteAccountDoc;
+  return cachedAccount;
 }
 
 async function getCurrentAccount() {
+  if (cachedAccount) return cachedAccount;
   try {
-    return (await account.get()) as unknown as AppwriteAccountDoc;
+    cachedAccount = (await account.get()) as unknown as AppwriteAccountDoc;
+    return cachedAccount;
   } catch {
     return undefined;
   }
@@ -621,6 +643,11 @@ export async function removeFavorite(documentId: string): Promise<void> {
 }
 
 async function checkAndApplySelfDeduction(userId: string, username: string) {
+  const metadata = await ensureUserMetadata(userId);
+  return checkAndApplySelfDeductionWithMeta(userId, username, metadata);
+}
+
+async function checkAndApplySelfDeductionWithMeta(userId: string, username: string, metadata: AppwriteMetadataDoc) {
   const usersToDeduct = [
     { username: 'marcelojanssen', amount: 200 },
     { username: 'luizascopel', amount: 190 },
@@ -631,7 +658,6 @@ async function checkAndApplySelfDeduction(userId: string, username: string) {
   const matched = usersToDeduct.find((u) => normalizeUsername(u.username) === normalizeUsername(username));
   if (!matched) return;
 
-  const metadata = await ensureUserMetadata(userId);
   const dbAvatarId = metadata.avatar_id || '';
   let parsed: any = {};
   if (dbAvatarId.startsWith('{')) {
@@ -650,10 +676,11 @@ async function checkAndApplySelfDeduction(userId: string, username: string) {
       avatarId: parsed.avatarId || (dbAvatarId.startsWith('{') ? undefined : dbAvatarId),
     };
 
-    await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, {
+    const updated = await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, {
       mcoins: newMcoins,
       avatar_id: JSON.stringify(payload)
-    });
+    }) as unknown as AppwriteMetadataDoc;
+    metadataCache.set(userId, updated);
 
     await addActivity(userId, `pontos reajustados para correcao (-${matched.amount} MC)`, -matched.amount);
   }
@@ -709,20 +736,25 @@ async function getSessionProfile() {
     return null;
   }
 
-  try {
-    await account.updatePrefs({
-      ...(currentAccount.prefs ?? {}),
-      appUserId: profile.$id,
-      username: profile.username,
-    });
-  } catch {
-    // Non-fatal; profile lookup can still fall back to username.
+  // Only update prefs if they differ (saves a network call)
+  if (prefs.appUserId !== profile.$id || prefs.username !== profile.username) {
+    try {
+      await account.updatePrefs({
+        ...(currentAccount.prefs ?? {}),
+        appUserId: profile.$id,
+        username: profile.username,
+      });
+    } catch {
+      // Non-fatal; profile lookup can still fall back to username.
+    }
   }
 
-  await ensureUserMetadata(profile.$id);
+  // ensureUserMetadata + checkAndApplySelfDeduction both call ensureUserMetadata.
+  // Do it once and pass the result to avoid duplicate Appwrite calls.
+  const metadata = await ensureUserMetadata(profile.$id);
   
   try {
-    await checkAndApplySelfDeduction(profile.$id, profile.username);
+    await checkAndApplySelfDeductionWithMeta(profile.$id, profile.username, metadata);
   } catch (err) {
     console.error('Failed self deduction check:', err);
   }
@@ -731,11 +763,11 @@ async function getSessionProfile() {
 }
 
 async function requireSessionUser(expectedUserId: string) {
-  const session = await getSessionProfile();
-  if (!session || session.id !== expectedUserId) {
+  const currentAccount = await getCurrentAccount();
+  if (!currentAccount || currentAccount.$id !== expectedUserId) {
     throw new Error('Sessao invalida para esta operacao.');
   }
-  return session;
+  return { id: currentAccount.$id, username: currentAccount.name };
 }
 
 function hasUpdatePermission(doc: Models.Document, permissions: string[]) {
@@ -843,10 +875,11 @@ async function grantMCoins(userId: string, trigger: TriggerKey) {
     avatarId: parsed.avatarId || (dbAvatarId.startsWith('{') ? undefined : dbAvatarId),
   };
   
-  await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, {
+  const updated = await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, {
     mcoins: newMcoins,
     avatar_id: JSON.stringify(payload)
-  });
+  }) as unknown as AppwriteMetadataDoc;
+  metadataCache.set(userId, updated);
   
   return delta;
 }
@@ -912,50 +945,12 @@ async function upsertPersonalOscarMovie(userId: string, movie: OscarMovie, statu
   await createDocument(COLLECTION_PERSONAL_MOVIES, payload);
 }
 
-async function runOneTimeDeductions() {
-  const usersToDeduct = [
-    { username: 'marcelojanssen', amount: 200 },
-    { username: 'luizascopel', amount: 190 },
-    { username: 'igro', amount: 30 },
-    { username: 'edumzz', amount: 50 },
-  ];
-
-  for (const { username, amount } of usersToDeduct) {
-    try {
-      const user = await firstDocument<AppwriteUserDoc>(COLLECTION_APP_USERS, [
-        Query.equal('username', [username]),
-      ]);
-      if (!user) continue;
-
-      const metadata = await ensureUserMetadata(user.$id);
-      const dbAvatarId = metadata.avatar_id || '';
-      let parsed: any = {};
-      if (dbAvatarId.startsWith('{')) {
-        try {
-          parsed = JSON.parse(dbAvatarId);
-        } catch {}
-      }
-
-      if (!parsed.deductions_applied_v1) {
-        let currentMcoins = metadata.mcoins ?? 0;
-        const newMcoins = Math.max(0, currentMcoins - amount);
-        parsed.deductions_applied_v1 = true;
-        
-        const payload = {
-          ...parsed,
-          avatarId: parsed.avatarId || (dbAvatarId.startsWith('{') ? undefined : dbAvatarId),
-        };
-
-        await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, {
-          mcoins: newMcoins,
-          avatar_id: JSON.stringify(payload)
-        });
-
-        await addActivity(user.$id, `pontos reajustados para correcao (-${amount} MC)`, -amount);
-      }
-    } catch (err) {
-      console.error(`Failed to deduct for ${username}:`, err);
-    }
+export async function runOneTimeDeductionsForUser(userId: string, username: string) {
+  // Delegates to the shared implementation to avoid duplicate API calls
+  try {
+    await checkAndApplySelfDeduction(userId, username);
+  } catch (err) {
+    console.error(`Failed to deduct for ${username}:`, err);
   }
 }
 
@@ -985,12 +980,6 @@ export async function bootstrapApp() {
         );
       }
 
-      try {
-        await runOneTimeDeductions();
-      } catch (err) {
-        console.error('Failed to run one-time deductions:', err);
-      }
-
       sessionStorage.setItem(BOOTSTRAP_KEY, '1');
     },
     () => localData.bootstrapApp(),
@@ -998,6 +987,7 @@ export async function bootstrapApp() {
 }
 
 export async function loginUser(username: string, password: string) {
+  clearAppDataCache();
   return withFallback(
     async () => {
       const normalized = normalizeUsername(username);
@@ -1345,6 +1335,7 @@ export async function importLegacyDataForUser(userId: string) {
 }
 
 export async function logoutUser() {
+  clearAppDataCache();
   return withFallback(
     async () => {
       try {
@@ -1380,9 +1371,10 @@ export async function updateUserAvatar(userId: string, avatarId: string) {
         return;
       }
 
-      await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, {
+      const updated = await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, {
         avatar_id: newDbAvatarValue,
-      });
+      }) as unknown as AppwriteMetadataDoc;
+      metadataCache.set(userId, updated);
     },
     () => localData.updateUserAvatar(userId, avatarId),
   );
@@ -1451,7 +1443,8 @@ export async function updateUserProfile(
         return;
       }
 
-      await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, updates);
+      const updated = await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, updates) as unknown as AppwriteMetadataDoc;
+      metadataCache.set(userId, updated);
     },
     () => localData.updateUserProfile(userId, data),
   );
@@ -2324,10 +2317,11 @@ export async function resetUserMcoinsForMonth(userId: string, currentMonth: stri
         } catch {}
       }
       parsed.last_reset_month = currentMonth;
-      await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, {
+      const updated = await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, {
         mcoins: 0,
         avatar_id: JSON.stringify(parsed),
-      });
+      }) as unknown as AppwriteMetadataDoc;
+      metadataCache.set(userId, updated);
     },
     () => localData.resetUserMcoinsForMonth(userId, currentMonth),
   );

@@ -3,6 +3,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { Download, Instagram, Star, X } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { usePersonalMovies } from '../../hooks/usePersonalMovies';
+import { useSeries } from '../../hooks/useSeries';
 import { generateImagePath } from '../../lib/imageUtils';
 
 interface ShareReviewModalProps {
@@ -12,6 +13,16 @@ interface ShareReviewModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
+interface SharedItem {
+  id: string;
+  type: 'movie' | 'series';
+  titulo: string;
+  capa_url: string | null;
+  rating: number | null;
+  review: string | null;
+  created_at: string;
+}
+
 export default function ShareReviewModal({
   currentUserId,
   currentDisplayName,
@@ -19,14 +30,41 @@ export default function ShareReviewModal({
   onOpenChange,
 }: ShareReviewModalProps) {
   const { moviesQuery } = usePersonalMovies(currentUserId);
+  const { seriesQuery } = useSeries(currentUserId);
+
   const movies = moviesQuery.data || [];
+  const series = seriesQuery.data || [];
   
-  // Apenas filmes assistidos e ordenados por data
-  const watchedMovies = movies
+  // Apenas filmes assistidos
+  const watchedMovies: SharedItem[] = movies
     .filter((m) => m.status === 'watched')
+    .map((m) => ({
+      id: m.id,
+      type: 'movie',
+      titulo: m.titulo,
+      capa_url: m.capa_url,
+      rating: m.rating ?? m.avaliacao ?? null,
+      review: m.review ?? null,
+      created_at: m.created_at,
+    }));
+
+  // Apenas séries assistidas
+  const watchedSeries: SharedItem[] = series
+    .filter((s) => s.status === 'watched')
+    .map((s) => ({
+      id: s.id,
+      type: 'series',
+      titulo: s.titulo,
+      capa_url: s.capa_url,
+      rating: s.rating ?? s.avaliacao ?? null,
+      review: s.review ?? null,
+      created_at: s.created_at,
+    }));
+
+  const combinedItems = [...watchedMovies, ...watchedSeries]
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-  const [selectedMovieId, setSelectedMovieId] = useState<string>('');
+  const [selectedKey, setSelectedKey] = useState<string>(''); // Formato: type-id (ex: "movie-123")
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImages, setGeneratedImages] = useState<string[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -34,27 +72,27 @@ export default function ShareReviewModal({
   const postRefPhoto = useRef<HTMLDivElement>(null);
   const postRefDark = useRef<HTMLDivElement>(null);
 
-  const selectedMovie = watchedMovies.find(m => m.id === selectedMovieId);
+  const selectedItem = combinedItems.find(item => `${item.type}-${item.id}` === selectedKey);
 
   // Rewrite TMDB image URLs to go through our proxy (same-origin, no CORS issues)
-  const getProxiedImageUrl = (movie: typeof selectedMovie) => {
-    if (!movie) return null;
-    const rawUrl = generateImagePath(movie.titulo, movie.capa_url);
+  const getProxiedImageUrl = (item: SharedItem | undefined) => {
+    if (!item) return null;
+    const rawUrl = generateImagePath(item.titulo, item.capa_url);
     if (!rawUrl) return null;
-    // Rewrite https://image.tmdb.org/t/p/w500/xxx.jpg → /tmdb-img/w500/xxx.jpg
+    // Rewrite https://image.tmdb.org/t/p/
     if (rawUrl.includes('image.tmdb.org/t/p/')) {
       return rawUrl.replace('https://image.tmdb.org/t/p/', '/tmdb-img/');
     }
     return rawUrl;
   };
 
-  const coverImageUrl = selectedMovie ? getProxiedImageUrl(selectedMovie) : null;
+  const coverImageUrl = selectedItem ? getProxiedImageUrl(selectedItem) : null;
 
   const handleOpenChange = (nextOpen: boolean) => {
     onOpenChange(nextOpen);
     if (!nextOpen) {
       setTimeout(() => {
-        setSelectedMovieId('');
+        setSelectedKey('');
         setGeneratedImages([]);
         setCurrentImageIndex(0);
         setIsGenerating(false);
@@ -63,7 +101,7 @@ export default function ShareReviewModal({
   };
 
   const generateImage = async () => {
-    if (!postRefPhoto.current || !postRefDark.current || !selectedMovie) return;
+    if (!postRefPhoto.current || !postRefDark.current || !selectedItem) return;
     setIsGenerating(true);
     setGeneratedImages([]);
     setCurrentImageIndex(0);
@@ -90,30 +128,30 @@ export default function ShareReviewModal({
   };
 
   const handleDownload = () => {
-    if (generatedImages.length === 0 || !selectedMovie) return;
+    if (generatedImages.length === 0 || !selectedItem) return;
     const link = document.createElement('a');
     link.href = generatedImages[currentImageIndex];
     const styleName = currentImageIndex === 0 ? 'foto' : 'escuro';
-    link.download = `review-${selectedMovie.titulo.toLowerCase().replace(/\s+/g, '-')}-${styleName}.png`;
+    link.download = `review-${selectedItem.titulo.toLowerCase().replace(/\s+/g, '-')}-${styleName}.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
   const handleShare = async () => {
-    if (generatedImages.length === 0 || !selectedMovie) return;
+    if (generatedImages.length === 0 || !selectedItem) return;
     
     try {
       const response = await fetch(generatedImages[currentImageIndex]);
       const blob = await response.blob();
       const styleName = currentImageIndex === 0 ? 'foto' : 'escuro';
-      const file = new File([blob], `review-${selectedMovie.titulo.toLowerCase().replace(/\s+/g, '-')}-${styleName}.png`, { type: 'image/png' });
+      const file = new File([blob], `review-${selectedItem.titulo.toLowerCase().replace(/\s+/g, '-')}-${styleName}.png`, { type: 'image/png' });
       
       if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
           files: [file],
           title: 'Resenha Cinerats',
-          text: `Confira minha resenha de ${selectedMovie.titulo} no Cinerats!`,
+          text: `Confira minha resenha de ${selectedItem.titulo} no CineRats!`,
         });
       } else {
         alert("Compartilhamento direto com o Instagram não suportado no seu navegador/dispositivo atual. Por favor, baixe a imagem e poste manualmente.");
@@ -162,26 +200,26 @@ export default function ShareReviewModal({
             <div className="flex flex-col gap-4">
               <div>
                 <label className="block text-xs uppercase tracking-[0.14em] text-brand-text-muted mb-2">
-                  Selecione um filme avaliado
+                  Selecione um título avaliado (Filme ou Série)
                 </label>
                 <select
-                  value={selectedMovieId}
-                  onChange={(e) => setSelectedMovieId(e.target.value)}
+                  value={selectedKey}
+                  onChange={(e) => setSelectedKey(e.target.value)}
                   className="w-full bg-[#151515] border border-[#222] rounded-lg px-3 py-3 text-sm text-brand-text focus:border-brand-gold/40 focus:outline-none transition"
                 >
-                  <option value="">-- Escolha um filme --</option>
-                  {watchedMovies.map((movie) => {
-                    const nota = movie.rating || movie.avaliacao;
+                  <option value="">-- Escolha um item --</option>
+                  {combinedItems.map((item) => {
+                    const tag = item.type === 'movie' ? 'Filme' : 'Série';
                     return (
-                      <option key={movie.id} value={movie.id}>
-                        {movie.titulo} {nota ? `(${nota} ⭐)` : ''}
+                      <option key={`${item.type}-${item.id}`} value={`${item.type}-${item.id}`}>
+                        [{tag}] {item.titulo} {item.rating ? `(${item.rating} ⭐)` : ''}
                       </option>
                     );
                   })}
                 </select>
               </div>
 
-              {selectedMovie && (
+              {selectedItem && (
                 <div className="flex justify-end mt-4">
                   <button
                     onClick={generateImage}
@@ -266,7 +304,7 @@ export default function ShareReviewModal({
         </Dialog.Content>
 
         {/* COMPONENTE OCULTO PARA RENDERIZAÇÃO (1080x1920) */}
-        {selectedMovie && (
+        {selectedItem && (
           <div className="fixed top-0 pointer-events-none flex" style={{ left: '-9999px', zIndex: -9999 }}>
             
             {/* VARIANTE 1: Fundo com a Foto */}
@@ -303,9 +341,9 @@ export default function ShareReviewModal({
                   <div 
                     className="w-[600px] h-[900px] rounded-xl overflow-hidden mb-16 relative flex items-center justify-center"
                     style={{ 
-                      backgroundColor: '#1a1a1a', 
-                      boxShadow: '0 0 80px rgba(212, 175, 55, 0.15)',
-                      border: '4px solid rgba(212, 175, 55, 0.4)'
+                       backgroundColor: '#1a1a1a', 
+                       boxShadow: '0 0 80px rgba(212, 175, 55, 0.15)',
+                       border: '4px solid rgba(212, 175, 55, 0.4)'
                     }}
                   >
                     {coverImageUrl ? (
@@ -322,21 +360,21 @@ export default function ShareReviewModal({
                   </div>
                   
                   <h2 className="text-6xl font-light text-center px-12 leading-tight uppercase tracking-wider mb-8" style={{ color: '#ffffff' }}>
-                    {selectedMovie.titulo}
+                    {selectedItem.titulo}
                   </h2>
                   
-                  {renderStars(selectedMovie.rating || selectedMovie.avaliacao)}
+                  {renderStars(selectedItem.rating)}
                 </div>
 
                 {/* TEXTO (Resenha) */}
                 <div className="h-[350px] w-full flex items-center justify-center px-16">
-                  {selectedMovie.review ? (
+                  {selectedItem.review ? (
                     <p className="text-4xl text-center font-light leading-[1.6] italic" style={{ color: '#d1d5db' }}>
-                      "{truncateReview(selectedMovie.review)}"
+                      "{truncateReview(selectedItem.review)}"
                     </p>
                   ) : (
                     <div className="text-3xl uppercase tracking-widest font-light" style={{ color: '#6b7280' }}>
-                      Avaliado no CineRats
+                      {selectedItem.type === 'movie' ? 'Avaliado no CineRats' : 'Avaliada no CineRats'}
                     </div>
                   )}
                 </div>
@@ -344,7 +382,9 @@ export default function ShareReviewModal({
                 {/* RODAPÉ (Usuário) */}
                 <div className="w-full flex justify-between items-end pt-12 mt-8" style={{ borderTop: '1px solid #333333' }}>
                   <div className="flex flex-col">
-                    <span className="text-2xl uppercase tracking-[0.2em] mb-2" style={{ color: 'rgba(212, 175, 55, 0.7)' }}>Resenha por</span>
+                    <span className="text-2xl uppercase tracking-[0.2em] mb-2" style={{ color: 'rgba(212, 175, 55, 0.7)' }}>
+                      {selectedItem.type === 'movie' ? 'Filme' : 'Série'} • Resenha por
+                    </span>
                     <span className="text-4xl font-medium tracking-wide" style={{ color: '#ffffff' }}>
                       {currentDisplayName}
                     </span>
@@ -373,9 +413,9 @@ export default function ShareReviewModal({
                   <div 
                     className="w-[600px] h-[900px] rounded-xl overflow-hidden mb-16 relative flex items-center justify-center"
                     style={{ 
-                      backgroundColor: '#1a1a1a', 
-                      boxShadow: '0 0 80px rgba(212, 175, 55, 0.15)',
-                      border: '4px solid rgba(212, 175, 55, 0.4)'
+                       backgroundColor: '#1a1a1a', 
+                       boxShadow: '0 0 80px rgba(212, 175, 55, 0.15)',
+                       border: '4px solid rgba(212, 175, 55, 0.4)'
                     }}
                   >
                     {coverImageUrl ? (
@@ -392,27 +432,29 @@ export default function ShareReviewModal({
                   </div>
                   
                   <h2 className="text-6xl font-light text-center px-12 leading-tight uppercase tracking-wider mb-8" style={{ color: '#ffffff' }}>
-                    {selectedMovie.titulo}
+                    {selectedItem.titulo}
                   </h2>
                   
-                  {renderStars(selectedMovie.rating || selectedMovie.avaliacao)}
+                  {renderStars(selectedItem.rating)}
                 </div>
 
                 <div className="h-[350px] w-full flex items-center justify-center px-16">
-                  {selectedMovie.review ? (
+                  {selectedItem.review ? (
                     <p className="text-4xl text-center font-light leading-[1.6] italic" style={{ color: '#d1d5db' }}>
-                      "{truncateReview(selectedMovie.review)}"
+                      "{truncateReview(selectedItem.review)}"
                     </p>
                   ) : (
                     <div className="text-3xl uppercase tracking-widest font-light" style={{ color: '#6b7280' }}>
-                      Avaliado no CineRats
+                      {selectedItem.type === 'movie' ? 'Avaliado no CineRats' : 'Avaliada no CineRats'}
                     </div>
                   )}
                 </div>
 
                 <div className="w-full flex justify-between items-end pt-12 mt-8" style={{ borderTop: '1px solid #333333' }}>
                   <div className="flex flex-col">
-                    <span className="text-2xl uppercase tracking-[0.2em] mb-2" style={{ color: 'rgba(212, 175, 55, 0.7)' }}>Resenha por</span>
+                    <span className="text-2xl uppercase tracking-[0.2em] mb-2" style={{ color: 'rgba(212, 175, 55, 0.7)' }}>
+                      {selectedItem.type === 'movie' ? 'Filme' : 'Série'} • Resenha por
+                    </span>
                     <span className="text-4xl font-medium tracking-wide" style={{ color: '#ffffff' }}>
                       {currentDisplayName}
                     </span>

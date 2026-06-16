@@ -5,6 +5,7 @@ export function useUsers() {
   return useQuery({
     queryKey: ['users'],
     queryFn: listRankedUsers,
+    staleTime: 1000 * 30, // 30 seconds – avoids redundant refetches during mount cascade
   });
 }
 

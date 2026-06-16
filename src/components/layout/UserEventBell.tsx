@@ -116,42 +116,50 @@ export default function UserEventBell({
       </button>
 
       {open ? (
-        <div className="absolute right-0 top-[calc(100%+10px)] z-30 w-[min(92vw,360px)] rounded-2xl border border-[#222] bg-[#070a10] shadow-[0_18px_60px_rgba(0,0,0,0.55)] overflow-hidden">
-          <div className="px-4 py-3 border-b border-[#161616] text-xs uppercase tracking-[0.18em] text-brand-gold-alt">
-            {title}
-          </div>
+        <>
+          {/* Mobile overlay backdrop */}
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 sm:hidden"
+            onClick={() => setOpen(false)}
+          />
+          {/* Panel: centered on mobile, dropdown on desktop */}
+          <div className="fixed inset-x-4 top-[50%] -translate-y-[50%] z-50 sm:translate-y-0 sm:inset-x-auto sm:absolute sm:right-0 sm:top-[calc(100%+10px)] w-auto sm:w-[min(92vw,360px)] rounded-2xl border border-[#222] bg-[#070a10] shadow-[0_18px_60px_rgba(0,0,0,0.55)] overflow-hidden max-h-[80vh] sm:max-h-none">
+            <div className="px-4 py-3 border-b border-[#161616] text-xs uppercase tracking-[0.18em] text-brand-gold-alt">
+              {title}
+            </div>
 
-          {isLoading ? (
-            <div className="px-4 py-6 flex items-center gap-2 text-xs uppercase tracking-[0.14em] text-brand-text-muted">
-              <Loader2 size={14} className="animate-spin" /> Carregando...
-            </div>
-          ) : items.length === 0 ? (
-            <div className="px-4 py-6 text-sm text-brand-text-muted">
-              {emptyLabel}
-            </div>
-          ) : (
-            <ul className="max-h-[420px] overflow-y-auto">
-              {items.map((item) => {
-                const isNewMember = item.message.startsWith('Novo membro!');
-                return (
-                  <li 
-                    key={item.id} 
-                    className={clsx(
-                      "px-4 py-3 border-b border-[#121212] last:border-b-0",
-                      isNewMember && "cursor-pointer hover:bg-white/5 transition-colors"
-                    )}
-                    onClick={() => isNewMember && handleNotificationClick(item.message)}
-                  >
-                    <p className="text-sm leading-relaxed text-brand-text">{item.message}</p>
-                    <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-brand-text-muted">
-                      {formatTimestamp(item.created_at)}
-                    </p>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
+            {isLoading ? (
+              <div className="px-4 py-6 flex items-center gap-2 text-xs uppercase tracking-[0.14em] text-brand-text-muted">
+                <Loader2 size={14} className="animate-spin" /> Carregando...
+              </div>
+            ) : items.length === 0 ? (
+              <div className="px-4 py-6 text-sm text-brand-text-muted">
+                {emptyLabel}
+              </div>
+            ) : (
+              <ul className="max-h-[420px] overflow-y-auto">
+                {items.map((item) => {
+                  const isNewMember = item.message.startsWith('Novo membro!');
+                  return (
+                    <li 
+                      key={item.id} 
+                      className={clsx(
+                        "px-4 py-3 border-b border-[#121212] last:border-b-0",
+                        isNewMember && "cursor-pointer hover:bg-white/5 transition-colors"
+                      )}
+                      onClick={() => isNewMember && handleNotificationClick(item.message)}
+                    >
+                      <p className="text-sm leading-relaxed text-brand-text">{item.message}</p>
+                      <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-brand-text-muted">
+                        {formatTimestamp(item.created_at)}
+                      </p>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </>
       ) : null}
     </div>
   );

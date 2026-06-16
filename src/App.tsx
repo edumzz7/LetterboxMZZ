@@ -29,6 +29,7 @@ import {
   registerUser,
   updateUserProfile,
   checkAndRunMonthlyReset,
+  runOneTimeDeductionsForUser,
 } from './lib/appData';
 import type { SessionUser } from './types/app';
 
@@ -48,13 +49,15 @@ function readStoredSession(): SessionUser | null {
 
 function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'oscars' | 'personal'>('dashboard');
-  const [session, setSession] = useState<SessionUser | null>(() => readStoredSession());
+  const storedSession = readStoredSession();
+  const [session, setSession] = useState<SessionUser | null>(storedSession);
   const [location, setLocation] = useLocation();
   const [match, params] = useRoute('/:username');
   const [authError, setAuthError] = useState<string | null>(null);
   const [authPending, setAuthPending] = useState(false);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
-  const [isBootstrapping, setIsBootstrapping] = useState(true);
+  // If we have a stored session, skip the loading screen entirely
+  const [isBootstrapping, setIsBootstrapping] = useState(!storedSession);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const { favorites, isUserFavorited, toggleFavorite } = useFavorites(session?.id || '');
@@ -76,25 +79,34 @@ function App() {
 
     async function runBootstrap() {
       try {
+        // 1. Bootstrap oscar data (fast, cached by sessionStorage)
         await bootstrapApp();
-        await checkAndRunMonthlyReset();
+
+        // 2. Validate session in background — don't block UI if we have a stored session
         const currentSession = await getCurrentSessionUser();
-        if (currentSession) {
-          const imported = await importLegacyDataForUser(currentSession.id);
-          if (imported) {
-            await refetchUsers();
-          }
-        }
         if (!isMounted) return;
 
         if (currentSession) {
           setSession(currentSession);
           if (location === '/') setLocation(`/${currentSession.username}`);
           localStorage.setItem(SESSION_KEY, JSON.stringify(currentSession));
+
+          // 3. Run deductions + legacy import in parallel (non-blocking)
+          const [, imported] = await Promise.all([
+            runOneTimeDeductionsForUser(currentSession.id, currentSession.username).catch(() => {}),
+            importLegacyDataForUser(currentSession.id).catch(() => false),
+          ]);
+          if (imported && isMounted) {
+            void refetchUsers();
+          }
         } else {
           setSession(null);
           localStorage.removeItem(SESSION_KEY);
         }
+
+        // 4. Monthly reset — runs only after July 2026, so skip the heavy
+        //    listRankedUsers call when it's a no-op.
+        checkAndRunMonthlyReset().catch(() => {});
       } catch (error) {
         if (isMounted) {
           const message =
@@ -113,13 +125,8 @@ function App() {
     return () => {
       isMounted = false;
     };
-  }, [refetchUsers]);
-
-  useEffect(() => {
-    if (!isBootstrapping) {
-      void refetchUsers();
-    }
-  }, [isBootstrapping, refetchUsers]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!session?.id) return;

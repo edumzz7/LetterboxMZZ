@@ -42,7 +42,13 @@ export default function UserEventBell({
 }: UserEventBellProps) {
   const [open, setOpen] = useState(false);
   const [seenTimestamp, setSeenTimestamp] = useState(() => readSeenTimestamp(currentUserId));
-  const activityUserIds = useMemo(() => [viewedUserId, 'global', ...friendIds], [viewedUserId, friendIds]);
+  const activityUserIds = useMemo(() => {
+    if (isOwnDashboard) {
+      return [currentUserId, 'global', ...friendIds];
+    } else {
+      return [viewedUserId];
+    }
+  }, [isOwnDashboard, currentUserId, viewedUserId, friendIds]);
   const activityQuery = useUserActivity(activityUserIds);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [, setLocation] = useLocation();

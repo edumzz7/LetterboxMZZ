@@ -148,6 +148,16 @@ function addActivity(user_id: string, message: string, mcoins_delta = 0) {
   writeActivitiesStore(items);
 }
 
+function deleteActivitiesForTitle(user_id: string, title: string) {
+  try {
+    const items = readActivitiesStore();
+    const updated = items.filter((act) => !(act.user_id === user_id && act.message.includes(title)));
+    writeActivitiesStore(updated);
+  } catch (err) {
+    console.error('Failed to clean up local activities for title:', err);
+  }
+}
+
 function updateUserMcoins(userId: string, delta: number) {
   if (!delta) return;
   const users = readUsers();
@@ -600,7 +610,7 @@ export async function addPersonalMovie(
   };
   items.push(created);
   writePersonalMovies(items);
-  if (created.status === 'watched') {
+  if (created.status === 'watched' && !created.is_retroactive) {
     const recommendation = created.source_movie_id?.match(/^tmdb:(\d+)\|rec:([A-Za-z0-9_-]+)$/);
     if (recommendation) {
       updateUserMcoins(created.user_id, 40);
@@ -627,7 +637,8 @@ export async function updatePersonalMovie(
   const next = { ...previous, ...updates };
   items[index] = next;
   writePersonalMovies(items);
-  if (previous.status !== 'watched' && next.status === 'watched') {
+  const isRetroactive = previous.is_retroactive || previous.plataforma_slug?.endsWith('|retroactive') || previous.source_movie_id?.endsWith('|retroactive') || previous.source_movie_id === 'retroactive';
+  if (previous.status !== 'watched' && next.status === 'watched' && !isRetroactive) {
     updateUserMcoins(next.user_id, 30);
     addActivity(next.user_id, `assistiu ao filme ${next.titulo}.`, 30);
   }
@@ -640,6 +651,7 @@ export async function deletePersonalMovie(movieId: string) {
   if (!current) return;
   requireSession(current.user_id);
   writePersonalMovies(items.filter((item) => item.id !== movieId));
+  deleteActivitiesForTitle(current.user_id, current.titulo);
 }
 
 export async function listSeries(userId: string) {
@@ -665,7 +677,7 @@ export async function addSeries(
   };
   items.push(created);
   writeSeries(items);
-  if (created.status !== 'watchlist') {
+  if (created.status !== 'watchlist' && !created.is_retroactive) {
     updateUserMcoins(userId, 20);
     addActivity(userId, `iniciou a serie ${series.titulo}.`, 20);
   }
@@ -689,11 +701,13 @@ export async function updateSeries(
   }
   items[index] = next;
   writeSeries(items);
-  if (current.status === 'watchlist' && next.status === 'watching') {
+  
+  const isRetroactive = current.is_retroactive || current.plataforma_slug?.endsWith('|retroactive');
+  if (current.status === 'watchlist' && next.status === 'watching' && !isRetroactive) {
     updateUserMcoins(next.user_id, 20);
     addActivity(next.user_id, `iniciou a serie ${next.titulo}.`, 20);
   }
-  if (current.status !== 'watched' && next.status === 'watched') {
+  if (current.status !== 'watched' && next.status === 'watched' && !isRetroactive) {
     updateUserMcoins(next.user_id, 50);
     addActivity(next.user_id, `finalizou 100% da serie ${next.titulo}.`, 50);
   }
@@ -788,7 +802,8 @@ export async function rateMovie(
   }
 
   const isWatched = current.status === 'watched';
-  if (isWatched) {
+  const isRetroactive = current.is_retroactive || current.plataforma_slug?.endsWith('|retroactive') || current.source_movie_id?.endsWith('|retroactive') || current.source_movie_id === 'retroactive';
+  if (isWatched && !isRetroactive) {
     const prevRating = current.rating ?? current.avaliacao ?? null;
     const prevReview = current.review ?? null;
 
@@ -820,7 +835,8 @@ export async function rateSeries(
   }
 
   const isWatched = current.status === 'watched';
-  if (isWatched) {
+  const isRetroactive = current.is_retroactive || current.plataforma_slug?.endsWith('|retroactive');
+  if (isWatched && !isRetroactive) {
     const prevRating = current.rating ?? current.avaliacao ?? null;
     const prevReview = current.review ?? null;
 
@@ -843,6 +859,7 @@ export async function deleteSeries(seriesId: string) {
   if (!current) return;
   requireSession(current.user_id);
   writeSeries(items.filter((item) => item.id !== seriesId));
+  deleteActivitiesForTitle(current.user_id, current.titulo);
 }
 
 function pickRandom<T>(items: T[]) {

@@ -122,7 +122,7 @@ export default function AddMovieDialog(props: AddMovieDialogProps) {
           status: personalDefaultStatus,
           source: 'manual',
           source_movie_id: selectedMovie ? String(selectedMovie.id) : null,
-          rating: selectedMovie?.vote_average ?? null,
+          rating: null,
           streaming_data: streamingData,
           is_retroactive: isRetroactive,
         });

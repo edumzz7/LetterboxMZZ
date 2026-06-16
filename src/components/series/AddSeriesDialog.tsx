@@ -25,7 +25,6 @@ export default function AddSeriesDialog({
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [selectedSeries, setSelectedSeries] = useState<TMDBSeries | null>(null);
   const [seasonMeta, setSeasonMeta] = useState<TMDBTvSeasonMeta[]>([]);
   const [totalSeasons, setTotalSeasons] = useState(0);
   const [streamingData, setStreamingData] = useState<string | null>(null);
@@ -53,7 +52,6 @@ export default function AddSeriesDialog({
     setSearchResults([]);
     setShowDropdown(false);
     setSubmitError(null);
-    setSelectedSeries(null);
     setSeasonMeta([]);
     setTotalSeasons(0);
     setStreamingData(null);
@@ -84,7 +82,6 @@ export default function AddSeriesDialog({
   };
 
   const handleSelectSeries = (series: TMDBSeries) => {
-    setSelectedSeries(series);
     setTitulo(series.name);
     if (series.poster_path) {
       setCapaUrl(`https://image.tmdb.org/t/p/w500${series.poster_path}`);
@@ -138,7 +135,7 @@ export default function AddSeriesDialog({
         episodios_vistos: episodiosVistos,
         status: defaultStatus,
         plataforma_slug: 'stremio',
-        rating: selectedSeries?.vote_average ?? null,
+        rating: null,
         streaming_data: streamingData,
         is_retroactive: isRetroactive,
       });

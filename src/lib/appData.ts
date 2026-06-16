@@ -358,13 +358,15 @@ function mapOscarMovie(doc: AppwriteOscarMovieDoc): OscarMovie {
 }
 
 function mapPersonalMovie(doc: AppwritePersonalMovieDoc): PersonalMovie {
+  const isRetroactive = doc.plataforma_slug?.endsWith('|retroactive') || doc.source_movie_id?.endsWith('|retroactive') || doc.source_movie_id === 'retroactive';
+  const cleanPlataforma = doc.plataforma_slug?.replace('|retroactive', '') ?? null;
   return {
     id: doc.$id,
     user_id: doc.user_id,
     titulo: doc.titulo,
     ano_lancamento: doc.ano_lancamento ?? null,
     capa_url: doc.capa_url ?? null,
-    plataforma_slug: doc.plataforma_slug ?? null,
+    plataforma_slug: cleanPlataforma,
     status: doc.status,
     source: doc.source,
     source_movie_id: doc.source_movie_id ?? null,
@@ -373,6 +375,7 @@ function mapPersonalMovie(doc: AppwritePersonalMovieDoc): PersonalMovie {
     review: doc.review ?? null,
     streaming_data: doc.streamingData ?? null,
     created_at: doc.$createdAt,
+    is_retroactive: isRetroactive,
   };
 }
 
@@ -381,6 +384,8 @@ function mapSeries(doc: AppwriteSeriesDoc): SeriesEntry {
   const episodiosVistos = doc.episodiosVistos ?? 0;
   const derivedStatus = getSeriesStatus(episodiosVistos, totalEpisodios);
   const storedStatus = fromAppwriteSeriesStatus(doc.status);
+  const isRetroactive = doc.plataforma?.endsWith('|retroactive') ?? false;
+  const cleanPlataforma = doc.plataforma?.replace('|retroactive', '') ?? null;
   return {
     id: doc.$id,
     user_id: doc.user_id ?? '',
@@ -390,12 +395,13 @@ function mapSeries(doc: AppwriteSeriesDoc): SeriesEntry {
     temporada: readSeriesSeason(doc),
     total_episodios: totalEpisodios,
     episodios_vistos: episodiosVistos,
-    plataforma_slug: doc.plataforma ?? null,
+    plataforma_slug: cleanPlataforma,
     avaliacao: doc.avaliacao ?? null,
     rating: doc.rating ?? null,
     review: doc.review ?? null,
     streaming_data: doc.streamingData ?? null,
     created_at: doc.$createdAt,
+    is_retroactive: isRetroactive,
   };
 }
 
@@ -1567,12 +1573,13 @@ export async function addPersonalMovie(
         ...movie,
         rating: movie.rating ?? null,
         streamingData: movie.streaming_data ?? null,
+        plataforma_slug: movie.is_retroactive ? `${movie.plataforma_slug || 'stremio'}|retroactive` : movie.plataforma_slug,
         user_id: userId,
       }, await ownerScopedPermissions(userId));
 
       const created = mapPersonalMovie(data as unknown as AppwritePersonalMovieDoc);
 
-      if (created.status === 'watched') {
+      if (created.status === 'watched' && !movie.is_retroactive) {
         const recommendation = parseRecommendedSource(created.source_movie_id);
         if (recommendation) {
           await awardMCoins(created.user_id, 'FILME_INDICADO_ASSISTIDO', `Assistiu ao filme indicado: ${created.titulo}.`);
@@ -1613,8 +1620,9 @@ export async function updatePersonalMovie(
       );
 
       const nextDoc = data as unknown as AppwritePersonalMovieDoc;
+      const isRetroactive = currentDoc.plataforma_slug?.endsWith('|retroactive') || currentDoc.source_movie_id?.endsWith('|retroactive') || currentDoc.source_movie_id === 'retroactive';
 
-      if (currentDoc.status !== 'watched' && nextDoc.status === 'watched') {
+      if (currentDoc.status !== 'watched' && nextDoc.status === 'watched' && !isRetroactive) {
         const recommendation = parseRecommendedSource(nextDoc.source_movie_id);
         if (recommendation) {
           await awardMCoins(nextDoc.user_id, 'FILME_INDICADO_ASSISTIDO', `Assistiu ao filme indicado: ${nextDoc.titulo}.`);
@@ -1634,6 +1642,23 @@ export async function updatePersonalMovie(
   );
 }
 
+async function deleteActivitiesForTitle(userId: string, title: string) {
+  try {
+    const activities = await listDocuments<AppwriteActivityDoc>(COLLECTION_ATIVIDADES, [
+      Query.equal('user_id', [userId]),
+      Query.limit(100),
+    ]);
+    const targets = activities.filter((act) => act.message.includes(title));
+    if (targets.length > 0) {
+      await Promise.all(
+        targets.map((act) => databases.deleteDocument(DATABASE_ID, COLLECTION_ATIVIDADES, act.$id).catch(() => {}))
+      );
+    }
+  } catch (err) {
+    console.error('Failed to clean up activities for deleted title:', err);
+  }
+}
+
 export async function deletePersonalMovie(movieId: string) {
   return withFallback(
     async () => {
@@ -1645,6 +1670,7 @@ export async function deletePersonalMovie(movieId: string) {
       await requireSessionUser(current.user_id);
       const writableDoc = await repairPersonalMovieDoc(current);
       await deleteDocument(COLLECTION_PERSONAL_MOVIES, writableDoc.$id);
+      await deleteActivitiesForTitle(current.user_id, current.titulo);
     },
     () => localData.deletePersonalMovie(movieId),
   );
@@ -1700,7 +1726,7 @@ export async function addSeries(
         user_id: userId,
         titulo: series.titulo,
         capaUrl: ensureValidUrl(series.capa_url),
-        plataforma: series.plataforma_slug ?? 'stremio',
+        plataforma: series.is_retroactive ? `${series.plataforma_slug || 'stremio'}|retroactive` : (series.plataforma_slug ?? 'stremio'),
         temporada: Math.max(1, series.temporada || 1),
         Temporada: Math.max(1, series.temporada || 1),
         episodiosVistos,
@@ -1711,7 +1737,7 @@ export async function addSeries(
         streamingData: series.streaming_data ?? null,
       }, await ownerScopedPermissions(userId));
 
-      if (fromAppwriteSeriesStatus((data as unknown as AppwriteSeriesDoc).status) !== 'watchlist') {
+      if (fromAppwriteSeriesStatus((data as unknown as AppwriteSeriesDoc).status) !== 'watchlist' && !series.is_retroactive) {
         await awardMCoins(userId, 'INICIOU_SERIE', `Iniciou a serie ${series.titulo}.`);
       }
       return mapSeries(data as unknown as AppwriteSeriesDoc);
@@ -1772,17 +1798,18 @@ export async function updateSeries(
         throw new Error("A coluna 'temporada' precisa existir em 'series_pessoais' para salvar a temporada atual.");
       }
 
+      const isRetroactive = current.plataforma?.endsWith('|retroactive') ?? false;
       const previousSeriesStatus = fromAppwriteSeriesStatus(current.status);
       const nextSeriesStatus = fromAppwriteSeriesStatus(data.status);
 
-      if (previousSeriesStatus === 'watchlist' && nextSeriesStatus === 'watching') {
+      if (previousSeriesStatus === 'watchlist' && nextSeriesStatus === 'watching' && !isRetroactive) {
         const viewerId = (current as { user_id?: string }).user_id ?? '';
         if (viewerId) {
           await awardMCoins(viewerId, 'INICIOU_SERIE', `Iniciou a serie ${data.titulo}.`);
         }
       }
 
-      if (previousSeriesStatus !== 'watched' && nextSeriesStatus === 'watched') {
+      if (previousSeriesStatus !== 'watched' && nextSeriesStatus === 'watched' && !isRetroactive) {
         const viewerId = (current as { user_id?: string }).user_id ?? '';
         if (viewerId) {
           await awardMCoins(viewerId, 'SERIE_100', `Finalizou 100% da serie ${data.titulo}.`);
@@ -1975,7 +2002,8 @@ export async function rateMovie(
           throw new Error("A coluna 'rating' (Double) precisa ser criada em 'personal_movies' para salvar avaliações com decimais.");
         }
 
-        if (isWatched) {
+        const isRetroactive = current.plataforma_slug?.endsWith('|retroactive') || current.source_movie_id?.endsWith('|retroactive') || current.source_movie_id === 'retroactive';
+        if (isWatched && !isRetroactive) {
           if (stars > 0 && (prevRating === null || prevRating === 0)) {
             await awardMCoins(actorUserId, 'AVALIOU_ITEM', `avaliou o filme ${current.titulo}.`);
           }
@@ -2029,7 +2057,8 @@ export async function rateSeries(
           throw new Error("A coluna 'rating' (Double) precisa ser criada em 'personal_series' para salvar avaliações com decimais.");
         }
 
-        if (isWatched) {
+        const isRetroactive = current.plataforma?.endsWith('|retroactive') ?? false;
+        if (isWatched && !isRetroactive) {
           if (stars > 0 && (prevRating === null || prevRating === 0)) {
             await awardMCoins(actorUserId, 'AVALIOU_ITEM', `avaliou a serie ${current.titulo}.`);
           }
@@ -2063,6 +2092,7 @@ export async function deleteSeries(seriesId: string) {
       await requireSessionUser(current.user_id);
       const writableDoc = await repairSeriesDoc(current);
       await deleteDocument(COLLECTION_PERSONAL_SERIES, writableDoc.$id);
+      await deleteActivitiesForTitle(current.user_id, current.titulo);
     },
     () => localData.deleteSeries(seriesId),
   );

@@ -11,19 +11,35 @@ export default function AllAchievements() {
   const secretBadgeRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: Event) => {
       if (secretBadgeRef.current && !secretBadgeRef.current.contains(event.target as Node)) {
         setShowSecretTooltip(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
   }, []);
 
   // Sort by difficulty: level 3 (Épica) → 2 (Rara) → 1 (Simples)
   const sorted = [...publicAchievements].sort(
     (a, b) => (LEVEL_ORDER[a.level] ?? 99) - (LEVEL_ORDER[b.level] ?? 99)
   );
+
+  const handleMouseEnter = () => {
+    if (window.matchMedia('(hover: hover)').matches) {
+      setShowSecretTooltip(true);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (window.matchMedia('(hover: hover)').matches) {
+      setShowSecretTooltip(false);
+    }
+  };
 
   return (
     <div className="flex flex-wrap items-center gap-2 py-1">
@@ -39,8 +55,8 @@ export default function AllAchievements() {
           e.stopPropagation();
           setShowSecretTooltip((prev) => !prev);
         }}
-        onMouseEnter={() => setShowSecretTooltip(true)}
-        onMouseLeave={() => setShowSecretTooltip(false)}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
         <div
           className="w-8 h-8 rounded-full flex items-center justify-center transition-all border bg-purple-950/20 border-purple-500/30 text-purple-400 hover:border-purple-400 hover:shadow-[0_0_12px_rgba(168,85,247,0.25)]"

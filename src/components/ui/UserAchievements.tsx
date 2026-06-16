@@ -17,13 +17,17 @@ export function AchievementBadge({ achievement }: AchievementBadgeProps) {
   const badgeRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: Event) => {
       if (badgeRef.current && !badgeRef.current.contains(event.target as Node)) {
         setShowTooltip(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
   }, []);
 
   // Determine styles and labels based on level/secrecy
@@ -45,6 +49,18 @@ export function AchievementBadge({ achievement }: AchievementBadgeProps) {
     levelLabel = "Rara";
   }
 
+  const handleMouseEnter = () => {
+    if (window.matchMedia('(hover: hover)').matches) {
+      setShowTooltip(true);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (window.matchMedia('(hover: hover)').matches) {
+      setShowTooltip(false);
+    }
+  };
+
   return (
     <div
       ref={badgeRef}
@@ -53,8 +69,8 @@ export function AchievementBadge({ achievement }: AchievementBadgeProps) {
         e.stopPropagation();
         setShowTooltip((prev) => !prev);
       }}
-      onMouseEnter={() => setShowTooltip(true)}
-      onMouseLeave={() => setShowTooltip(false)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       <div
         className={clsx(

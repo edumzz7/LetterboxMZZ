@@ -539,11 +539,13 @@ function createManagedPassword(password: string) {
 }
 
 let cachedAccount: AppwriteAccountDoc | undefined = undefined;
+let cachedSessionUser: { id: string; username: string } | null = null;
 const usernameCache = new Map<string, string>();
 const metadataCache = new Map<string, AppwriteMetadataDoc>();
 
 export function clearAppDataCache() {
   cachedAccount = undefined;
+  cachedSessionUser = null;
   usernameCache.clear();
   metadataCache.clear();
 }
@@ -687,6 +689,7 @@ async function checkAndApplySelfDeductionWithMeta(userId: string, username: stri
 }
 
 async function getSessionProfile() {
+  if (cachedSessionUser) return cachedSessionUser;
   const currentAccount = await getCurrentAccount();
   if (!currentAccount) return null;
 
@@ -759,15 +762,17 @@ async function getSessionProfile() {
     console.error('Failed self deduction check:', err);
   }
 
-  return { id: profile.$id, username: profile.username };
+  const result = { id: profile.$id, username: profile.username };
+  cachedSessionUser = result;
+  return result;
 }
 
 async function requireSessionUser(expectedUserId: string) {
-  const currentAccount = await getCurrentAccount();
-  if (!currentAccount || currentAccount.$id !== expectedUserId) {
+  const session = await getSessionProfile();
+  if (!session || session.id !== expectedUserId) {
     throw new Error('Sessao invalida para esta operacao.');
   }
-  return { id: currentAccount.$id, username: currentAccount.name };
+  return session;
 }
 
 function hasUpdatePermission(doc: Models.Document, permissions: string[]) {

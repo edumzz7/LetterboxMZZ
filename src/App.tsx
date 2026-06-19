@@ -22,6 +22,7 @@ import {
   bootstrapApp,
   changePassword,
   adminResetPassword,
+  deleteCurrentUser,
   getCurrentSessionUser,
   importLegacyDataForUser,
   loginUser,
@@ -56,6 +57,7 @@ function App() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [authPending, setAuthPending] = useState(false);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
+  const [deleteProfilePending, setDeleteProfilePending] = useState(false);
   // If we have a stored session, skip the loading screen entirely
   const [isBootstrapping, setIsBootstrapping] = useState(!storedSession);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -290,6 +292,23 @@ function App() {
     await adminResetPassword(targetUsername, newPassword);
   };
 
+  const handleDeleteProfile = async (currentPassword: string) => {
+    if (!session?.id) {
+      throw new Error('Nenhuma sessao ativa.');
+    }
+
+    setDeleteProfilePending(true);
+    try {
+      await deleteCurrentUser(session.id, currentPassword);
+      persistSession(null);
+      if (typeof window !== 'undefined') {
+        window.location.assign(import.meta.env.VITE_PUBLIC_APP_URL ?? 'https://cinerats.vercel.app');
+      }
+    } finally {
+      setDeleteProfilePending(false);
+    }
+  };
+
   if (isBootstrapping) {
     return (
       <div className="min-h-screen bg-brand-bg text-brand-text flex items-center justify-center">
@@ -378,6 +397,8 @@ function App() {
                       await updateUserProfile(session.id, data);
                       await refetchUsers();
                     }}
+                    onDeleteProfile={handleDeleteProfile}
+                    deleteProfilePending={deleteProfilePending}
                   />
                 </div>
               )}
@@ -460,5 +481,4 @@ function App() {
 }
 
 export default App;
-
 

@@ -152,7 +152,7 @@ export default function AddMovieDialog(props: AddMovieDialogProps) {
           className={clsx(
             'flex items-center justify-center gap-2 border border-[#222] text-brand-gold-alt text-xs tracking-widest uppercase rounded-md hover:border-brand-gold hover:text-brand-gold transition-all bg-brand-bg group border-dashed',
             layout === 'grid'
-              ? 'min-h-[140px] w-full min-w-[140px] md:min-w-[180px] aspect-[2/3]'
+              ? 'min-h-[140px] w-full min-w-0 aspect-[2/3]'
               : 'px-4 py-2 min-h-[143px] w-[160px] md:w-[200px] shrink-0 snap-center',
           )}
         >

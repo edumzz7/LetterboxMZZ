@@ -489,6 +489,41 @@ export async function logoutUser() {
   writeSessionUserId(null);
 }
 
+export async function deleteCurrentUser(userId: string, currentPassword: string) {
+  requireSession(userId);
+
+  const users = readUsers();
+  const user = users.find((item) => item.id === userId);
+  if (!user) throw new Error('Usuario nao encontrado.');
+
+  const currentHash = await hashPassword(currentPassword);
+  if (user.password_hash !== currentHash) {
+    throw new Error('Senha atual incorreta.');
+  }
+
+  writeUsers(users.filter((item) => item.id !== userId));
+  writePersonalMovies(readPersonalMovies().filter((item) => item.user_id !== userId));
+  writeSeries(readSeries().filter((item) => item.user_id !== userId));
+  writeOscarStatuses(readOscarStatuses().filter((item) => item.user_id !== userId));
+  writeActivitiesStore(
+    readActivitiesStore().filter(
+      (item) => item.user_id !== userId && !item.message.includes(`@${user.username}`),
+    ),
+  );
+  writeFavorites(
+    readFavorites().filter(
+      (item) => item.owner_user_id !== userId && item.favorite_user_id !== userId,
+    ),
+  );
+  writeJson(
+    KEYS.oscarPredictions,
+    readJson<UserOscarPrediction[]>(KEYS.oscarPredictions, []).filter((item) => item.user_id !== userId),
+  );
+
+  localStorage.removeItem(`${LEGACY_IMPORT_PREFIX}${userId}`);
+  writeSessionUserId(null);
+}
+
 export async function updateUserAvatar(userId: string, avatarId: string) {
   requireSession(userId);
   const users = readUsers();
@@ -1094,4 +1129,3 @@ export async function countFavoritedBy(userId: string): Promise<number> {
   const items = readFavorites();
   return items.filter((f) => f.favorite_user_id === userId).length;
 }
-

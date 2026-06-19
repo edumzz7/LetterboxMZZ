@@ -85,7 +85,8 @@ export default function SeriesCard({
     setLocalTotalEps((series.total_episodios || 0).toString());
   };
 
-  const loadSeasonEpisodes = async (seriesId: number, seasonNumber: number) => {
+  const loadSeasonEpisodes = async (seriesId: number, seasonNumberArg: number | string) => {
+    const seasonNumber = Number(seasonNumberArg);
     if (episodesCache[seasonNumber]) {
       setSeasonEpisodes(episodesCache[seasonNumber]);
       return;
@@ -100,7 +101,8 @@ export default function SeriesCard({
     }
   };
 
-  const hydrateSeriesContext = async (seasonNumber: number) => {
+  const hydrateSeriesContext = async (seasonNumberArg: number | string) => {
+    const seasonNumber = Number(seasonNumberArg);
     let currentId = tmdbSeriesId;
     if (!currentId) {
       const candidates = await searchSeries(series.titulo);
@@ -118,7 +120,7 @@ export default function SeriesCard({
       const details = await getTvDetails(currentId);
       if (details) {
         setSeasonMeta(details.seasons);
-        const activeSeason = details.seasons.find((item) => item.season_number === seasonNumber);
+        const activeSeason = details.seasons.find((item) => Number(item.season_number) === seasonNumber);
         if (activeSeason?.episode_count && activeSeason.episode_count > 0) {
           setLocalTotalEps(String(activeSeason.episode_count));
         }
@@ -265,7 +267,7 @@ export default function SeriesCard({
           if (nextOpen) {
             syncLocalState();
             setSaveError(null);
-            void hydrateSeriesContext(series.temporada || 1);
+            void hydrateSeriesContext(Number(series.temporada) || 1);
           }
           setOpen(nextOpen);
         }}
@@ -278,6 +280,9 @@ export default function SeriesCard({
             if (e.currentTarget && !e.currentTarget.contains(e.target as Node)) {
               return;
             }
+            syncLocalState();
+            setSaveError(null);
+            void hydrateSeriesContext(Number(series.temporada) || 1);
             setOpen(true);
           }}
         >

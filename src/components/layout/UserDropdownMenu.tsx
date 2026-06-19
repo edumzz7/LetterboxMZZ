@@ -27,6 +27,8 @@ interface UserDropdownMenuProps {
     favorite_series?: string;
     watch_preference?: 'home' | 'cinema';
   }) => Promise<unknown>;
+  onDeleteProfile: (currentPassword: string) => Promise<void>;
+  deleteProfilePending?: boolean;
   onChangePassword: (userId: string, current: string, next: string) => Promise<void>;
   onAdminReset: (targetUsername: string, newPassword: string) => Promise<void>;
   adminUsername?: string;
@@ -40,6 +42,8 @@ export default function UserDropdownMenu({
   avatarMutationPending,
   onSaveAvatar,
   onSaveProfile,
+  onDeleteProfile,
+  deleteProfilePending = false,
   onChangePassword,
   onAdminReset,
   adminUsername,
@@ -157,6 +161,8 @@ export default function UserDropdownMenu({
           onOpenChange={(open) => setActiveModal(open ? 'editProfile' : null)}
           isSaving={avatarMutationPending}
           onSave={onSaveProfile}
+          isDeleting={deleteProfilePending}
+          onDeleteProfile={onDeleteProfile}
         />
       )}
 

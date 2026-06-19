@@ -10,6 +10,7 @@ interface EditProfileModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   isSaving: boolean;
+  isDeleting?: boolean;
   onSave: (data: {
     display_name?: string;
     favorite_movie?: string;
@@ -18,6 +19,7 @@ interface EditProfileModalProps {
     favorite_series?: string;
     watch_preference?: 'home' | 'cinema';
   }) => Promise<unknown>;
+  onDeleteProfile: (currentPassword: string) => Promise<unknown>;
 }
 
 interface SearchItem {
@@ -160,7 +162,9 @@ export default function EditProfileModal({
   open,
   onOpenChange,
   isSaving,
+  isDeleting = false,
   onSave,
+  onDeleteProfile,
 }: EditProfileModalProps) {
   const [displayName, setDisplayName] = useState(user.display_name || '');
   const [favoriteMovie, setFavoriteMovie] = useState(user.favorite_movie || '');
@@ -172,6 +176,9 @@ export default function EditProfileModal({
   );
   const [error, setError] = useState<string | null>(null);
   const [internalSaving, setInternalSaving] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const handleOpenChange = (nextOpen: boolean) => {
     onOpenChange(nextOpen);
@@ -183,6 +190,9 @@ export default function EditProfileModal({
       setFavoriteGenre(user.favorite_genre || '');
       setWatchPref(user.watch_preference || '');
       setError(null);
+      setConfirmDeleteOpen(false);
+      setCurrentPassword('');
+      setDeleteError(null);
     }
   };
 
@@ -215,6 +225,21 @@ export default function EditProfileModal({
   const seriesSearchFn = async (query: string) => {
     const results = await searchSeries(query);
     return results.map(r => ({ id: r.id, title: r.name, release_date: r.first_air_date, poster_path: r.poster_path }));
+  };
+
+  const handleDeleteProfile = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setDeleteError(null);
+
+    try {
+      await onDeleteProfile(currentPassword);
+      setConfirmDeleteOpen(false);
+      setCurrentPassword('');
+    } catch (deleteProfileError) {
+      setDeleteError(
+        deleteProfileError instanceof Error ? deleteProfileError.message : 'Falha ao excluir perfil.',
+      );
+    }
   };
 
   return (
@@ -332,7 +357,18 @@ export default function EditProfileModal({
 
             {error && <p className="text-xs text-red-300 mt-1">{error}</p>}
 
-            <div className="mt-4 flex justify-end">
+            <div className="mt-4 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteError(null);
+                  setCurrentPassword('');
+                  setConfirmDeleteOpen(true);
+                }}
+                className="px-4 py-2 text-xs uppercase tracking-[0.14em] rounded border border-red-500/40 text-red-300 hover:bg-red-500/10 transition"
+              >
+                Excluir perfil
+              </button>
               <button
                 type="submit"
                 disabled={isSaving || internalSaving}
@@ -348,6 +384,58 @@ export default function EditProfileModal({
               <X size={16} />
             </button>
           </Dialog.Close>
+
+          {confirmDeleteOpen ? (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 px-4">
+              <div className="w-full max-w-md rounded-xl border border-red-500/30 bg-[#090b11] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.6)]">
+                <div className="space-y-2">
+                  <h3 className="text-lg uppercase tracking-[0.14em] text-red-300">Confirmar exclusao</h3>
+                  <p className="text-sm leading-relaxed text-brand-text-muted">
+                    Essa acao remove seu perfil do app e bloqueia este cadastro atual. Digite sua senha atual para confirmar.
+                  </p>
+                </div>
+
+                <form onSubmit={handleDeleteProfile} className="mt-5 flex flex-col gap-4">
+                  <div>
+                    <label className="block text-xs uppercase tracking-[0.14em] text-brand-text-muted mb-1">
+                      Senha atual
+                    </label>
+                    <input
+                      type="password"
+                      value={currentPassword}
+                      onChange={(event) => setCurrentPassword(event.target.value)}
+                      autoComplete="current-password"
+                      className="w-full bg-[#151515] border border-[#222] rounded-lg px-3 py-2 text-sm text-brand-text focus:border-red-400/50 focus:outline-none transition"
+                      required
+                    />
+                  </div>
+
+                  {deleteError ? <p className="text-xs text-red-300">{deleteError}</p> : null}
+
+                  <div className="flex items-center justify-end gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConfirmDeleteOpen(false);
+                        setCurrentPassword('');
+                        setDeleteError(null);
+                      }}
+                      className="px-4 py-2 text-xs uppercase tracking-[0.14em] text-brand-text-muted hover:text-brand-text transition"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isDeleting}
+                      className="px-4 py-2 text-xs uppercase tracking-[0.14em] rounded bg-red-600 text-white disabled:opacity-50"
+                    >
+                      {isDeleting ? 'Excluindo...' : 'Confirmar exclusao'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          ) : null}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

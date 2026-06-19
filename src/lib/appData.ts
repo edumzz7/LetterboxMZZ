@@ -139,8 +139,8 @@ const LOCAL_MODE_KEY = 'letterboxmzz_force_local_v1';
 const LEGACY_IMPORT_PREFIX = 'letterboxmzz_legacy_imported_v1_';
 const HAS_APPWRITE_ENV = Boolean(
   import.meta.env.VITE_APPWRITE_ENDPOINT &&
-    import.meta.env.VITE_APPWRITE_PROJECT_ID &&
-    import.meta.env.VITE_APPWRITE_DATABASE_ID,
+  import.meta.env.VITE_APPWRITE_PROJECT_ID &&
+  import.meta.env.VITE_APPWRITE_DATABASE_ID,
 );
 let runtimeLocalMode = !HAS_APPWRITE_ENV;
 
@@ -512,13 +512,48 @@ async function getUsernameById(userId: string) {
   }
 }
 
-async function addActivity(userId: string, message: string, mcoinsDelta: number) {
-  const permissions = await ownerScopedPermissions(userId);
+async function addActivity(
+  userId: string,
+  message: string,
+  mcoinsDelta: number,
+  options?: { ownerUserId?: string },
+) {
+  const permissions = await ownerScopedPermissions(options?.ownerUserId ?? userId);
   await createDocument(COLLECTION_ATIVIDADES, {
     user_id: userId,
     message,
     mcoins_delta: mcoinsDelta,
   }, permissions);
+}
+
+async function safeAddActivity(
+  userId: string,
+  message: string,
+  mcoinsDelta: number,
+  options?: { ownerUserId?: string },
+) {
+  try {
+    await addActivity(userId, message, mcoinsDelta, options);
+  } catch (error) {
+    console.warn(`Falha ao registrar atividade em '${COLLECTION_ATIVIDADES}'.`, error);
+  }
+}
+
+async function notifyExistingUsersAboutNewMember(newUserId: string, username: string) {
+  const recipients = await listDocuments<AppwriteUserDoc>(COLLECTION_APP_USERS, [
+    Query.limit(500),
+  ]);
+
+  const message = `Novo membro! @${username} entrou no Cinerats.`;
+  await Promise.all(
+    recipients
+      .filter((user) => user.$id !== newUserId)
+      .map((user) =>
+        safeAddActivity(user.$id, message, 0, {
+          ownerUserId: newUserId,
+        }),
+      ),
+  );
 }
 
 export async function ownerScopedPermissions(ownerUserId: string, readAny = true) {
@@ -657,10 +692,7 @@ async function checkAndApplySelfDeduction(userId: string, username: string) {
 
 async function checkAndApplySelfDeductionWithMeta(userId: string, username: string, metadata: AppwriteMetadataDoc) {
   const usersToDeduct = [
-    { username: 'marcelojanssen', amount: 200 },
-    { username: 'luizascopel', amount: 190 },
-    { username: 'igro', amount: 30 },
-    { username: 'edumzz', amount: 50 },
+    { username: 'edumzz', amount: 60 },
   ];
 
   const matched = usersToDeduct.find((u) => normalizeUsername(u.username) === normalizeUsername(username));
@@ -671,14 +703,14 @@ async function checkAndApplySelfDeductionWithMeta(userId: string, username: stri
   if (dbAvatarId.startsWith('{')) {
     try {
       parsed = JSON.parse(dbAvatarId);
-    } catch {}
+    } catch { }
   }
 
-  if (!parsed.deductions_applied_v1) {
+  if (!parsed.deductions_applied_v2) {
     let currentMcoins = metadata.mcoins ?? 0;
     const newMcoins = Math.max(0, currentMcoins - matched.amount);
-    parsed.deductions_applied_v1 = true;
-    
+    parsed.deductions_applied_v2 = true;
+
     const payload = {
       ...parsed,
       avatarId: parsed.avatarId || (dbAvatarId.startsWith('{') ? undefined : dbAvatarId),
@@ -761,7 +793,7 @@ async function getSessionProfile() {
   // ensureUserMetadata + checkAndApplySelfDeduction both call ensureUserMetadata.
   // Do it once and pass the result to avoid duplicate Appwrite calls.
   const metadata = await ensureUserMetadata(profile.$id);
-  
+
   try {
     await checkAndApplySelfDeductionWithMeta(profile.$id, profile.username, metadata);
   } catch (err) {
@@ -816,7 +848,7 @@ async function repairPersonalMovieDoc(doc: AppwritePersonalMovieDoc) {
     }, permissions)) as unknown as AppwritePersonalMovieDoc;
     try {
       await databases.deleteDocument(DATABASE_ID, COLLECTION_PERSONAL_MOVIES, doc.$id);
-    } catch {}
+    } catch { }
     return newDoc;
   } catch {
     return doc;
@@ -846,7 +878,7 @@ async function repairSeriesDoc(doc: AppwriteSeriesDoc) {
     }, permissions)) as unknown as AppwriteSeriesDoc;
     try {
       await databases.deleteDocument(DATABASE_ID, COLLECTION_PERSONAL_SERIES, doc.$id);
-    } catch {}
+    } catch { }
     return newDoc;
   } catch {
     return doc;
@@ -856,20 +888,20 @@ async function repairSeriesDoc(doc: AppwriteSeriesDoc) {
 async function grantMCoins(userId: string, trigger: TriggerKey) {
   const delta = TRIGGER_POINTS[trigger];
   const metadata = await ensureUserMetadata(userId);
-  
+
   const dbAvatarId = metadata.avatar_id || '';
   let parsed: any = {};
   if (dbAvatarId.startsWith('{')) {
     try {
       parsed = JSON.parse(dbAvatarId);
-    } catch {}
+    } catch { }
   }
-  
+
   const currentMonth = new Date().toISOString().slice(0, 7);
   let newMcoins = metadata.mcoins ?? 0;
-  
+
   const isResetActive = currentMonth >= '2026-07';
-  
+
   if (isResetActive && parsed.last_reset_month !== currentMonth) {
     // If we've crossed into a new month since the last recorded month AND we are past the initial grace period, reset!
     newMcoins = 0;
@@ -878,20 +910,20 @@ async function grantMCoins(userId: string, trigger: TriggerKey) {
     // If it's the first time running this, just record the current month without resetting
     parsed.last_reset_month = currentMonth;
   }
-  
+
   newMcoins = Math.max(0, newMcoins + delta);
-  
+
   const payload = {
     ...parsed,
     avatarId: parsed.avatarId || (dbAvatarId.startsWith('{') ? undefined : dbAvatarId),
   };
-  
+
   const updated = await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, {
     mcoins: newMcoins,
     avatar_id: JSON.stringify(payload)
   }) as unknown as AppwriteMetadataDoc;
   metadataCache.set(userId, updated);
-  
+
   return delta;
 }
 
@@ -1011,6 +1043,10 @@ export async function loginUser(username: string, password: string) {
         }
         return profile;
       } catch {
+        const currentProfile = await getSessionProfile();
+        if (currentProfile && normalizeUsername(currentProfile.username) === normalized) {
+          return currentProfile;
+        }
         throw new Error('Usuario ou senha invalidos.');
       }
     },
@@ -1055,9 +1091,14 @@ export async function registerUser(username: string, password: string) {
         }
 
         await ensureUserMetadata(data.$id);
-        
-        // Add activity to global timeline
-        await addActivity('global', `Novo membro! @${data.username} entrou no Cinerats.`, 0);
+
+        // Notifica usuarios existentes sem deixar a criacao de conta falhar por causa do feed.
+        await notifyExistingUsersAboutNewMember(data.$id, data.username as string);
+
+        // Mantem o feed global para telas que ainda consumam esse marcador.
+        await safeAddActivity('global', `Novo membro! @${data.username} entrou no Cinerats.`, 0, {
+          ownerUserId: data.$id,
+        });
 
         return { id: data.$id, username: data.username as string };
       } catch (error) {
@@ -1359,18 +1400,93 @@ export async function logoutUser() {
   );
 }
 
+async function deleteDocumentsByQueries(collectionId: string, queries: string[]) {
+  const docs = await listDocuments<Models.Document>(collectionId, queries);
+  await Promise.all(
+    docs.map((doc) =>
+      databases.deleteDocument(DATABASE_ID, collectionId, doc.$id).catch(() => { })
+    ),
+  );
+}
+
+export async function deleteCurrentUser(userId: string, currentPassword: string) {
+  clearAppDataCache();
+  return withFallback(
+    async () => {
+      const normalizedPassword = currentPassword.trim();
+      if (!normalizedPassword) {
+        throw new Error('Informe sua senha atual para confirmar a exclusao.');
+      }
+
+      const session = await requireSessionUser(userId);
+      const currentAccount = await getCurrentAccount();
+      if (!currentAccount) {
+        throw new Error('Nenhuma sessao ativa.');
+      }
+
+      try {
+        await ensureAppwriteSession(session.username, normalizedPassword);
+      } catch {
+        throw new Error('Senha atual incorreta.');
+      }
+
+      const mentionToken = `@${session.username}`;
+
+      await Promise.all([
+        deleteDocumentsByQueries(COLLECTION_PERSONAL_MOVIES, [Query.equal('user_id', [userId])]),
+        deleteDocumentsByQueries(COLLECTION_PERSONAL_SERIES, [Query.equal('user_id', [userId])]),
+        deleteDocumentsByQueries(COLLECTION_USER_OSCAR_MOVIES, [Query.equal('user_id', [userId])]),
+        deleteDocumentsByQueries(COLLECTION_USER_OSCAR_PREDICTIONS, [Query.equal('user_id', [userId])]),
+        deleteDocumentsByQueries(COLLECTION_USUARIOS_METADATA, [Query.equal('user_id', [userId])]),
+        deleteDocumentsByQueries(COLLECTION_ATIVIDADES, [Query.equal('user_id', [userId])]),
+        deleteDocumentsByQueries(COLLECTION_USER_FAVORITES, [Query.equal('owner_user_id', [userId])]),
+      ]);
+
+      try {
+        const allActivities = await listDocuments<AppwriteActivityDoc>(COLLECTION_ATIVIDADES);
+        const relatedActivities = allActivities.filter((item) => item.message.includes(mentionToken));
+        await Promise.all(
+          relatedActivities.map((item) =>
+            databases.deleteDocument(DATABASE_ID, COLLECTION_ATIVIDADES, item.$id).catch(() => { }),
+          ),
+        );
+      } catch (error) {
+        console.warn('Falha ao limpar atividades relacionadas ao usuario excluido.', error);
+      }
+
+      try {
+        await deleteDocument(COLLECTION_APP_USERS, userId);
+      } catch (error) {
+        console.warn('Falha ao remover o perfil principal do usuario.', error);
+      }
+
+      metadataCache.delete(userId);
+      usernameCache.delete(userId);
+
+      try {
+        await account.updateStatus();
+      } catch (error) {
+        console.warn('Falha ao bloquear a conta Auth apos a exclusao do perfil.', error);
+      }
+
+      clearAppDataCache();
+    },
+    () => localData.deleteCurrentUser(userId, currentPassword),
+  );
+}
+
 export async function updateUserAvatar(userId: string, avatarId: string) {
   return withFallback(
     async () => {
       await requireSessionUser(userId);
       const metadata = await ensureUserMetadata(userId);
-      
+
       let parsed: any = {};
       const currentDbAvatar = metadata.avatar_id;
       if (currentDbAvatar && currentDbAvatar.startsWith('{')) {
         try {
           parsed = JSON.parse(currentDbAvatar);
-        } catch {}
+        } catch { }
       }
 
       const newDbAvatarValue = JSON.stringify({
@@ -1413,7 +1529,7 @@ export async function updateUserProfile(
       if (currentDbAvatar.startsWith('{')) {
         try {
           parsed = JSON.parse(currentDbAvatar);
-        } catch {}
+        } catch { }
       }
 
       if (data.display_name !== undefined) {
@@ -1423,7 +1539,7 @@ export async function updateUserProfile(
         } catch (err) {
           console.warn('Erro ao atualizar nome na conta Appwrite:', err);
         }
-        
+
         const newDbAvatarValue = JSON.stringify({
           ...parsed,
           avatarId: parsed.avatarId || (currentDbAvatar.startsWith('{') ? undefined : currentDbAvatar),
@@ -1651,7 +1767,7 @@ async function deleteActivitiesForTitle(userId: string, title: string) {
     const targets = activities.filter((act) => act.message.includes(title));
     if (targets.length > 0) {
       await Promise.all(
-        targets.map((act) => databases.deleteDocument(DATABASE_ID, COLLECTION_ATIVIDADES, act.$id).catch(() => {}))
+        targets.map((act) => databases.deleteDocument(DATABASE_ID, COLLECTION_ATIVIDADES, act.$id).catch(() => { }))
       );
     }
   } catch (err) {
@@ -1938,12 +2054,12 @@ export async function suggestMovieToUser(
       ]);
       const label = mediaType === 'movie' ? 'filme' : 'serie';
       await Promise.all([
-        addActivity(
+        safeAddActivity(
           toUserId,
           `@${fromName} indicou ${label} ${movie.titulo} para voce.`,
           0,
         ),
-        addActivity(
+        safeAddActivity(
           fromUserId,
           `${fromName} indicou ${label} ${movie.titulo} para @${toName}. (+${delta} MC)`,
           delta,
@@ -2169,7 +2285,7 @@ export async function getTrendingMovies(): Promise<TrendingMovie[]> {
     async () => {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      
+
       const docs = await listDocuments<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
         Query.equal('status', 'watched'),
         Query.greaterThanEqual('$createdAt', thirtyDaysAgo.toISOString()),
@@ -2349,7 +2465,7 @@ export async function resetUserMcoinsForMonth(userId: string, currentMonth: stri
       if (dbAvatarId.startsWith('{')) {
         try {
           parsed = JSON.parse(dbAvatarId);
-        } catch {}
+        } catch { }
       }
       parsed.last_reset_month = currentMonth;
       const updated = await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, {
@@ -2364,7 +2480,7 @@ export async function resetUserMcoinsForMonth(userId: string, currentMonth: stri
 
 export async function checkAndRunMonthlyReset(): Promise<void> {
   const currentMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
-  
+
   // Start from July 2026
   if (currentMonth < '2026-07') return;
 

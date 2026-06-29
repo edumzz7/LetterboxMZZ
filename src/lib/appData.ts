@@ -1,5 +1,5 @@
 import type { Models } from 'appwrite';
-import { account, databases, ID, Permission, Query, Role } from './appwrite';
+import { account, databases, ID, Permission, Query, Role, OAuthProvider } from './appwrite';
 import * as localData from './localData';
 import { normalizeUsername } from './auth';
 import { DEFAULT_OSCAR_MOVIES, readLegacyMovieData, readLegacySeriesData } from './catalog';
@@ -590,8 +590,9 @@ export function clearAppDataCache() {
   metadataCache.clear();
 }
 
-async function ensureAppwriteSession(username: string, password: string) {
-  const email = createSessionEmail(username);
+async function ensureAppwriteSession(identifier: string, password: string) {
+  const isEmail = identifier.includes('@');
+  const email = isEmail ? identifier : createSessionEmail(identifier);
   await account.createEmailPasswordSession(email, createManagedPassword(password));
   cachedAccount = (await account.get()) as unknown as AppwriteAccountDoc;
   return cachedAccount;
@@ -1035,11 +1036,11 @@ export async function bootstrapApp() {
   );
 }
 
-export async function loginUser(username: string, password: string) {
+export async function loginUser(identifier: string, password: string) {
   clearAppDataCache();
   return withFallback(
     async () => {
-      const normalized = normalizeUsername(username);
+      const normalized = identifier.includes('@') ? identifier : normalizeUsername(identifier);
 
       try {
         await ensureAppwriteSession(normalized, password);
@@ -1056,11 +1057,11 @@ export async function loginUser(username: string, password: string) {
         throw new Error('Usuario ou senha invalidos.');
       }
     },
-    () => localData.loginUser(username, password),
+    () => localData.loginUser(identifier, password),
   );
 }
 
-export async function registerUser(username: string, password: string) {
+export async function registerUser(username: string, email: string, password: string) {
   return withFallback(
     async () => {
       const normalized = normalizeUsername(username);
@@ -1076,11 +1077,11 @@ export async function registerUser(username: string, password: string) {
       try {
         const createdAccount = await account.create(
           ID.unique(),
-          createSessionEmail(normalized),
+          email,
           createManagedPassword(password),
           normalized,
         );
-        await ensureAppwriteSession(normalized, password);
+        await ensureAppwriteSession(email, password);
 
         const data = (await createDocumentWithId(COLLECTION_APP_USERS, createdAccount.$id, {
           username: normalized,
@@ -1116,6 +1117,25 @@ export async function registerUser(username: string, password: string) {
     },
     () => localData.registerUser(username, password),
   );
+}
+
+export async function loginWithGoogle() {
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  account.createOAuth2Token(OAuthProvider.Google, origin, origin);
+}
+
+export async function linkGoogleAccount() {
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  account.createOAuth2Token(OAuthProvider.Google, origin, origin);
+}
+
+export async function handleOAuth2Token(userId: string, secret: string) {
+  try {
+    await account.createSession(userId, secret);
+  } catch (err) {
+    console.error('Failed to create session from OAuth2 token:', err);
+    throw err;
+  }
 }
 
 export async function changePassword(

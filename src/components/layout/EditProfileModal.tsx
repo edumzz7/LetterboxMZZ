@@ -3,6 +3,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import clsx from 'clsx';
 import { X, Loader2 } from 'lucide-react';
 import { searchMovies, searchSeries } from '../../lib/tmdb';
+import { linkGoogleAccount } from '../../lib/appData';
 import type { RankedUser } from '../../types/app';
 
 interface EditProfileModalProps {
@@ -368,6 +369,13 @@ export default function EditProfileModal({
                 className="px-4 py-2 text-xs uppercase tracking-[0.14em] rounded border border-red-500/40 text-red-300 hover:bg-red-500/10 transition"
               >
                 Excluir perfil
+              </button>
+              <button
+                type="button"
+                onClick={() => linkGoogleAccount()}
+                className="px-4 py-2 text-xs uppercase tracking-[0.14em] rounded border border-brand-gold/40 text-brand-gold hover:bg-brand-gold/10 transition"
+              >
+                Vincular conta do Google
               </button>
               <button
                 type="submit"

@@ -33,6 +33,7 @@ import {
   updateUserProfile,
   checkAndRunMonthlyReset,
   runOneTimeDeductionsForUser,
+  handleOAuth2Token,
 } from './lib/appData';
 import type { SessionUser } from './types/app';
 
@@ -85,6 +86,19 @@ function App() {
 
     async function runBootstrap() {
       try {
+        // Handle OAuth2 token redirect if present
+        const urlParams = new URLSearchParams(window.location.search);
+        const oauthUserId = urlParams.get('userId');
+        const oauthSecret = urlParams.get('secret');
+        if (oauthUserId && oauthSecret) {
+          try {
+            await handleOAuth2Token(oauthUserId, oauthSecret);
+            window.history.replaceState({}, document.title, window.location.pathname);
+          } catch (e) {
+            console.error('Failed to handle OAuth token', e);
+          }
+        }
+
         // 1. Bootstrap oscar data (fast, cached by sessionStorage)
         await bootstrapApp();
 
@@ -277,12 +291,12 @@ function App() {
     }
   };
 
-  const handleRegister = async (username: string, password: string) => {
+  const handleRegister = async (username: string, email: string, password: string) => {
     setAuthPending(true);
     setAuthError(null);
 
     try {
-      const nextSession = await registerUser(username, password);
+      const nextSession = await registerUser(username, email, password);
       await runLegacyImport(nextSession.id);
       persistSession(nextSession);
       await refetchUsers();

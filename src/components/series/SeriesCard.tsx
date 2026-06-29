@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { Eye, EyeOff, Loader2, Trash2, Tv, X, Pencil, MessageSquare, MoreVertical, BookOpen } from 'lucide-react';
+import { useLocation } from 'wouter';
 import ReviewModal from '../ui/ReviewModal';
 import SynopsisModal from '../ui/SynopsisModal';
 import clsx from 'clsx';
@@ -42,6 +43,27 @@ export default function SeriesCard({
   onDelete,
   onRate,
 }: SeriesCardProps) {
+  const [, setLocation] = useLocation();
+
+  const handleCardClick = async (event?: React.MouseEvent) => {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    let currentId = tmdbSeriesId;
+    if (!currentId) {
+      const candidates = await searchSeries(series.titulo);
+      const picked = candidates[0];
+      if (picked) {
+        currentId = picked.id;
+        setTmdbSeriesId(currentId);
+      }
+    }
+    if (currentId) {
+      setLocation(`/serie/${currentId}`);
+    }
+  };
+
   const [open, setOpen] = useState(false);
   const [localEps, setLocalEps] = useState(series.episodios_vistos.toString());
   const [localTemporada, setLocalTemporada] = useState((series.temporada || 1).toString());
@@ -287,6 +309,7 @@ export default function SeriesCard({
           }}
         >
             <div
+              onClick={handleCardClick}
               className={clsx(
                 'relative aspect-[2/3] w-full rounded-md overflow-hidden bg-brand-card border border-[#222] transition-all',
                 canEdit && 'hover:border-brand-gold-alt hover:shadow-[0_0_15px_rgba(212,175,55,0.15)] cursor-pointer',
@@ -391,7 +414,11 @@ export default function SeriesCard({
             </div>
 
             <div className="flex flex-col gap-2 px-0.5">
-              <h3 className="text-sm font-medium text-brand-text line-clamp-1" title={series.titulo}>
+              <h3 
+                onClick={handleCardClick}
+                className="text-sm font-medium text-brand-text line-clamp-1 hover:text-brand-gold cursor-pointer transition-colors" 
+                title={series.titulo}
+              >
                 {series.titulo}
               </h3>
 

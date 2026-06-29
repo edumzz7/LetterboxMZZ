@@ -1129,3 +1129,48 @@ export async function countFavoritedBy(userId: string): Promise<number> {
   const items = readFavorites();
   return items.filter((f) => f.favorite_user_id === userId).length;
 }
+
+export async function getMovieCineratsStats(sourceMovieId: string | null, title: string) {
+  const docs = readPersonalMovies().filter(
+    (m) =>
+      (sourceMovieId && m.source_movie_id === sourceMovieId) ||
+      titleKey(m.titulo) === titleKey(title)
+  );
+  const watchedDocs = docs.filter((m) => m.status === 'watched');
+  const ratings = watchedDocs.map((m) => m.rating ?? m.avaliacao).filter((r) => typeof r === 'number' && r > 0) as number[];
+  const avg = ratings.length > 0 ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length : 0;
+  const reviews = docs
+    .filter((m) => m.review && m.review.trim().length > 0)
+    .map((m) => ({
+      userId: m.user_id,
+      review: m.review!,
+      rating: m.rating ?? m.avaliacao ?? null,
+      createdAt: m.created_at,
+    }));
+  return {
+    watchersCount: watchedDocs.length,
+    averageRating: Number(avg.toFixed(1)),
+    reviews,
+  };
+}
+
+export async function getSeriesCineratsStats(title: string) {
+  const docs = readSeries().filter((s) => titleKey(s.titulo) === titleKey(title));
+  const watchedDocs = docs.filter((s) => s.status === 'watched' || s.status === 'concluido' as any);
+  const ratings = docs.map((s) => s.rating ?? s.avaliacao).filter((r) => typeof r === 'number' && r > 0) as number[];
+  const avg = ratings.length > 0 ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length : 0;
+  const reviews = docs
+    .filter((s) => s.review && s.review.trim().length > 0)
+    .map((s) => ({
+      userId: s.user_id,
+      review: s.review!,
+      rating: s.rating ?? s.avaliacao ?? null,
+      createdAt: s.created_at,
+    }));
+  return {
+    watchersCount: watchedDocs.length,
+    averageRating: Number(avg.toFixed(1)),
+    reviews,
+  };
+}
+

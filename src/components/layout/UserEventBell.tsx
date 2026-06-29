@@ -76,7 +76,24 @@ export default function UserEventBell({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const items = useMemo(() => activityQuery.data ?? [], [activityQuery.data]);
+  const items = useMemo(() => {
+    const rawItems = activityQuery.data ?? [];
+    const seenBroadcasts = new Set<string>();
+
+    return rawItems.filter((item) => {
+      if (!item.message.startsWith('Novo membro!')) {
+        return true;
+      }
+
+      const key = item.message.trim().toLowerCase();
+      if (seenBroadcasts.has(key)) {
+        return false;
+      }
+
+      seenBroadcasts.add(key);
+      return true;
+    });
+  }, [activityQuery.data]);
   const isLoading = activityQuery.isLoading;
 
   const unseenCount = useMemo(() => {

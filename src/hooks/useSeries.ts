@@ -2,14 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { addSeries, deleteSeries, getSeriesStatus, listSeries, rateSeries, updateSeries } from '../lib/appData';
 import type { SeriesEntry, SeriesStatus } from '../types/app';
 
-export function useSeries(userId: string | null) {
+export function useSeriesMutations(userId: string | null) {
   const queryClient = useQueryClient();
-
-  const seriesQuery = useQuery({
-    queryKey: ['series', userId],
-    queryFn: () => listSeries(userId as string),
-    enabled: Boolean(userId),
-  });
 
   const updateProgressMutation = useMutation({
     mutationFn: async ({
@@ -44,27 +38,37 @@ export function useSeries(userId: string | null) {
         avaliacao,
       });
     },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['series', userId] });
+    onSuccess: (data, variables) => {
+      if (data) {
+        queryClient.setQueryData(['series', userId], (old: SeriesEntry[] = []) =>
+          old.map((s) => (s.id === variables.id ? { ...s, ...data } : s))
+        );
+      } else {
+        void queryClient.invalidateQueries({ queryKey: ['series', userId] });
+      }
       void queryClient.invalidateQueries({ queryKey: ['users'] });
-      void queryClient.invalidateQueries({ queryKey: ['notifications', userId] });
     },
   });
 
   const addSeriesMutation = useMutation({
     mutationFn: (newSeries: Omit<SeriesEntry, 'id' | 'user_id' | 'created_at'>) =>
       addSeries(userId as string, newSeries),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['series', userId] });
+    onSuccess: (data) => {
+      if (data) {
+        queryClient.setQueryData(['series', userId], (old: SeriesEntry[] = []) => [data, ...old]);
+      } else {
+        void queryClient.invalidateQueries({ queryKey: ['series', userId] });
+      }
       void queryClient.invalidateQueries({ queryKey: ['users'] });
-      void queryClient.invalidateQueries({ queryKey: ['notifications', userId] });
     },
   });
 
   const deleteSeriesMutation = useMutation({
     mutationFn: deleteSeries,
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['series', userId] });
+    onSuccess: (_data, deletedId) => {
+      queryClient.setQueryData(['series', userId], (old: SeriesEntry[] = []) =>
+        old.filter((s) => s.id !== deletedId)
+      );
     },
   });
 
@@ -100,7 +104,25 @@ export function useSeries(userId: string | null) {
     },
   });
 
-  return { seriesQuery, updateProgressMutation, addSeriesMutation, deleteSeriesMutation, rateSeriesMutation };
+  return { updateProgressMutation, addSeriesMutation, deleteSeriesMutation, rateSeriesMutation };
 }
+
+export function useSeriesQuery(userId: string | null) {
+  return useQuery({
+    queryKey: ['series', userId],
+    queryFn: () => listSeries(userId as string),
+    enabled: Boolean(userId),
+    staleTime: 1000 * 30,
+  });
+}
+
+export function useSeries(userId: string | null) {
+  const seriesQuery = useSeriesQuery(userId);
+  const mutations = useSeriesMutations(userId);
+
+  return { seriesQuery, ...mutations };
+}
+
+
 
 export type Series = SeriesEntry;

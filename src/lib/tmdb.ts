@@ -292,3 +292,32 @@ export async function searchPeople(query: string): Promise<TMDBPerson[]> {
         return [];
     }
 }
+
+export async function getMovieCredits(movieId: string | number) {
+    if (!TMDB_API_KEY || !movieId) return null;
+    try {
+        const response = await fetch(
+            `${TMDB_BASE_URL}/movie/${movieId}/credits?api_key=${TMDB_API_KEY}&language=pt-BR`
+        );
+        if (!response.ok) return null;
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching movie credits:', error);
+        return null;
+    }
+}
+
+export async function getTvCredits(tvId: string | number) {
+    if (!TMDB_API_KEY || !tvId) return null;
+    try {
+        const response = await fetch(
+            `${TMDB_BASE_URL}/tv/${tvId}/credits?api_key=${TMDB_API_KEY}&language=pt-BR`
+        );
+        if (!response.ok) return null;
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching TV credits:', error);
+        return null;
+    }
+}
+

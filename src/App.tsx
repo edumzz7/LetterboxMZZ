@@ -8,6 +8,8 @@ import AuthScreen from './components/auth/AuthScreen';
 import OscarPredictionsSection from './components/movies/OscarPredictionsSection';
 import PersonalMoviesSection from './components/movies/PersonalMoviesSection';
 import SeriesSection from './components/series/SeriesSection';
+import MovieDetailScreen from './components/movies/MovieDetailScreen';
+import SeriesDetailScreen from './components/series/SeriesDetailScreen';
 import UserDropdownMenu from './components/layout/UserDropdownMenu';
 import UserEventBell from './components/layout/UserEventBell';
 import { useAvatarMutation, useUsers } from './hooks/useUsers';
@@ -54,6 +56,8 @@ function App() {
   const [session, setSession] = useState<SessionUser | null>(storedSession);
   const [location, setLocation] = useLocation();
   const [match, params] = useRoute('/:username');
+  const [matchMovie, movieParams] = useRoute('/filme/:id');
+  const [matchSerie, serieParams] = useRoute('/serie/:id');
   const [authError, setAuthError] = useState<string | null>(null);
   const [authPending, setAuthPending] = useState(false);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
@@ -181,6 +185,18 @@ function App() {
   }, [activeTab, canAccessOscars]);
 
   const headerCopy = useMemo(() => {
+    if (matchMovie) {
+      return {
+        title: 'Cinema',
+      };
+    }
+
+    if (matchSerie) {
+      return {
+        title: 'Televisão',
+      };
+    }
+
     if (urlUsername === 'ranking') {
       return {
         title: 'Ranking Geral',
@@ -405,7 +421,7 @@ function App() {
               subSlot={
                 urlUsername === 'ranking' ? (
                   <AllAchievements />
-                ) : selectedUserId ? (
+                ) : (matchMovie || matchSerie) ? null : selectedUserId ? (
                   <UserAchievements
                     movies={personalMovies}
                     series={userSeries}
@@ -415,14 +431,24 @@ function App() {
                   />
                 ) : null
               }
-              hideTabs={urlUsername === 'ranking'}
-              onBack={!isOwnDashboard && viewedUser && urlUsername !== 'ranking' ? () => setLocation(`/${session.username}`) : undefined}
+              hideTabs={urlUsername === 'ranking' || Boolean(matchMovie) || Boolean(matchSerie)}
+              onBack={
+                (matchMovie || matchSerie)
+                  ? () => setLocation('/')
+                  : !isOwnDashboard && viewedUser && urlUsername !== 'ranking'
+                  ? () => setLocation(`/${session.username}`)
+                  : undefined
+              }
             />
 
             {usersQuery.isLoading ? (
               <div className="flex justify-center items-center py-20 text-brand-gold-alt opacity-50">
                 <Loader2 className="animate-spin" size={32} />
               </div>
+            ) : matchMovie ? (
+              <MovieDetailScreen id={movieParams.id} currentUserId={session.id} />
+            ) : matchSerie ? (
+              <SeriesDetailScreen id={serieParams.id} currentUserId={session.id} />
             ) : urlUsername === 'ranking' ? (
               <RankingScreen
                 users={users}

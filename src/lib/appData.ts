@@ -472,7 +472,6 @@ async function ensureUserMetadata(userId: string) {
   }
   const existingDocs = await listDocuments<AppwriteMetadataDoc>(COLLECTION_USUARIOS_METADATA, [
     Query.equal('user_id', [userId]),
-    Query.orderDesc('$updatedAt'),
   ]);
   const permissions = await ownerScopedPermissions(userId);
   const expectedUpdatePermission = permissions.find((entry) => entry.startsWith('update('));
@@ -598,14 +597,22 @@ async function ensureAppwriteSession(username: string, password: string) {
   return cachedAccount;
 }
 
+let accountPromise: Promise<AppwriteAccountDoc | undefined> | null = null;
+
 async function getCurrentAccount() {
   if (cachedAccount) return cachedAccount;
-  try {
-    cachedAccount = (await account.get()) as unknown as AppwriteAccountDoc;
-    return cachedAccount;
-  } catch {
-    return undefined;
+  if (!accountPromise) {
+    accountPromise = account.get()
+      .then((res) => {
+        cachedAccount = res as unknown as AppwriteAccountDoc;
+        return cachedAccount;
+      })
+      .catch(() => {
+        cachedAccount = undefined;
+        return undefined;
+      });
   }
+  return accountPromise;
 }
 
 // ==========================================
@@ -957,15 +964,14 @@ async function upsertUserOscarMovie(userId: string, oscarMovieId: string, status
 }
 
 async function upsertPersonalOscarMovie(userId: string, movie: OscarMovie, status: MovieStatus) {
-  const existingBySource = await firstDocument<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
+  const userDocs = await listDocuments<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
     Query.equal('user_id', [userId]),
-    Query.equal('source_movie_id', [movie.id]),
   ]);
-  const existingByTitle = await firstDocument<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
-    Query.equal('user_id', [userId]),
-    Query.equal('titulo', [movie.titulo]),
-  ]);
-  const existing = existingBySource ?? existingByTitle;
+  const existing = userDocs.find((doc) => {
+    const titleMatch = doc.titulo?.toLowerCase().trim() === movie.titulo?.toLowerCase().trim();
+    const sourceMatch = doc.source_movie_id === movie.id;
+    return titleMatch || sourceMatch;
+  });
 
   const payload = {
     user_id: userId,
@@ -1413,21 +1419,20 @@ export async function deleteCurrentUser(userId: string, currentPassword: string)
   clearAppDataCache();
   return withFallback(
     async () => {
-      const normalizedPassword = currentPassword.trim();
-      if (!normalizedPassword) {
+      if (!currentPassword.trim()) {
         throw new Error('Informe sua senha atual para confirmar a exclusao.');
       }
 
       const session = await requireSessionUser(userId);
-      const currentAccount = await getCurrentAccount();
-      if (!currentAccount) {
-        throw new Error('Nenhuma sessao ativa.');
-      }
 
       try {
-        await ensureAppwriteSession(session.username, normalizedPassword);
-      } catch {
-        throw new Error('Senha atual incorreta.');
+        await account.updatePassword(createManagedPassword(currentPassword), createManagedPassword(currentPassword));
+      } catch (error: any) {
+        console.error('Falha ao validar senha para exclusao de perfil.', error);
+        if (error?.code === 401) {
+          throw new Error('Senha atual incorreta.');
+        }
+        throw new Error(error?.message ?? 'Falha ao validar a exclusao do perfil.');
       }
 
       const mentionToken = `@${session.username}`;
@@ -1644,8 +1649,10 @@ export async function listPersonalMovies(userId: string) {
     async () => {
       const data = await listDocuments<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
         Query.equal('user_id', [userId]),
-        Query.orderDesc('$createdAt'),
       ]);
+      // Sort by $createdAt desc in memory
+      data.sort((a, b) => new Date(b.$createdAt).getTime() - new Date(a.$createdAt).getTime());
+
       const deduped = new Map<string, AppwritePersonalMovieDoc>();
       for (const doc of data) {
         const key = movieIdentityKey(doc);
@@ -1667,22 +1674,18 @@ export async function addPersonalMovie(
   return withFallback(
     async () => {
       await requireSessionUser(userId);
-      const existingByTitle = await firstDocument<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
+      const userDocs = await listDocuments<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
         Query.equal('user_id', [userId]),
-        Query.equal('titulo', [movie.titulo]),
       ]);
-      if (existingByTitle) {
-        throw new Error('Esse filme ja esta na sua lista.');
-      }
 
-      if (movie.source_movie_id) {
-        const existingBySource = await firstDocument<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
-          Query.equal('user_id', [userId]),
-          Query.equal('source_movie_id', [movie.source_movie_id]),
-        ]);
-        if (existingBySource) {
-          throw new Error('Esse filme ja esta na sua lista.');
-        }
+      const alreadyExists = userDocs.some((doc) => {
+        const titleMatch = doc.titulo?.toLowerCase().trim() === movie.titulo?.toLowerCase().trim();
+        const sourceMatch = movie.source_movie_id && doc.source_movie_id === movie.source_movie_id;
+        return titleMatch || sourceMatch;
+      });
+
+      if (alreadyExists) {
+        throw new Error('Esse filme ja esta na sua lista.');
       }
 
       const data = await createDocument(COLLECTION_PERSONAL_MOVIES, {
@@ -1798,8 +1801,10 @@ export async function listSeries(userId: string) {
       try {
         const data = await listDocuments<AppwriteSeriesDoc>(COLLECTION_PERSONAL_SERIES, [
           Query.equal('user_id', [userId]),
-          Query.orderDesc('$createdAt'),
         ]);
+        // Sort by $createdAt desc in memory
+        data.sort((a, b) => new Date(b.$createdAt).getTime() - new Date(a.$createdAt).getTime());
+
         const deduped = new Map<string, AppwriteSeriesDoc>();
         for (const doc of data) {
           const key = seriesIdentityKey(doc);
@@ -1828,10 +1833,10 @@ export async function addSeries(
   return withFallback(
     async () => {
       await requireSessionUser(userId);
-      const existing = await firstDocument<AppwriteSeriesDoc>(COLLECTION_PERSONAL_SERIES, [
+      const userSeries = await listDocuments<AppwriteSeriesDoc>(COLLECTION_PERSONAL_SERIES, [
         Query.equal('user_id', [userId]),
-        Query.equal('titulo', [series.titulo]),
       ]);
+      const existing = userSeries.find((s) => s.titulo?.toLowerCase().trim() === series.titulo?.toLowerCase().trim());
       if (existing) {
         throw new Error('Essa serie ja esta cadastrada.');
       }
@@ -2014,10 +2019,10 @@ export async function suggestMovieToUser(
     async () => {
       await requireSessionUser(fromUserId);
       if (mediaType === 'movie') {
-        const existingByTitle = await firstDocument<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
+        const friendDocs = await listDocuments<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
           Query.equal('user_id', [toUserId]),
-          Query.equal('titulo', [movie.titulo]),
         ]);
+        const existingByTitle = friendDocs.find((doc) => doc.titulo?.toLowerCase().trim() === movie.titulo?.toLowerCase().trim());
         if (existingByTitle) {
           throw new Error('Esse filme ja esta na lista do amigo.');
         }
@@ -2519,8 +2524,70 @@ export async function checkAndRunMonthlyReset(): Promise<void> {
   await addActivity(winner.id, message, 0);
 }
 
+export async function getMovieCineratsStats(sourceMovieId: string | null, title: string) {
+  return withFallback(
+    async () => {
+      let docs: AppwritePersonalMovieDoc[] = [];
+      if (sourceMovieId) {
+        docs = await listDocuments<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
+          Query.equal('source_movie_id', [String(sourceMovieId)]),
+        ]);
+      }
 
+      if (docs.length === 0 && title) {
+        docs = await listDocuments<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
+          Query.equal('titulo', [title]),
+        ]);
+      }
 
+      const watchedDocs = docs.filter(d => d.status === 'watched');
+      const ratings = watchedDocs.map(d => d.rating ?? d.avaliacao).filter(r => typeof r === 'number' && r > 0) as number[];
+      const avgRating = ratings.length > 0 ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length : 0;
+
+      const reviews = docs.filter(d => d.review && d.review.trim().length > 0).map(d => ({
+        userId: d.user_id,
+        review: d.review!,
+        rating: d.rating ?? d.avaliacao ?? null,
+        createdAt: d.$createdAt,
+      }));
+
+      return {
+        watchersCount: watchedDocs.length,
+        averageRating: Number(avgRating.toFixed(1)),
+        reviews,
+      };
+    },
+    () => localData.getMovieCineratsStats(sourceMovieId, title),
+  );
+}
+
+export async function getSeriesCineratsStats(title: string) {
+  return withFallback(
+    async () => {
+      const docs = await listDocuments<AppwriteSeriesDoc>(COLLECTION_PERSONAL_SERIES, [
+        Query.equal('titulo', [title]),
+      ]);
+
+      const watchedDocs = docs.filter(d => d.status === 'concluido' || fromAppwriteSeriesStatus(d.status) === 'watched');
+      const ratings = docs.map(d => d.rating ?? d.avaliacao).filter(r => typeof r === 'number' && r > 0) as number[];
+      const avgRating = ratings.length > 0 ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length : 0;
+
+      const reviews = docs.filter(d => d.review && d.review.trim().length > 0).map(d => ({
+        userId: d.user_id || '',
+        review: d.review!,
+        rating: d.rating ?? d.avaliacao ?? null,
+        createdAt: d.$createdAt,
+      }));
+
+      return {
+        watchersCount: watchedDocs.length,
+        averageRating: Number(avgRating.toFixed(1)),
+        reviews,
+      };
+    },
+    () => localData.getSeriesCineratsStats(title),
+  );
+}
 
 
 

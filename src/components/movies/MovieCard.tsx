@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { Film, Eye, EyeOff, Trash2, Loader2, Pencil, MessageSquare, MoreVertical, BookOpen, Plus } from 'lucide-react';
 import clsx from 'clsx';
+import { useLocation } from 'wouter';
 import { generateImagePath } from '../../lib/imageUtils';
 import {
   findMovieIdByTitle,
@@ -12,7 +13,7 @@ import {
   updateOscarMovieStreaming,
   updatePersonalMovieStreaming,
 } from '../../lib/appData';
-import { usePersonalMovies } from '../../hooks/usePersonalMovies';
+import { usePersonalMovieMutations } from '../../hooks/usePersonalMovies';
 import StarRatingInput from '../ui/StarRatingInput';
 import ReviewModal from '../ui/ReviewModal';
 import SynopsisModal from '../ui/SynopsisModal';
@@ -78,6 +79,21 @@ export default function MovieCard({
   onRate,
   onReact,
 }: MovieCardProps) {
+  const [, setLocation] = useLocation();
+
+  const handleCardClick = async () => {
+    let id = isPersonalMovie(movie) ? parseTmdbFromSource(movie.source_movie_id) : null;
+    if (!id) {
+      id = await findMovieIdByTitle(
+        movie.titulo,
+        'ano_lancamento' in movie ? movie.ano_lancamento : movie.ano_oscar
+      );
+    }
+    if (id) {
+      setLocation(`/filme/${id}`);
+    }
+  };
+
   const imageSrc = generateImagePath(movie.titulo, movie.capa_url);
   const isWatched = movie.status === 'watched';
   const isOscarMovie = !isPersonalMovie(movie);
@@ -93,7 +109,7 @@ export default function MovieCard({
   const [providersLoading, setProvidersLoading] = useState(false);
   const [reactionPending, setReactionPending] = useState<ReactionEmoji | null>(null);
 
-  const { addMovieMutation } = usePersonalMovies(currentUserId || '');
+  const { addMovieMutation } = usePersonalMovieMutations(currentUserId || '');
   const [addedToWatchlist, setAddedToWatchlist] = useState(false);
 
   const [ratingPending, setRatingPending] = useState<number | null>(null);
@@ -106,11 +122,10 @@ export default function MovieCard({
   const showReadOnlyRating = isPersonalMovie(movie) && isWatched && (canRate || localRating > 0);
   const providersRef = useRef<HTMLDivElement | null>(null);
 
+  const currentRatingValue = isPersonalMovie(movie) ? (movie.rating ?? movie.avaliacao ?? 0) : 0;
   useEffect(() => {
-    if (isPersonalMovie(movie)) {
-      setLocalRating(movie.rating ?? movie.avaliacao ?? 0);
-    }
-  }, [movie]);
+    setLocalRating(currentRatingValue);
+  }, [currentRatingValue]);
 
   useEffect(() => {
     setProviders(parseProviders(movie.streaming_data));
@@ -234,6 +249,7 @@ export default function MovieCard({
       )}
     >
       <div
+        onClick={handleCardClick}
         className="relative aspect-[2/3] w-full rounded-md overflow-hidden bg-brand-card border border-[#222] transition-all hover:border-brand-gold-alt hover:shadow-[0_0_15px_rgba(212,175,55,0.15)] group cursor-pointer"
       >
         <img
@@ -373,7 +389,11 @@ export default function MovieCard({
       </div>
 
       <div className="flex flex-col gap-2">
-        <h3 className="text-sm font-medium text-brand-text line-clamp-1" title={movie.titulo}>
+        <h3
+          onClick={handleCardClick}
+          className="text-sm font-medium text-brand-text line-clamp-1 hover:text-brand-gold cursor-pointer transition-colors"
+          title={movie.titulo}
+        >
           {movie.titulo}
         </h3>
 

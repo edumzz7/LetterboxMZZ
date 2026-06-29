@@ -69,7 +69,7 @@ function App() {
 
   const { favorites, isUserFavorited, toggleFavorite } = useFavorites(session?.id || '');
 
-  const usersQuery = useUsers();
+  const usersQuery = useUsers(Boolean(session?.id));
   const avatarMutation = useAvatarMutation();
   const { refetch: refetchUsers } = usersQuery;
 

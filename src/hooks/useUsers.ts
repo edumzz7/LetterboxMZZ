@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { listRankedUsers, updateUserAvatar } from '../lib/appData';
 
-export function useUsers() {
+export function useUsers(isAuthenticated: boolean = true) {
   return useQuery({
     queryKey: ['users'],
     queryFn: listRankedUsers,
     staleTime: 1000 * 30, // 30 seconds – avoids redundant refetches during mount cascade
+    enabled: isAuthenticated,
   });
 }
 

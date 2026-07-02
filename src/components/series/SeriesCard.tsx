@@ -294,20 +294,7 @@ export default function SeriesCard({
           setOpen(nextOpen);
         }}
       >
-        <div
-          className="flex min-w-0 w-full flex-col gap-3 snap-center group"
-          onClick={(e) => {
-            if (!canEdit) return;
-            // Prevent opening if the click originated inside a portal (like dropdown content)
-            if (e.currentTarget && !e.currentTarget.contains(e.target as Node)) {
-              return;
-            }
-            syncLocalState();
-            setSaveError(null);
-            void hydrateSeriesContext(Number(series.temporada) || 1);
-            setOpen(true);
-          }}
-        >
+        <div className="flex min-w-0 w-full flex-col gap-3 snap-center group">
             <div
               onClick={handleCardClick}
               className={clsx(
@@ -378,6 +365,22 @@ export default function SeriesCard({
                         <BookOpen size={14} />
                         Ver Sinopse
                       </DropdownMenu.Item>
+
+                      {canEdit && (
+                        <DropdownMenu.Item
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            syncLocalState();
+                            setSaveError(null);
+                            void hydrateSeriesContext(Number(series.temporada) || 1);
+                            setOpen(true);
+                          }}
+                          className="flex items-center gap-2 px-2 py-2 text-xs text-brand-text rounded-md cursor-pointer outline-none hover:bg-brand-gold/10 hover:text-brand-gold transition-colors focus:bg-brand-gold/10 focus:text-brand-gold"
+                        >
+                          <Pencil size={14} />
+                          Editar Progresso
+                        </DropdownMenu.Item>
+                      )}
 
                       {canEdit && (
                         <DropdownMenu.Item

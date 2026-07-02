@@ -37,6 +37,10 @@ export default function ProfileAvatarModal({
       setSelected(currentAvatarId);
       setDisplayName(currentDisplayName || '');
       setError(null);
+    } else {
+      setTimeout(() => {
+        document.body.style.pointerEvents = '';
+      }, 500);
     }
   };
 

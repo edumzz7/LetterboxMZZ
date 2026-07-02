@@ -194,6 +194,10 @@ export default function EditProfileModal({
       setConfirmDeleteOpen(false);
       setCurrentPassword('');
       setDeleteError(null);
+    } else {
+      setTimeout(() => {
+        document.body.style.pointerEvents = '';
+      }, 500);
     }
   };
 

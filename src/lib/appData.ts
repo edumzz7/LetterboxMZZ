@@ -125,7 +125,7 @@ const COLLECTION_ATIVIDADES = import.meta.env.VITE_APPWRITE_COLLECTION_ATIVIDADE
 const COLLECTION_USER_FAVORITES = import.meta.env.VITE_APPWRITE_COLLECTION_USER_FAVORITES ?? 'user_favorites';
 const COLLECTION_USER_OSCAR_PREDICTIONS = import.meta.env.VITE_APPWRITE_COLLECTION_USER_OSCAR_PREDICTIONS ?? 'user_oscar_predictions';
 const MANAGED_PASSWORD_PLACEHOLDER = 'managed-by-appwrite';
-const MANAGED_PASSWORD_PREFIX = 'letterboxzzo::managed::';
+const MANAGED_PASSWORD_PREFIX = 'RESET.SENHA::';
 /** Base URL used for sharing links. Override with VITE_PUBLIC_APP_URL env var. */
 const BASE_URL = (import.meta.env.VITE_PUBLIC_APP_URL ?? 'https://cinerats.vercel.app').replace(
   /\/$/,
@@ -788,11 +788,13 @@ async function getSessionProfile() {
   // Only update prefs if they differ (saves a network call)
   if (prefs.appUserId !== profile.$id || prefs.username !== profile.username) {
     try {
-      await account.updatePrefs({
+      const newPrefs = {
         ...(currentAccount.prefs ?? {}),
         appUserId: profile.$id,
         username: profile.username,
-      });
+      };
+      await account.updatePrefs(newPrefs);
+      currentAccount.prefs = newPrefs;
     } catch {
       // Non-fatal; profile lookup can still fall back to username.
     }
@@ -2492,6 +2494,11 @@ export async function resetUserMcoinsForMonth(userId: string, currentMonth: stri
           parsed = JSON.parse(dbAvatarId);
         } catch { }
       }
+
+      if (parsed.last_reset_month === currentMonth) {
+        return; // Already reset for this month, preserve earned points
+      }
+
       parsed.last_reset_month = currentMonth;
       const updated = await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, {
         mcoins: 0,
@@ -2509,7 +2516,7 @@ export async function checkAndRunMonthlyReset(): Promise<void> {
   // Start from July 2026
   if (currentMonth < '2026-07') return;
 
-  const activities = await listActivities(50);
+  const activities = await listActivities(1000); // Aumento para captar todas as atividades e atualizar corretamente a virada de mês.
   const resetPrefix = `[Reset Mensal - ${currentMonth}]`;
   const alreadyReset = activities.some((act) => act.message.includes(resetPrefix));
   if (alreadyReset) return;

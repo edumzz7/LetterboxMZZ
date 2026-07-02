@@ -213,7 +213,7 @@ function App() {
 
     if (urlUsername === 'ranking') {
       return {
-        title: 'Ranking Geral',
+        title: 'Conquistas Disponíveis',
       };
     }
 

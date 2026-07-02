@@ -1118,6 +1118,11 @@ export async function resetUserMcoinsForMonth(userId: string, currentMonth: stri
         parsed = JSON.parse(dbAvatarId);
       } catch {}
     }
+
+    if (parsed.last_reset_month === currentMonth) {
+      return; // Already reset for this month, preserve earned points
+    }
+
     parsed.last_reset_month = currentMonth;
     users[index].mcoins = 0;
     users[index].avatar_id = JSON.stringify(parsed);

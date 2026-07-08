@@ -2,6 +2,7 @@ import type { Models } from 'appwrite';
 import { account, databases, ID, Permission, Query, Role, OAuthProvider } from './appwrite';
 import * as localData from './localData';
 import { normalizeUsername } from './auth';
+import apiClient from './apiClient';
 import { DEFAULT_OSCAR_MOVIES, readLegacyMovieData, readLegacySeriesData } from './catalog';
 import type {
   ActivityEntry,
@@ -125,7 +126,6 @@ const COLLECTION_ATIVIDADES = import.meta.env.VITE_APPWRITE_COLLECTION_ATIVIDADE
 const COLLECTION_USER_FAVORITES = import.meta.env.VITE_APPWRITE_COLLECTION_USER_FAVORITES ?? 'user_favorites';
 const COLLECTION_USER_OSCAR_PREDICTIONS = import.meta.env.VITE_APPWRITE_COLLECTION_USER_OSCAR_PREDICTIONS ?? 'user_oscar_predictions';
 const MANAGED_PASSWORD_PLACEHOLDER = 'managed-by-appwrite';
-const MANAGED_PASSWORD_PREFIX = 'RESET.SENHA::';
 /** Base URL used for sharing links. Override with VITE_PUBLIC_APP_URL env var. */
 const BASE_URL = (import.meta.env.VITE_PUBLIC_APP_URL ?? 'https://cinerats.vercel.app').replace(
   /\/$/,
@@ -282,15 +282,6 @@ async function createDocumentInternal<T extends Record<string, unknown>>(
     }
   }
   throw new Error('Nao foi possivel criar documento com os atributos atuais.');
-}
-
-async function createDocumentWithId<T extends Record<string, unknown>>(
-  collectionId: string,
-  documentId: string,
-  data: T,
-  permissions?: string[],
-) {
-  return createDocumentInternal(collectionId, documentId, data, permissions);
 }
 
 export async function updateDocument<T extends Record<string, unknown>>(collectionId: string, documentId: string, data: T) {
@@ -452,15 +443,6 @@ async function firstDocument<T extends Models.Document>(collectionId: string, qu
   return docs[0] ?? null;
 }
 
-function isConflictError(error: unknown) {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as { code?: number }).code === 409
-  );
-}
-
 function fallbackAvatar(userId: string) {
   const index = Math.abs(Array.from(userId).reduce((sum, char) => sum + char.charCodeAt(0), 0)) % AVATAR_IDS.length;
   return AVATAR_IDS[index];
@@ -570,14 +552,6 @@ export async function ownerScopedPermissions(ownerUserId: string, readAny = true
   ];
 }
 
-function createSessionEmail(username: string) {
-  return `${normalizeUsername(username)}@letterboxzzo.local`;
-}
-
-function createManagedPassword(password: string) {
-  return `${MANAGED_PASSWORD_PREFIX}${password}::v1`;
-}
-
 let cachedAccount: AppwriteAccountDoc | undefined = undefined;
 let cachedSessionUser: { id: string; username: string } | null = null;
 const usernameCache = new Map<string, string>();
@@ -588,14 +562,6 @@ export function clearAppDataCache() {
   cachedSessionUser = null;
   usernameCache.clear();
   metadataCache.clear();
-}
-
-async function ensureAppwriteSession(identifier: string, password: string) {
-  const isEmail = identifier.includes('@');
-  const email = isEmail ? identifier : createSessionEmail(identifier);
-  await account.createEmailPasswordSession(email, createManagedPassword(password));
-  cachedAccount = (await account.get()) as unknown as AppwriteAccountDoc;
-  return cachedAccount;
 }
 
 let accountPromise: Promise<AppwriteAccountDoc | undefined> | null = null;
@@ -816,7 +782,7 @@ async function getSessionProfile() {
 }
 
 async function requireSessionUser(expectedUserId: string) {
-  const session = await getSessionProfile();
+  const session = await getCurrentSessionUser();
   if (!session || session.id !== expectedUserId) {
     throw new Error('Sessao invalida para esta operacao.');
   }
@@ -1042,22 +1008,10 @@ export async function loginUser(identifier: string, password: string) {
   clearAppDataCache();
   return withFallback(
     async () => {
-      const normalized = identifier.includes('@') ? identifier : normalizeUsername(identifier);
-
-      try {
-        await ensureAppwriteSession(normalized, password);
-        const profile = await getSessionProfile();
-        if (!profile) {
-          throw new Error('Perfil do usuario nao encontrado.');
-        }
-        return profile;
-      } catch {
-        const currentProfile = await getSessionProfile();
-        if (currentProfile && normalizeUsername(currentProfile.username) === normalized) {
-          return currentProfile;
-        }
-        throw new Error('Usuario ou senha invalidos.');
-      }
+      await apiClient.post('/auth/sign-in', { login: identifier, password });
+      const { data } = await apiClient.get<{ id: string; username: string }>('/auth/me');
+      cachedSessionUser = { id: data.id, username: data.username };
+      return cachedSessionUser;
     },
     () => localData.loginUser(identifier, password),
   );
@@ -1066,56 +1020,31 @@ export async function loginUser(identifier: string, password: string) {
 export async function registerUser(username: string, email: string, password: string) {
   return withFallback(
     async () => {
-      const normalized = normalizeUsername(username);
+      await apiClient.post('/auth/sign-up', {
+        username,
+        email,
+        password,
+        confirmPassword: password,
+      });
+      const { data } = await apiClient.get<{ id: string; username: string }>('/auth/me');
+      cachedSessionUser = { id: data.id, username: data.username };
 
-      const existing = await firstDocument<AppwriteUserDoc>(COLLECTION_APP_USERS, [
-        Query.equal('username', [normalized]),
-      ]);
-
-      if (existing) {
-        throw new Error('Esse username ja esta em uso.');
-      }
-
+      // Ensure metadata exists and notify other users (Appwrite side-effects)
       try {
-        const createdAccount = await account.create(
-          ID.unique(),
-          email,
-          createManagedPassword(password),
-          normalized,
-        );
-        await ensureAppwriteSession(email, password);
-
-        const data = (await createDocumentWithId(COLLECTION_APP_USERS, createdAccount.$id, {
-          username: normalized,
-          password_hash: MANAGED_PASSWORD_PLACEHOLDER,
-        }, await ownerScopedPermissions(createdAccount.$id))) as unknown as AppwriteUserDoc;
-
-        try {
-          await account.updatePrefs({
-            appUserId: data.$id,
-            username: data.username,
-          });
-        } catch {
-          // Non-fatal
-        }
-
-        await ensureUserMetadata(data.$id);
-
-        // Notifica usuarios existentes sem deixar a criacao de conta falhar por causa do feed.
-        await notifyExistingUsersAboutNewMember(data.$id, data.username as string);
-
-        // Mantem o feed global para telas que ainda consumam esse marcador.
-        await safeAddActivity('global', `Novo membro! @${data.username} entrou no Cinerats.`, 0, {
-          ownerUserId: data.$id,
-        });
-
-        return { id: data.$id, username: data.username as string };
-      } catch (error) {
-        if (isConflictError(error)) {
-          throw new Error('Esse username ja esta em uso.');
-        }
-        throw error;
+        await ensureUserMetadata(data.id);
+      } catch {
+        // Non-fatal
       }
+      try {
+        await notifyExistingUsersAboutNewMember(data.id, data.username);
+        await safeAddActivity('global', `Novo membro! @${data.username} entrou no Cinerats.`, 0, {
+          ownerUserId: data.id,
+        });
+      } catch {
+        // Non-fatal
+      }
+
+      return cachedSessionUser;
     },
     () => localData.registerUser(username, password),
   );
@@ -1131,13 +1060,8 @@ export async function linkGoogleAccount() {
   account.createOAuth2Token(OAuthProvider.Google, origin, origin);
 }
 
-export async function handleOAuth2Token(userId: string, secret: string) {
-  try {
-    await account.createSession(userId, secret);
-  } catch (err) {
-    console.error('Failed to create session from OAuth2 token:', err);
-    throw err;
-  }
+export async function handleOAuth2Token(_userId: string, _secret: string) {
+  // OAuth2 not migrated to cinerats-api yet — no-op.
 }
 
 export async function changePassword(
@@ -1147,27 +1071,11 @@ export async function changePassword(
 ) {
   return withFallback(
     async () => {
-      // Validate current password by attempting a fresh session
-      const currentAccount = await getCurrentAccount();
-      if (!currentAccount) throw new Error('Nenhuma sessao ativa.');
-
-      // Re-authenticate with current password to confirm identity
-      const username = currentAccount.prefs?.username as string | undefined;
-      if (!username) throw new Error('Nao foi possivel identificar o usuario.');
-
-      try {
-        // Update password on Appwrite account
-        // This inherently validates the current password
-        await account.updatePassword(
-          createManagedPassword(newPassword),
-          createManagedPassword(currentPassword),
-        );
-      } catch (error: any) {
-        if (error.code === 401) {
-          throw new Error('Senha atual incorreta.');
-        }
-        throw new Error('Falha ao atualizar a senha no servidor.');
-      }
+      await apiClient.patch('/auth/change-password', {
+        currentPassword,
+        newPassword,
+        confirmNewPassword: newPassword,
+      });
     },
     () => localData.changePassword(userId, currentPassword, newPassword),
   );
@@ -1314,7 +1222,16 @@ export async function listUserActivity(userIds: string[], limit = 20) {
 
 export async function getCurrentSessionUser() {
   return withFallback(
-    async () => getSessionProfile(),
+    async () => {
+      if (cachedSessionUser) return cachedSessionUser;
+      try {
+        const { data } = await apiClient.get<{ id: string; username: string }>('/auth/me');
+        cachedSessionUser = { id: data.id, username: data.username };
+        return cachedSessionUser;
+      } catch {
+        return null;
+      }
+    },
     () => localData.getCurrentSessionUser(),
   );
 }
@@ -1419,21 +1336,12 @@ export async function logoutUser() {
   return withFallback(
     async () => {
       try {
-        await account.deleteSession('current');
+        await apiClient.post('/auth/sign-out');
       } catch {
-        // Ignore missing session and proceed with local cleanup.
+        // Ignore errors and proceed with local cleanup.
       }
     },
     () => localData.logoutUser(),
-  );
-}
-
-async function deleteDocumentsByQueries(collectionId: string, queries: string[]) {
-  const docs = await listDocuments<Models.Document>(collectionId, queries);
-  await Promise.all(
-    docs.map((doc) =>
-      databases.deleteDocument(DATABASE_ID, collectionId, doc.$id).catch(() => { })
-    ),
   );
 }
 
@@ -1445,57 +1353,10 @@ export async function deleteCurrentUser(userId: string, currentPassword: string)
         throw new Error('Informe sua senha atual para confirmar a exclusao.');
       }
 
-      const session = await requireSessionUser(userId);
-
-      try {
-        await account.updatePassword(createManagedPassword(currentPassword), createManagedPassword(currentPassword));
-      } catch (error: any) {
-        console.error('Falha ao validar senha para exclusao de perfil.', error);
-        if (error?.code === 401) {
-          throw new Error('Senha atual incorreta.');
-        }
-        throw new Error(error?.message ?? 'Falha ao validar a exclusao do perfil.');
-      }
-
-      const mentionToken = `@${session.username}`;
-
-      await Promise.all([
-        deleteDocumentsByQueries(COLLECTION_PERSONAL_MOVIES, [Query.equal('user_id', [userId])]),
-        deleteDocumentsByQueries(COLLECTION_PERSONAL_SERIES, [Query.equal('user_id', [userId])]),
-        deleteDocumentsByQueries(COLLECTION_USER_OSCAR_MOVIES, [Query.equal('user_id', [userId])]),
-        deleteDocumentsByQueries(COLLECTION_USER_OSCAR_PREDICTIONS, [Query.equal('user_id', [userId])]),
-        deleteDocumentsByQueries(COLLECTION_USUARIOS_METADATA, [Query.equal('user_id', [userId])]),
-        deleteDocumentsByQueries(COLLECTION_ATIVIDADES, [Query.equal('user_id', [userId])]),
-        deleteDocumentsByQueries(COLLECTION_USER_FAVORITES, [Query.equal('owner_user_id', [userId])]),
-      ]);
-
-      try {
-        const allActivities = await listDocuments<AppwriteActivityDoc>(COLLECTION_ATIVIDADES);
-        const relatedActivities = allActivities.filter((item) => item.message.includes(mentionToken));
-        await Promise.all(
-          relatedActivities.map((item) =>
-            databases.deleteDocument(DATABASE_ID, COLLECTION_ATIVIDADES, item.$id).catch(() => { }),
-          ),
-        );
-      } catch (error) {
-        console.warn('Falha ao limpar atividades relacionadas ao usuario excluido.', error);
-      }
-
-      try {
-        await deleteDocument(COLLECTION_APP_USERS, userId);
-      } catch (error) {
-        console.warn('Falha ao remover o perfil principal do usuario.', error);
-      }
+      await apiClient.delete('/auth/delete-account', { data: { password: currentPassword } });
 
       metadataCache.delete(userId);
       usernameCache.delete(userId);
-
-      try {
-        await account.updateStatus();
-      } catch (error) {
-        console.warn('Falha ao bloquear a conta Auth apos a exclusao do perfil.', error);
-      }
-
       clearAppDataCache();
     },
     () => localData.deleteCurrentUser(userId, currentPassword),
@@ -1560,13 +1421,6 @@ export async function updateUserProfile(
       }
 
       if (data.display_name !== undefined) {
-        // Save to Auth Account name as well
-        try {
-          await account.updateName(data.display_name);
-        } catch (err) {
-          console.warn('Erro ao atualizar nome na conta Appwrite:', err);
-        }
-
         const newDbAvatarValue = JSON.stringify({
           ...parsed,
           avatarId: parsed.avatarId || (currentDbAvatar.startsWith('{') ? undefined : currentDbAvatar),

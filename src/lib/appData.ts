@@ -1111,10 +1111,13 @@ export async function listUsers() {
 export async function listRankedUsers() {
   return withFallback(
     async () => {
-      const [users, metadata] = await Promise.all([
-        listUsers(),
+      // Fetch ranked users from backend API and Appwrite metadata in parallel
+      const [apiResponse, metadata] = await Promise.all([
+        apiClient.get<{ id: string; username: string; totalPoints: number; rank: number; createdAt: string }[]>('/users'),
         listDocuments<AppwriteMetadataDoc>(COLLECTION_USUARIOS_METADATA),
       ]);
+
+      const apiUsers = apiResponse.data;
 
       const metadataByUser = new Map<string, AppwriteMetadataDoc>();
       for (const item of metadata) {
@@ -1124,63 +1127,39 @@ export async function listRankedUsers() {
         }
       }
 
-      const currentMonth = new Date().toISOString().slice(0, 7);
-      const ranked = users
-        .map((user) => {
-          const userMeta = metadataByUser.get(user.id);
-          let dbAvatarId = userMeta?.avatar_id ?? fallbackAvatar(user.id);
-          let dbDisplayName: string | undefined = undefined;
-          let userMcoins = userMeta?.mcoins ?? 0;
-          let deductionsApplied = false;
+      const ranked = apiUsers.map((apiUser) => {
+        const userMeta = metadataByUser.get(apiUser.id);
+        let dbAvatarId = userMeta?.avatar_id ?? fallbackAvatar(apiUser.id);
+        let dbDisplayName: string | undefined = undefined;
 
-          const isResetActive = currentMonth >= '2026-07';
-
-          if (dbAvatarId.startsWith('{')) {
-            try {
-              const parsed = JSON.parse(dbAvatarId);
-              dbAvatarId = parsed.avatarId || fallbackAvatar(user.id);
-              dbDisplayName = parsed.displayName || undefined;
-              if (isResetActive && parsed.last_reset_month !== currentMonth) {
-                userMcoins = 0;
-              }
-              if (parsed.deductions_applied_v1) {
-                deductionsApplied = true;
-              }
-            } catch (e) {
-              console.warn('Failed to parse avatar_id JSON:', e);
-              if (isResetActive) userMcoins = 0;
-            }
-          } else {
-            if (isResetActive) userMcoins = 0;
+        if (dbAvatarId.startsWith('{')) {
+          try {
+            const parsed = JSON.parse(dbAvatarId);
+            dbAvatarId = parsed.avatarId || fallbackAvatar(apiUser.id);
+            dbDisplayName = parsed.displayName || undefined;
+          } catch (e) {
+            console.warn('Failed to parse avatar_id JSON:', e);
           }
+        }
 
-          if (!deductionsApplied) {
-            let deductAmount = 0;
-            const normalizedUser = normalizeUsername(user.username);
-            if (normalizedUser === 'marcelojanssen') deductAmount = 200;
-            else if (normalizedUser === 'luizascopel') deductAmount = 190;
-            else if (normalizedUser === 'igro') deductAmount = 30;
-            else if (normalizedUser === 'edumzz') deductAmount = 50;
+        return {
+          id: apiUser.id,
+          username: apiUser.username,
+          created_at: apiUser.createdAt,
+          user_id: apiUser.id,
+          mcoins: apiUser.totalPoints,
+          rank: apiUser.rank,
+          avatar_id: dbAvatarId,
+          display_name: dbDisplayName || undefined,
+          favorite_movie: userMeta?.favorite_movie ?? undefined,
+          favorite_movie_2: userMeta?.favorite_movie_2 ?? undefined,
+          favorite_genre: userMeta?.favorite_genre ?? undefined,
+          favorite_series: userMeta?.favorite_series ?? undefined,
+          watch_preference: userMeta?.watch_preference ?? undefined,
+        } as RankedUser;
+      });
 
-            userMcoins = Math.max(0, userMcoins - deductAmount);
-          }
-
-          return {
-            ...user,
-            user_id: user.id,
-            mcoins: userMcoins,
-            avatar_id: dbAvatarId,
-            display_name: dbDisplayName || undefined,
-            favorite_movie: userMeta?.favorite_movie ?? undefined,
-            favorite_movie_2: userMeta?.favorite_movie_2 ?? undefined,
-            favorite_genre: userMeta?.favorite_genre ?? undefined,
-            favorite_series: userMeta?.favorite_series ?? undefined,
-            watch_preference: userMeta?.watch_preference ?? undefined,
-          };
-        })
-        .sort((a, b) => b.mcoins - a.mcoins || a.username.localeCompare(b.username));
-
-      return ranked.map((user, index) => ({ ...user, rank: index + 1 })) as RankedUser[];
+      return ranked;
     },
     () => localData.listRankedUsers(),
   );
@@ -1453,6 +1432,22 @@ export async function updateUserProfile(
 
       const updated = await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, updates) as unknown as AppwriteMetadataDoc;
       metadataCache.set(userId, updated);
+
+      // Dual-write: sync preferences to backend API
+      const apiPrefs: Record<string, string | undefined> = {};
+      if (data.favorite_movie !== undefined) apiPrefs.favoriteMovie = data.favorite_movie;
+      if (data.favorite_movie_2 !== undefined) apiPrefs.bestMovieWatched = data.favorite_movie_2;
+      if (data.favorite_series !== undefined) apiPrefs.favoriteSeries = data.favorite_series;
+      if (data.favorite_genre !== undefined) apiPrefs.favoriteGenre = data.favorite_genre;
+      if (data.watch_preference !== undefined) apiPrefs.watchPreference = data.watch_preference;
+
+      if (Object.keys(apiPrefs).length > 0) {
+        try {
+          await apiClient.put('/users/me/preferences', apiPrefs);
+        } catch (e) {
+          console.warn('Failed to sync preferences to backend API:', e);
+        }
+      }
     },
     () => localData.updateUserProfile(userId, data),
   );

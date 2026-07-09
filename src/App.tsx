@@ -312,7 +312,7 @@ function App() {
           <h1 className="text-2xl uppercase tracking-[0.15em] text-red-200">Bootstrap falhou</h1>
           <p className="text-red-100/90 leading-relaxed">{bootstrapError}</p>
           <p className="text-sm text-red-100/70">
-            Revise as variaveis de ambiente e permissoes das colecoes no Appwrite, depois recarregue.
+            Verifique se a API está rodando e tente novamente.
           </p>
         </div>
       </div>

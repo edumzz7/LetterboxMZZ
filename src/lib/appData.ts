@@ -17,17 +17,13 @@ import type {
 } from '../types/app';
 
 const AVATAR_IDS = ['avatar_clapper', 'avatar_popcorn', 'avatar_projector', 'avatar_girl', 'avatar_robot'];
-const HAS_APPWRITE_ENV = Boolean(
-  import.meta.env.VITE_APPWRITE_ENDPOINT &&
-  import.meta.env.VITE_APPWRITE_PROJECT_ID &&
-  import.meta.env.VITE_APPWRITE_DATABASE_ID,
-);
-let runtimeLocalMode = !HAS_APPWRITE_ENV;
+
+// Backend availability tracking
+let runtimeLocalMode = false;
 
 function isBackendUnavailable(error: unknown) {
   const message = error instanceof Error ? error.message : String(error ?? '');
   return (
-    !HAS_APPWRITE_ENV ||
     message.includes('Failed to fetch') ||
     message.includes('Network request failed') ||
     message.includes('fetch') ||
@@ -52,7 +48,7 @@ async function withFallback<T>(remote: () => Promise<T>, local: () => Promise<T>
     return await remote();
   } catch (error) {
     if (isBackendUnavailable(error)) {
-      console.warn('Appwrite indisponivel. Ativando modo local.', error);
+      console.warn('API indisponível. Ativando modo local.', error);
       activateLocalMode();
       return local();
     }
@@ -181,11 +177,10 @@ export async function adminResetPassword(
 ) {
   return withFallback(
     async () => {
-      // Appwrite client SDK cannot reset another user's password —
-      // only server-side Admin API can. In Appwrite mode we throw a
-      // descriptive error so the UI can surface a helpful message.
+      // Client SDK cannot reset another user's password —
+      // only server-side Admin API can. Throw a descriptive error.
       throw new Error(
-        `Para resetar a senha de "${targetUsername}" no Appwrite, acesse o console em cloud.appwrite.io → Auth → Users → ${targetUsername} → Update password.`,
+        `Para resetar a senha de "${targetUsername}", use o painel de administração da API ou contate um administrador.`,
       );
     },
     () => localData.adminResetPassword(targetUsername, newPassword),

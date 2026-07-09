@@ -5,7 +5,7 @@ import { useLocation } from 'wouter';
 import { useSeries } from '../../hooks/useSeries';
 import { useUsers } from '../../hooks/useUsers';
 import { getTvDetailsRaw, getTvCredits, getTvWatchProviders, getTvSeasonEpisodes } from '../../lib/tmdb';
-import { getSeriesCineratsStats } from '../../lib/localData';
+import { getSeriesCineratsStats } from '../../lib/appData';
 import StarRatingInput from '../ui/StarRatingInput';
 import ReviewModal from '../ui/ReviewModal';
 import AvatarDisplay from '../layout/AvatarDisplay';
@@ -49,7 +49,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
   // 4. Fetch CineRats Stats for this series
   const cineratsQuery = useQuery({
     queryKey: ['cinerats-series-stats', id],
-    queryFn: () => getSeriesCineratsStats(seriesQuery.data?.name || ''),
+    queryFn: () => getSeriesCineratsStats(id, seriesQuery.data?.name || ''),
     enabled: !!seriesQuery.data,
   });
 

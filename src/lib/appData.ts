@@ -972,6 +972,133 @@ export async function rateSeries(
   );
 }
 
+export async function listMediaReviews(providerExternalId: string, type: 'movie' | 'series') {
+  return withFallback(
+    async () => {
+      const { data } = await apiClient.get<{
+        id: string;
+        userId: string;
+        username: string;
+        rating: number;
+        review: string | null;
+        createdAt: string;
+      }[]>('/reviews', {
+        params: { providerExternalId, type },
+      });
+      return data;
+    },
+    async () => {
+      // Local mode: return empty array since we don't have review data locally
+      return [];
+    },
+  );
+}
+
+export async function listUserReviews(userId: string) {
+  return withFallback(
+    async () => {
+      const { data } = await apiClient.get<{
+        id: string;
+        userId: string;
+        providerExternalId: string;
+        type: 'movie' | 'series';
+        rating: number;
+        review: string | null;
+        createdAt: string;
+        mediaTitle?: string;
+        mediaPosterPath?: string;
+      }[]>(`/users/${userId}/reviews`);
+      return data;
+    },
+    async () => {
+      // Local mode: return empty array
+      return [];
+    },
+  );
+}
+
+export async function deleteReview(reviewId: string) {
+  return withFallback(
+    async () => {
+      await apiClient.delete(`/reviews/${reviewId}`);
+    },
+    async () => {
+      // Local mode: no-op
+    },
+  );
+}
+
+export async function getMovieCineratsStats(sourceMovieId: string | null, title: string) {
+  return withFallback(
+    async () => {
+      if (!sourceMovieId) {
+        // Fallback to local data if no TMDB ID
+        return localData.getMovieCineratsStats(sourceMovieId, title);
+      }
+
+      // Get reviews from new API
+      const reviews = await listMediaReviews(sourceMovieId, 'movie');
+
+      // Get watch count from watch-entries
+      const watchEntriesRes = await apiClient.get<{ id: string; providerExternalId: string; type: string }[]>('/watch-entries/trending');
+      const trendingEntry = watchEntriesRes.data.find((e) => e.providerExternalId === sourceMovieId);
+      const watchersCount = trendingEntry ? 1 : reviews.length; // Approximate, API doesn't return count directly
+
+      // Calculate average rating
+      const ratings = reviews.map((r) => r.rating).filter((r) => r > 0);
+      const averageRating = ratings.length > 0
+        ? Number((ratings.reduce((sum, r) => sum + r, 0) / ratings.length).toFixed(1))
+        : 0;
+
+      return {
+        watchersCount,
+        averageRating,
+        reviews: reviews.map((r) => ({
+          userId: r.userId,
+          username: r.username,
+          review: r.review,
+          rating: r.rating,
+          createdAt: r.createdAt,
+        })),
+      };
+    },
+    () => localData.getMovieCineratsStats(sourceMovieId, title),
+  );
+}
+
+export async function getSeriesCineratsStats(sourceMovieId: string | null, title: string) {
+  return withFallback(
+    async () => {
+      if (!sourceMovieId) {
+        // Fallback to local data if no TMDB ID
+        return localData.getSeriesCineratsStats(title);
+      }
+
+      // Get reviews from new API
+      const reviews = await listMediaReviews(sourceMovieId, 'series');
+
+      // Calculate stats
+      const ratings = reviews.map((r) => r.rating).filter((r) => r > 0);
+      const averageRating = ratings.length > 0
+        ? Number((ratings.reduce((sum, r) => sum + r, 0) / ratings.length).toFixed(1))
+        : 0;
+
+      return {
+        watchersCount: reviews.length, // Approximate
+        averageRating,
+        reviews: reviews.map((r) => ({
+          userId: r.userId,
+          username: r.username,
+          review: r.review,
+          rating: r.rating,
+          createdAt: r.createdAt,
+        })),
+      };
+    },
+    () => localData.getSeriesCineratsStats(title),
+  );
+}
+
 export async function deleteSeries(seriesId: string) {
   return withFallback(
     async () => {

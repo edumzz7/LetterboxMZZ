@@ -6,7 +6,7 @@ import { usePersonalMovies } from '../../hooks/usePersonalMovies';
 import { useSocialActions } from '../../hooks/useSocialActions';
 import { useUsers } from '../../hooks/useUsers';
 import { getMovieDetails, getMovieCredits, getMovieWatchProviders } from '../../lib/tmdb';
-import { getMovieCineratsStats } from '../../lib/localData';
+import { getMovieCineratsStats } from '../../lib/appData';
 import StarRatingInput from '../ui/StarRatingInput';
 import ReviewModal from '../ui/ReviewModal';
 import AvatarDisplay from '../layout/AvatarDisplay';

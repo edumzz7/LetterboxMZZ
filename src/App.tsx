@@ -21,18 +21,14 @@ import AllAchievements from './components/ui/AllAchievements';
 import RankingScreen from './components/layout/RankingScreen';
 import clsx from 'clsx';
 import {
-  bootstrapApp,
   changePassword,
   adminResetPassword,
   deleteCurrentUser,
   getCurrentSessionUser,
-  importLegacyDataForUser,
   loginUser,
   logoutUser,
   registerUser,
   updateUserProfile,
-  checkAndRunMonthlyReset,
-  runOneTimeDeductionsForUser,
 } from './lib/appData';
 import type { SessionUser } from './types/app';
 
@@ -72,23 +68,11 @@ function App() {
   const avatarMutation = useAvatarMutation();
   const { refetch: refetchUsers } = usersQuery;
 
-  const runLegacyImport = async (userId: string) => {
-    const imported = await importLegacyDataForUser(userId);
-    if (imported) {
-      await refetchUsers();
-    }
-    return imported;
-  };
-
   useEffect(() => {
     let isMounted = true;
 
     async function runBootstrap() {
       try {
-        // 1. Bootstrap oscar data (fast, cached by sessionStorage)
-        await bootstrapApp();
-
-        // 2. Validate session in background — don't block UI if we have a stored session
         const currentSession = await getCurrentSessionUser();
         if (!isMounted) return;
 
@@ -96,29 +80,16 @@ function App() {
           setSession(currentSession);
           if (location === '/') setLocation(`/${currentSession.username}`);
           localStorage.setItem(SESSION_KEY, JSON.stringify(currentSession));
-
-          // 3. Run deductions + legacy import in parallel (non-blocking)
-          const [, imported] = await Promise.all([
-            runOneTimeDeductionsForUser(currentSession.id, currentSession.username).catch(() => {}),
-            importLegacyDataForUser(currentSession.id).catch(() => false),
-          ]);
-          if (imported && isMounted) {
-            void refetchUsers();
-          }
         } else {
           setSession(null);
           localStorage.removeItem(SESSION_KEY);
         }
-
-        // 4. Monthly reset — runs only after July 2026, so skip the heavy
-        //    listRankedUsers call when it's a no-op.
-        checkAndRunMonthlyReset().catch(() => {});
       } catch (error) {
         if (isMounted) {
           const message =
             error instanceof Error
               ? error.message
-              : 'Nao foi possivel iniciar o banco. Revise configuracao e permissoes do Appwrite.';
+              : 'Nao foi possivel iniciar a aplicacao.';
           setBootstrapError(message);
         }
       } finally {
@@ -267,7 +238,6 @@ function App() {
 
     try {
       const nextSession = await loginUser(username, password);
-      await runLegacyImport(nextSession.id);
       persistSession(nextSession);
       await refetchUsers();
     } catch (error) {
@@ -283,7 +253,6 @@ function App() {
 
     try {
       const nextSession = await registerUser(username, email, password);
-      await runLegacyImport(nextSession.id);
       persistSession(nextSession);
       await refetchUsers();
     } catch (error) {
@@ -391,7 +360,7 @@ function App() {
                     currentUserId={session.id}
                     viewedUserId={viewedUser?.id ?? session.id}
                     isOwnDashboard={isOwnDashboard}
-                    friendIds={favorites?.map((f) => f.favorite_user_id) || []}
+                    friendIds={favorites?.map((f) => f.favoriteUserId) || []}
                   />
                   <UserDropdownMenu
                     session={session}
@@ -453,7 +422,7 @@ function App() {
               <RankingScreen
                 users={users}
                 currentUserId={session.id}
-                favorites={favorites?.map(f => f.favorite_user_id) || []}
+                favorites={favorites?.map(f => f.favoriteUserId) || []}
                 onToggleFavorite={toggleFavorite}
                 onSelectUser={(id) => {
                   const u = users.find(x => x.id === id);

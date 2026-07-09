@@ -3,32 +3,23 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { Edit3, Loader2, Plus, X } from 'lucide-react';
 import clsx from 'clsx';
 import { getMovieWatchProviders, searchMovies, type TMDBMovie } from '../../lib/tmdb';
-import type { OscarMovie, PersonalMovie } from '../../types/app';
+import type { PersonalMovie } from '../../types/app';
 
-type AddMovieDialogProps =
-  | {
-      mode: 'oscar';
-      onSubmit: (movie: Omit<OscarMovie, 'id'>) => Promise<unknown>;
-      isPending: boolean;
-      layout?: 'carousel' | 'grid';
-    }
-  | {
-      mode: 'personal';
-      onSubmit: (movie: Omit<PersonalMovie, 'id' | 'user_id' | 'created_at'>) => Promise<unknown>;
-      isPending: boolean;
-      layout?: 'carousel' | 'grid';
-      defaultStatus?: 'watchlist' | 'watched';
-    };
+type AddMovieDialogProps = {
+  mode?: 'personal';
+  onSubmit: (movie: Omit<PersonalMovie, 'id' | 'user_id' | 'created_at'>) => Promise<unknown>;
+  isPending: boolean;
+  layout?: 'carousel' | 'grid';
+  defaultStatus?: 'watchlist' | 'watched';
+};
 
 export default function AddMovieDialog(props: AddMovieDialogProps) {
-  const { mode, onSubmit, isPending, layout = 'carousel' } = props;
-  const personalDefaultStatus =
-    mode === 'personal' ? props.defaultStatus ?? 'watchlist' : 'watchlist';
-  const isPersonal = mode === 'personal';
+  const { onSubmit, isPending, layout = 'carousel' } = props;
+  const personalDefaultStatus = props.defaultStatus ?? 'watchlist';
   const [open, setOpen] = useState(false);
   const [titulo, setTitulo] = useState('');
   const [ano, setAno] = useState(new Date().getFullYear().toString());
-  const [categoria, setCategoria] = useState('');
+  const [_categoria, _setCategoria] = useState('');
   const [capaUrl, setCapaUrl] = useState('');
   const [searchResults, setSearchResults] = useState<TMDBMovie[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -56,7 +47,7 @@ export default function AddMovieDialog(props: AddMovieDialogProps) {
     setOpen(false);
     setTitulo('');
     setAno(new Date().getFullYear().toString());
-    setCategoria('');
+    _setCategoria('');
     setCapaUrl('');
     setSearchResults([]);
     setShowDropdown(false);
@@ -113,31 +104,17 @@ export default function AddMovieDialog(props: AddMovieDialogProps) {
     setSubmitError(null);
 
     try {
-      if (isPersonal) {
-        await onSubmit({
-          titulo,
-          ano_lancamento: parseInt(ano, 10) || new Date().getFullYear(),
-          capa_url: capaUrl.trim() || null,
-          plataforma_slug: 'stremio',
-          status: personalDefaultStatus,
-          source: 'manual',
-          source_movie_id: selectedMovie ? String(selectedMovie.id) : null,
-          rating: null,
-          streaming_data: streamingData,
-          is_retroactive: isRetroactive,
-        });
-        resetForm();
-        return;
-      }
-
       await onSubmit({
         titulo,
-        ano_oscar: parseInt(ano, 10) || new Date().getFullYear(),
-        categoria_principal: categoria.trim() || 'Melhor Filme',
+        ano_lancamento: parseInt(ano, 10) || new Date().getFullYear(),
         capa_url: capaUrl.trim() || null,
         plataforma_slug: 'stremio',
-        rating: selectedMovie?.vote_average ?? null,
+        status: personalDefaultStatus,
+        source: 'manual',
+        source_movie_id: selectedMovie ? String(selectedMovie.id) : null,
+        rating: null,
         streaming_data: streamingData,
+        is_retroactive: isRetroactive,
       });
       resetForm();
     } catch (error) {
@@ -157,7 +134,7 @@ export default function AddMovieDialog(props: AddMovieDialogProps) {
           )}
         >
           <Plus size={20} className="group-hover:scale-110 transition-transform" />
-          <span>{isPersonal ? 'Add Filme' : 'Add Oscar'}</span>
+          <span>Add Filme</span>
         </button>
       </Dialog.Trigger>
 
@@ -166,12 +143,10 @@ export default function AddMovieDialog(props: AddMovieDialogProps) {
         <Dialog.Content className="fixed left-[50%] top-[50%] z-50 grid w-[92vw] max-w-md translate-x-[-50%] translate-y-[-50%] gap-4 border border-[#222] bg-brand-bg p-6 shadow-lg rounded-xl">
           <div className="flex flex-col space-y-1.5 text-center sm:text-left">
             <Dialog.Title className="text-lg font-light text-brand-gold tracking-wider">
-              {isPersonal ? 'NOVO FILME PESSOAL' : 'NOVO FILME DO OSCAR'}
+              NOVO FILME
             </Dialog.Title>
             <Dialog.Description className="text-sm text-brand-text-muted font-light">
-              {isPersonal
-                ? 'Adicione um filme a sua lista pessoal.'
-                : 'Adicione um novo filme ao catalogo compartilhado do Oscar.'}
+              Adicione um filme a sua lista pessoal.
             </Dialog.Description>
           </div>
 
@@ -262,23 +237,9 @@ export default function AddMovieDialog(props: AddMovieDialogProps) {
                 />
               </div>
 
-              {!isPersonal ? (
-                <div className="flex flex-col gap-2 w-2/3">
-                  <label htmlFor="categoria" className="text-xs text-brand-text uppercase tracking-widest">
-                    Categoria
-                  </label>
-                  <input
-                    id="categoria"
-                    value={categoria}
-                    onChange={(event) => setCategoria(event.target.value)}
-                    className="w-full bg-[#0a0f1e] border border-[#222] text-brand-text p-2.5 rounded focus:outline-none focus:border-brand-gold font-light"
-                    placeholder="Melhor Filme"
-                  />
-                </div>
-              ) : null}
             </div>
 
-            {isPersonal && personalDefaultStatus === 'watched' ? (
+            {personalDefaultStatus === 'watched' ? (
               <div className="flex flex-col gap-2">
                 <label className="text-xs text-brand-text uppercase tracking-widest">
                   Quando voce assistiu?

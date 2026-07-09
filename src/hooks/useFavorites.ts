@@ -9,7 +9,7 @@ export function useFavorites(currentUserId: string | undefined) {
 
   const { data: favorites = [], isLoading } = useQuery({
     queryKey: [FAVORITES_QUERY_KEY, currentUserId],
-    queryFn: () => (currentUserId ? listFavorites(currentUserId) : Promise.resolve([])),
+    queryFn: () => listFavorites(),
     enabled: !!currentUserId,
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
@@ -18,41 +18,36 @@ export function useFavorites(currentUserId: string | undefined) {
     mutationFn: async ({ favoriteUserId, isFavorite }: { favoriteUserId: string; isFavorite: boolean }) => {
       if (!currentUserId) throw new Error('Not logged in');
       if (currentUserId === favoriteUserId) return null; // Prevent self-favorite
-      
-      console.log("Saving favorite:", { owner_user_id: currentUserId, favorite_user_id: favoriteUserId });
 
       if (isFavorite) {
         // Find the document ID to remove
-        const doc = favorites.find(f => f.favorite_user_id === favoriteUserId);
+        const doc = favorites.find(f => f.favoriteUserId === favoriteUserId);
         if (doc) {
           await removeFavorite(doc.id);
           return { action: 'removed', id: doc.id, favoriteUserId };
         }
       } else {
         // Add new favorite
-        const newFav = await addFavorite(currentUserId, favoriteUserId);
+        const newFav = await addFavorite(favoriteUserId);
         return { action: 'added', newFav };
       }
       return null;
     },
     onMutate: async ({ favoriteUserId, isFavorite }) => {
       if (!currentUserId) return;
-      
+
       await queryClient.cancelQueries({ queryKey: [FAVORITES_QUERY_KEY, currentUserId] });
       const previousFavorites = queryClient.getQueryData<UserFavorite[]>([FAVORITES_QUERY_KEY, currentUserId]) || [];
-
-      console.log("Favorites fetched:", previousFavorites);
 
       // Optimistic update
       queryClient.setQueryData<UserFavorite[]>([FAVORITES_QUERY_KEY, currentUserId], (old = []) => {
         if (isFavorite) {
-          return old.filter(f => f.favorite_user_id !== favoriteUserId);
+          return old.filter(f => f.favoriteUserId !== favoriteUserId);
         } else {
           const optimisticFav: UserFavorite = {
             id: `temp-${Date.now()}`,
-            owner_user_id: currentUserId,
-            favorite_user_id: favoriteUserId,
-            created_at: new Date().toISOString(),
+            favoriteUserId: favoriteUserId,
+            createdAt: new Date().toISOString(),
           };
           return [...old, optimisticFav];
         }
@@ -74,12 +69,12 @@ export function useFavorites(currentUserId: string | undefined) {
   });
 
   const isUserFavorited = (userId: string) => {
-    return favorites.some(f => f.favorite_user_id === userId);
+    return favorites.some(f => f.favoriteUserId === userId);
   };
 
   const toggleFavorite = (favoriteUserId: string) => {
     if (currentUserId === favoriteUserId) return;
-    
+
     // Prevent duplicate inserts if not synced yet
     const isFav = isUserFavorited(favoriteUserId);
     toggleFavoriteMutation.mutate({ favoriteUserId, isFavorite: isFav });

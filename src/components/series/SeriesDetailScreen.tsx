@@ -5,7 +5,7 @@ import { useLocation } from 'wouter';
 import { useSeries } from '../../hooks/useSeries';
 import { useUsers } from '../../hooks/useUsers';
 import { getTvDetailsRaw, getTvCredits, getTvWatchProviders, getTvSeasonEpisodes } from '../../lib/tmdb';
-import { getSeriesCineratsStats } from '../../lib/appData';
+import { getSeriesCineratsStats } from '../../lib/localData';
 import StarRatingInput from '../ui/StarRatingInput';
 import ReviewModal from '../ui/ReviewModal';
 import AvatarDisplay from '../layout/AvatarDisplay';

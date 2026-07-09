@@ -29,6 +29,10 @@ export function useSeriesMutations(userId: string | null) {
           ? getSeriesStatus(episodios_vistos, total_episodios)
           : undefined);
 
+      // Resolve source_movie_id from cache to avoid extra API call
+      const cached = queryClient.getQueryData<SeriesEntry[]>(['series', userId]);
+      const cachedEntry = cached?.find((s) => s.id === id);
+
       return updateSeries(id, {
         episodios_vistos,
         temporada,
@@ -36,12 +40,20 @@ export function useSeriesMutations(userId: string | null) {
         status: nextStatus,
         plataforma_slug,
         avaliacao,
+        source_movie_id: cachedEntry?.source_movie_id,
       });
     },
     onSuccess: (data, variables) => {
       if (data) {
         queryClient.setQueryData(['series', userId], (old: SeriesEntry[] = []) =>
-          old.map((s) => (s.id === variables.id ? { ...s, ...data } : s))
+          old.map((s) => {
+            if (s.id !== variables.id) return s;
+            // Preserve fields that the API doesn't return
+            const merged = { ...s, ...data };
+            if (!merged.capa_url && s.capa_url) merged.capa_url = s.capa_url;
+            if (!merged.titulo && s.titulo) merged.titulo = s.titulo;
+            return merged;
+          })
         );
       } else {
         void queryClient.invalidateQueries({ queryKey: ['series', userId] });

@@ -10,25 +10,16 @@ import {
   type TMDBWatchProvider,
 } from '../../lib/tmdb';
 import {
-  updateOscarMovieStreaming,
   updatePersonalMovieStreaming,
 } from '../../lib/appData';
 import { usePersonalMovieMutations } from '../../hooks/usePersonalMovies';
 import StarRatingInput from '../ui/StarRatingInput';
 import ReviewModal from '../ui/ReviewModal';
 import SynopsisModal from '../ui/SynopsisModal';
-import type { MovieStatus, OscarMovieWithStatus, PersonalMovie } from '../../types/app';
+import type { MovieStatus, PersonalMovie } from '../../types/app';
 
-type CardMovie = OscarMovieWithStatus | PersonalMovie;
-type ReactionEmoji = string;
+type CardMovie = PersonalMovie;
 type ProviderItem = TMDBWatchProvider;
-
-const REACTION_OPTIONS = [
-  { value: '\u2764\uFE0F', label: 'Amei' },
-  { value: '\u{1F525}', label: 'Fogo' },
-  { value: '\u{1F602}', label: 'Riso' },
-  { value: '\u{1F44E}', label: 'Nao curti' },
-] as const;
 
 interface MovieCardProps {
   movie: CardMovie;
@@ -41,12 +32,12 @@ interface MovieCardProps {
   onDelete?: (movie: PersonalMovie) => void;
   onPlatformChange?: (movie: CardMovie, platformId: string) => void;
   onRate?: (movie: PersonalMovie, stars: number, review?: string | null) => Promise<unknown> | unknown;
-  onReact?: (movie: PersonalMovie, reaction: ReactionEmoji) => Promise<unknown> | unknown;
 }
 
-function isPersonalMovie(movie: CardMovie): movie is PersonalMovie {
-  return 'user_id' in movie;
-}
+// Removed: isPersonalMovie type guard - no longer needed
+// function isPersonalMovie(_movie: CardMovie): _movie is PersonalMovie {
+//   return true;
+// }
 
 function parseProviders(streamingData: string | null | undefined): ProviderItem[] {
   if (!streamingData) return [];
@@ -77,17 +68,13 @@ export default function MovieCard({
   onToggleStatus,
   onDelete,
   onRate,
-  onReact,
 }: MovieCardProps) {
   const [, setLocation] = useLocation();
 
   const handleCardClick = async () => {
-    let id = isPersonalMovie(movie) ? parseTmdbFromSource(movie.source_movie_id) : null;
+    let id = parseTmdbFromSource(movie.source_movie_id);
     if (!id) {
-      id = await findMovieIdByTitle(
-        movie.titulo,
-        'ano_lancamento' in movie ? movie.ano_lancamento : movie.ano_oscar
-      );
+      id = await findMovieIdByTitle(movie.titulo, movie.ano_lancamento);
     }
     if (id) {
       setLocation(`/filme/${id}`);
@@ -96,18 +83,15 @@ export default function MovieCard({
 
   const imageSrc = generateImagePath(movie.titulo, movie.capa_url);
   const isWatched = movie.status === 'watched';
-  const isOscarMovie = !isPersonalMovie(movie);
-  const isFriendCard = isPersonalMovie(movie) && Boolean(currentUserId) && movie.user_id !== currentUserId;
-  const canRate = isPersonalMovie(movie) && !isFriendCard && isWatched && Boolean(onRate);
+  const isFriendCard = Boolean(currentUserId) && movie.user_id !== currentUserId;
+  const canRate = !isFriendCard && isWatched && Boolean(onRate);
   const suggestionBadge = useMemo(() => {
-    if (!isPersonalMovie(movie)) return false;
     return (movie.source_movie_id ?? '').includes('|rec:');
   }, [movie]);
 
   const [providers, setProviders] = useState<ProviderItem[]>([]);
   const [showProviders, setShowProviders] = useState(false);
   const [providersLoading, setProvidersLoading] = useState(false);
-  const [reactionPending, setReactionPending] = useState<ReactionEmoji | null>(null);
 
   const { addMovieMutation } = usePersonalMovieMutations(currentUserId || '');
   const [addedToWatchlist, setAddedToWatchlist] = useState(false);
@@ -116,13 +100,13 @@ export default function MovieCard({
   const [synopsisModalOpen, setSynopsisModalOpen] = useState(false);
   const [resolvedTmdbId, setResolvedTmdbId] = useState<number | null>(null);
   const [ratingError, setRatingError] = useState<string | null>(null);
-  const [localRating, setLocalRating] = useState<number>(isPersonalMovie(movie) ? (movie.rating ?? movie.avaliacao ?? 0) : 0);
+  const [localRating, setLocalRating] = useState<number>(movie.rating ?? movie.avaliacao ?? 0);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [pendingRating, setPendingRating] = useState<number>(localRating);
-  const showReadOnlyRating = isPersonalMovie(movie) && isWatched && (canRate || localRating > 0);
+  const showReadOnlyRating = isWatched && (canRate || localRating > 0);
   const providersRef = useRef<HTMLDivElement | null>(null);
 
-  const currentRatingValue = isPersonalMovie(movie) ? (movie.rating ?? movie.avaliacao ?? 0) : 0;
+  const currentRatingValue = movie.rating ?? movie.avaliacao ?? 0;
   useEffect(() => {
     setLocalRating(currentRatingValue);
   }, [currentRatingValue]);
@@ -142,12 +126,9 @@ export default function MovieCard({
   }, []);
 
   const handleOpenSynopsis = async () => {
-    let id = isPersonalMovie(movie) ? parseTmdbFromSource(movie.source_movie_id) : null;
+    let id = parseTmdbFromSource(movie.source_movie_id);
     if (!id) {
-      id = await findMovieIdByTitle(
-        movie.titulo,
-        'ano_lancamento' in movie ? movie.ano_lancamento : movie.ano_oscar
-      );
+      id = await findMovieIdByTitle(movie.titulo, movie.ano_lancamento);
     }
     setResolvedTmdbId(id);
     setSynopsisModalOpen(true);
@@ -159,30 +140,15 @@ export default function MovieCard({
   };
 
   const handleDelete = () => {
-    if (!canEdit || !isPersonalMovie(movie) || !onDelete) return;
-
-    if (movie.source === 'oscar') {
-      alert('Filmes sincronizados com o Oscar sao atualizados pela aba Oscar.');
-      return;
-    }
+    if (!canEdit || !onDelete) return;
 
     if (confirm(`Deseja remover "${movie.titulo}" da lista?`)) {
       onDelete(movie);
     }
   };
 
-  const handleReaction = async (reaction: ReactionEmoji) => {
-    if (!isPersonalMovie(movie) || !onReact) return;
-    setReactionPending(reaction);
-    try {
-      await onReact(movie, reaction);
-    } finally {
-      setReactionPending(null);
-    }
-  };
-
   const handleRate = async (stars: number, review?: string | null) => {
-    if (!isPersonalMovie(movie) || !onRate) return;
+    if (!onRate) return;
     const previousRating = localRating;
     setRatingError(null);
     setLocalRating(stars);
@@ -201,11 +167,11 @@ export default function MovieCard({
     if (!currentUserId || addedToWatchlist) return;
     addMovieMutation.mutate({
       titulo: movie.titulo,
-      capa_url: isPersonalMovie(movie) ? movie.capa_url : null,
-      source_movie_id: isPersonalMovie(movie) ? movie.source_movie_id : null,
+      capa_url: movie.capa_url,
+      source_movie_id: movie.source_movie_id,
       status: 'watchlist',
-      plataforma_slug: isPersonalMovie(movie) ? movie.plataforma_slug : null,
-      ano_lancamento: 'ano_lancamento' in movie ? movie.ano_lancamento : movie.ano_oscar,
+      plataforma_slug: movie.plataforma_slug,
+      ano_lancamento: movie.ano_lancamento,
       source: 'manual',
     });
     setAddedToWatchlist(true);
@@ -215,13 +181,8 @@ export default function MovieCard({
     if (providers.length > 0 || providersLoading) return;
     setProvidersLoading(true);
     try {
-      const tmdbId = isPersonalMovie(movie) ? parseTmdbFromSource(movie.source_movie_id) : null;
-      const resolvedId =
-        tmdbId ??
-        (await findMovieIdByTitle(
-          movie.titulo,
-          'ano_lancamento' in movie ? movie.ano_lancamento : movie.ano_oscar,
-        ));
+      const tmdbId = parseTmdbFromSource(movie.source_movie_id);
+      const resolvedId = tmdbId ?? (await findMovieIdByTitle(movie.titulo, movie.ano_lancamento));
       if (!resolvedId) {
         setProviders([]);
         return;
@@ -230,11 +191,7 @@ export default function MovieCard({
       const nextProviders = await getMovieWatchProviders(resolvedId, 'BR');
       setProviders(nextProviders);
       const serialized = JSON.stringify(nextProviders);
-      if (isPersonalMovie(movie)) {
-        await updatePersonalMovieStreaming(movie.id, serialized);
-      } else {
-        await updateOscarMovieStreaming(movie.id, serialized);
-      }
+      await updatePersonalMovieStreaming(movie.id, serialized);
     } finally {
       setProvidersLoading(false);
     }
@@ -284,28 +241,6 @@ export default function MovieCard({
                 align="end"
                 className="min-w-[180px] bg-[#0a0f1e]/95 backdrop-blur-md border border-[#222] rounded-xl p-1.5 shadow-xl shadow-black/50 z-50 animate-in fade-in zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:zoom-out-95"
               >
-                {isFriendCard && (
-                  <>
-                    <div className="px-2 py-1.5 text-xs text-brand-text-muted font-medium">Reagir</div>
-                    <div className="flex items-center justify-around px-2 py-1 mb-1">
-                      {REACTION_OPTIONS.map((reaction) => (
-                        <DropdownMenu.Item
-                          key={reaction.label}
-                          onSelect={() => void handleReaction(reaction.value)}
-                          className={clsx(
-                            'w-8 h-8 rounded-full flex items-center justify-center text-sm outline-none cursor-pointer hover:bg-brand-gold/20 hover:scale-110 transition-all focus:bg-brand-gold/20 focus:scale-110',
-                            reactionPending === reaction.value && 'opacity-50'
-                          )}
-                          title={reaction.label}
-                        >
-                          {reaction.value}
-                        </DropdownMenu.Item>
-                      ))}
-                    </div>
-                    <DropdownMenu.Separator className="h-[1px] bg-[#222] my-1" />
-                  </>
-                )}
-
                 <DropdownMenu.Item
                   onSelect={(e) => {
                     e.preventDefault();
@@ -346,7 +281,7 @@ export default function MovieCard({
                   </DropdownMenu.Item>
                 )}
                 
-                {canEdit && isPersonalMovie(movie) && (
+                {canEdit && (
                   <>
                     <DropdownMenu.Separator className="h-[1px] bg-[#222] my-1" />
                     <DropdownMenu.Item
@@ -362,18 +297,6 @@ export default function MovieCard({
             </DropdownMenu.Portal>
           </DropdownMenu.Root>
         </div>
-
-        {isOscarMovie && movie.categoria_principal ? (
-          <div className="absolute top-2 left-2 bg-brand-bg/80 backdrop-blur-sm px-2 py-1 rounded text-[10px] uppercase text-brand-gold border border-brand-gold/30 line-clamp-1 max-w-[70%]">
-            {movie.categoria_principal}
-          </div>
-        ) : null}
-
-        {isPersonalMovie(movie) && movie.source === 'oscar' ? (
-          <div className="absolute right-2 bottom-2 bg-brand-bg/85 border border-brand-gold/30 px-2 py-1 rounded text-[10px] uppercase tracking-[0.18em] text-brand-gold-alt">
-            Via Oscar
-          </div>
-        ) : null}
 
         {suggestionBadge ? (
           <div className="absolute right-2 bottom-10 bg-brand-bg/85 border border-emerald-500/40 px-2 py-1 rounded text-[10px] uppercase tracking-[0.12em] text-emerald-300">
@@ -465,10 +388,10 @@ export default function MovieCard({
                   className="p-1 text-brand-text-muted hover:text-brand-gold transition-colors"
                   title="Escrever Resenha"
                 >
-                  <Pencil size={12} className={clsx(isPersonalMovie(movie) && movie.review && "text-brand-gold-alt")} />
+                  <Pencil size={12} className={clsx(movie.review && "text-brand-gold-alt")} />
                 </button>
               ) : (
-                isPersonalMovie(movie) && movie.review && (
+                movie.review && (
                   <button
                     type="button"
                     onClick={(e) => {
@@ -490,7 +413,7 @@ export default function MovieCard({
         ) : null}
       </div>
 
-      {isReviewModalOpen && isPersonalMovie(movie) && (
+      {isReviewModalOpen && (
         <ReviewModal
           isOpen={isReviewModalOpen}
           onOpenChange={setIsReviewModalOpen}

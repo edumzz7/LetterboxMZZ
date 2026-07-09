@@ -217,6 +217,27 @@ export default function SeriesCard({
 
 
   useEffect(() => {
+    if (series.total_episodios > 0 || !series.source_movie_id) return;
+    let cancelled = false;
+    const fetchTotal = async () => {
+      const id = Number(series.source_movie_id);
+      if (Number.isNaN(id)) return;
+      setTmdbSeriesId(id);
+      const details = await getTvDetails(id);
+      if (cancelled || !details) return;
+      const season = details.seasons.find(
+        (s) => Number(s.season_number) === (series.temporada || 1),
+      );
+      if (season?.episode_count && season.episode_count > 0) {
+        setLocalTotalEps(String(season.episode_count));
+      }
+      setSeasonMeta(details.seasons);
+    };
+    void fetchTotal();
+    return () => { cancelled = true; };
+  }, [series.source_movie_id, series.total_episodios, series.temporada]);
+
+  useEffect(() => {
     setLocalRating(series.rating ?? series.avaliacao ?? 0);
   }, [series.rating, series.avaliacao]);
 

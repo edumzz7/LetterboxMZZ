@@ -5,7 +5,8 @@ import { useQuery } from '@tanstack/react-query';
 import { getUnlockedAchievements, type Achievement } from '../../lib/achievements';
 import type { PersonalMovie, SeriesEntry, RankedUser } from '../../types/app';
 import { useOscarPredictions } from '../../hooks/useOscarPredictions';
-import { listFavorites, countFavoritedBy, listUserActivity } from '../../lib/appData';
+import { listFavorites, listUserActivity } from '../../lib/appData';
+import { countFavoritedBy } from '../../lib/localData';
 
 interface AchievementBadgeProps {
   achievement: Achievement;
@@ -130,7 +131,7 @@ export default function UserAchievements({
 
   const { data: userFavorites = [], isLoading: favsLoading } = useQuery({
     queryKey: ['user_favorites_list', userId],
-    queryFn: () => listFavorites(userId),
+    queryFn: listFavorites,
     enabled: !!userId,
   });
 

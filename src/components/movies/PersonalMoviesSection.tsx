@@ -20,7 +20,7 @@ export default function PersonalMoviesSection({
 }: PersonalMoviesSectionProps) {
   const { moviesQuery, addMovieMutation, updatePlatformMutation, updateStatusMutation, deleteMovieMutation } =
     usePersonalMovies(userId);
-  const { rateMutation, reactMutation } = useSocialActions();
+  const { rateMutation } = useSocialActions();
   const [filter, setFilter] = useState<'watchlist' | 'watched'>('watchlist');
   const [optimisticMovies, setOptimisticMovies] = useState<PersonalMovie[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -128,14 +128,6 @@ export default function PersonalMoviesSection({
                       movieTitle: selectedMovie.titulo,
                       stars,
                       review,
-                    });
-                  }}
-                  onReact={async (selectedMovie, reaction) => {
-                    await reactMutation.mutateAsync({
-                      actorUserId: currentUserId,
-                      targetUserId: selectedMovie.user_id,
-                      movieTitle: selectedMovie.titulo,
-                      reaction,
                     });
                   }}
                   isPending={movie.id.startsWith('optimistic-')}

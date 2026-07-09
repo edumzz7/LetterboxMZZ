@@ -512,7 +512,7 @@ export async function deleteCurrentUser(userId: string, currentPassword: string)
   );
   writeFavorites(
     readFavorites().filter(
-      (item) => item.owner_user_id !== userId && item.favorite_user_id !== userId,
+      (item) => item.favoriteUserId !== userId,
     ),
   );
   writeJson(
@@ -1082,20 +1082,19 @@ function writeFavorites(items: UserFavorite[]) {
   writeJson(KEYS.favorites, items);
 }
 
-export async function listFavorites(ownerUserId: string): Promise<UserFavorite[]> {
-  return readFavorites().filter((f) => f.owner_user_id === ownerUserId);
+export async function listFavorites(): Promise<UserFavorite[]> {
+  return readFavorites();
 }
 
-export async function addFavorite(ownerUserId: string, favoriteUserId: string): Promise<UserFavorite> {
+export async function addFavorite(favoriteUserId: string): Promise<UserFavorite> {
   const items = readFavorites();
-  const existing = items.find((f) => f.owner_user_id === ownerUserId && f.favorite_user_id === favoriteUserId);
+  const existing = items.find((f) => f.favoriteUserId === favoriteUserId);
   if (existing) return existing;
 
   const newFav: UserFavorite = {
     id: randomId(),
-    owner_user_id: ownerUserId,
-    favorite_user_id: favoriteUserId,
-    created_at: nowIso(),
+    favoriteUserId: favoriteUserId,
+    createdAt: nowIso(),
   };
   items.push(newFav);
   writeFavorites(items);
@@ -1132,7 +1131,7 @@ export async function resetUserMcoinsForMonth(userId: string, currentMonth: stri
 
 export async function countFavoritedBy(userId: string): Promise<number> {
   const items = readFavorites();
-  return items.filter((f) => f.favorite_user_id === userId).length;
+  return items.filter((f) => f.favoriteUserId === userId).length;
 }
 
 export async function getMovieCineratsStats(sourceMovieId: string | null, title: string) {

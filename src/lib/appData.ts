@@ -1,17 +1,11 @@
-import type { Models } from 'appwrite';
-import { account, databases, ID, Permission, Query, Role, OAuthProvider } from './appwrite';
 import * as localData from './localData';
-import { normalizeUsername } from './auth';
 import apiClient from './apiClient';
-import { DEFAULT_OSCAR_MOVIES, readLegacyMovieData, readLegacySeriesData } from './catalog';
+import { getTvDetails } from './tmdb';
 import type {
   ActivityEntry,
-  AppUser,
   CineMatchMode,
   CineMatchSuggestion,
   MovieStatus,
-  OscarMovie,
-  OscarMovieWithStatus,
   PersonalMovie,
   RankedUser,
   SeriesEntry,
@@ -22,199 +16,13 @@ import type {
   AnticipatedMovie,
 } from '../types/app';
 
-type AppwriteUserDoc = Models.Document & {
-  username: string;
-  password_hash?: string;
-};
-
-type AppwriteAccountDoc = Models.User<Models.Preferences> & {
-  prefs?: {
-    appUserId?: string;
-    username?: string;
-  };
-};
-
-type AppwriteOscarMovieDoc = Models.Document & {
-  titulo: string;
-  ano: number;
-  categoria: string | null;
-  capaUrl: string | null;
-  plataforma: string | null;
-  rating?: number | null;
-  streamingData?: string | null;
-};
-
-type AppwriteUserOscarMovieDoc = Models.Document & {
-  user_id: string;
-  oscar_movie_id: string;
-  status: MovieStatus;
-};
-
-type AppwritePersonalMovieDoc = Models.Document & {
-  user_id: string;
-  titulo: string;
-  ano_lancamento: number | null;
-  capa_url: string | null;
-  plataforma_slug: string | null;
-  status: MovieStatus;
-  source: 'manual' | 'oscar';
-  source_movie_id: string | null;
-  avaliacao?: number | null;
-  rating?: number | null;
-  review?: string | null;
-  streamingData?: string | null;
-};
-
-type AppwriteSeriesDoc = Models.Document & {
-  user_id?: string;
-  titulo: string;
-  capaUrl: string | null;
-  plataforma: string | null;
-  temporada?: number | null;
-  Temporada?: number | null;
-  totalEpisodios: number;
-  episodiosVistos: number;
-  status: AppwriteSeriesStatus;
-  avaliacao?: number | null;
-  rating?: number | null;
-  review?: string | null;
-  streamingData?: string | null;
-};
-
-type AppwriteMetadataDoc = Models.Document & {
-  user_id: string;
-  mcoins: number;
-  avatar_id: string;
-  display_name?: string;
-  favorite_movie?: string;
-  favorite_movie_2?: string;
-  favorite_genre?: string;
-  favorite_series?: string;
-  watch_preference?: 'home' | 'cinema';
-};
-
-type AppwriteActivityDoc = Models.Document & {
-  user_id: string;
-  message: string;
-  mcoins_delta: number;
-};
-
-type AppwriteUserOscarPredictionDoc = Models.Document & {
-  user_id: string;
-  category: string;
-  tmdb_id: string;
-  title: string;
-  poster_path: string;
-  created_at?: string;
-};
-
-const BOOTSTRAP_KEY = 'letterboxmzz_bootstrap_v1';
-const QUERY_LIMIT = 5000;
-
-export const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
-const COLLECTION_APP_USERS = import.meta.env.VITE_APPWRITE_COLLECTION_APP_USERS ?? 'app_users';
-const COLLECTION_OSCAR_MOVIES =
-  import.meta.env.VITE_APPWRITE_COLLECTION_OSCAR_MOVIES ?? 'filmes_oscar';
-const COLLECTION_USER_OSCAR_MOVIES =
-  import.meta.env.VITE_APPWRITE_COLLECTION_USER_OSCAR_MOVIES ?? 'user_oscar_movies';
-const COLLECTION_PERSONAL_MOVIES =
-  import.meta.env.VITE_APPWRITE_COLLECTION_PERSONAL_MOVIES ?? 'personal_movies';
-const COLLECTION_PERSONAL_SERIES =
-  import.meta.env.VITE_APPWRITE_COLLECTION_PERSONAL_SERIES ?? 'series_pessoais';
-export const COLLECTION_USUARIOS_METADATA = import.meta.env.VITE_APPWRITE_COLLECTION_USUARIOS_METADATA ?? 'usuarios_metadata';
-const COLLECTION_ATIVIDADES = import.meta.env.VITE_APPWRITE_COLLECTION_ATIVIDADES ?? 'atividades';
-const COLLECTION_USER_FAVORITES = import.meta.env.VITE_APPWRITE_COLLECTION_USER_FAVORITES ?? 'user_favorites';
-const COLLECTION_USER_OSCAR_PREDICTIONS = import.meta.env.VITE_APPWRITE_COLLECTION_USER_OSCAR_PREDICTIONS ?? 'user_oscar_predictions';
-const MANAGED_PASSWORD_PLACEHOLDER = 'managed-by-appwrite';
-/** Base URL used for sharing links. Override with VITE_PUBLIC_APP_URL env var. */
-const BASE_URL = (import.meta.env.VITE_PUBLIC_APP_URL ?? 'https://cinerats.vercel.app').replace(
-  /\/$/,
-  '',
-);
-/** @deprecated Use BASE_URL */
-const PUBLIC_APP_URL = BASE_URL;
-const FALLBACK_POSTER_URL = 'https://placehold.co/600x900/png';
 const AVATAR_IDS = ['avatar_clapper', 'avatar_popcorn', 'avatar_projector', 'avatar_girl', 'avatar_robot'];
-const LOCAL_MODE_KEY = 'letterboxmzz_force_local_v1';
-const LEGACY_IMPORT_PREFIX = 'letterboxmzz_legacy_imported_v1_';
 const HAS_APPWRITE_ENV = Boolean(
   import.meta.env.VITE_APPWRITE_ENDPOINT &&
   import.meta.env.VITE_APPWRITE_PROJECT_ID &&
   import.meta.env.VITE_APPWRITE_DATABASE_ID,
 );
 let runtimeLocalMode = !HAS_APPWRITE_ENV;
-
-if (typeof window !== 'undefined') {
-  sessionStorage.removeItem(LOCAL_MODE_KEY);
-}
-
-const TRIGGER_POINTS = {
-  ASSISTIU_FILME: 30,
-  INICIOU_SERIE: 20,
-  SERIE_100: 50,
-  INDICOU_FILME: 5,
-  FILME_INDICADO_ASSISTIDO: 40,
-  SERIE_INDICADA_100: 60,
-  BONUS_CURADOR: 30,
-  AVALIOU_ITEM: 5,
-  RESENHOU_ITEM: 5,
-} as const;
-
-type TriggerKey = keyof typeof TRIGGER_POINTS;
-type AppwriteSeriesStatus = 'naoIniciado' | 'emProgresso' | 'concluido' | 'abandonado';
-
-function ensureValidUrl(value: string | null | undefined): string {
-  const trimmed = value?.trim();
-  if (!trimmed) return FALLBACK_POSTER_URL;
-
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-
-  if (trimmed.startsWith('/')) {
-    if (typeof window !== 'undefined') {
-      return `${window.location.origin}${trimmed}`;
-    }
-    return `${PUBLIC_APP_URL}${trimmed}`;
-  }
-
-  return `https://${trimmed}`;
-}
-
-function titleKey(title: string) {
-  return title.trim().toLowerCase();
-}
-
-function toAppwriteSeriesStatus(
-  status: SeriesStatus | undefined,
-  episodiosVistos: number,
-  totalEpisodios: number,
-): AppwriteSeriesStatus {
-  if (status === 'watchlist' || episodiosVistos <= 0) {
-    return 'naoIniciado';
-  }
-  if (status === 'watched' || (totalEpisodios > 0 && episodiosVistos >= totalEpisodios)) {
-    return 'concluido';
-  }
-  return 'emProgresso';
-}
-
-function fromAppwriteSeriesStatus(status: AppwriteSeriesStatus | string | null | undefined): SeriesStatus {
-  if (status === 'concluido') return 'watched';
-  if (status === 'naoIniciado') return 'watchlist';
-  return 'watching';
-}
-
-function readSeriesSeason(doc: Pick<AppwriteSeriesDoc, 'temporada' | 'Temporada'>) {
-  return Math.max(1, doc.temporada ?? doc.Temporada ?? 1);
-}
-
-function wrapPermissionError(error: unknown, collectionId: string) {
-  const code = typeof error === 'object' && error !== null && 'code' in error ? (error as { code?: number }).code : undefined;
-  if (code === 401 || code === 403) {
-    return new Error(`Sem permissao de escrita em '${collectionId}'. Revise as permissoes autenticadas/documento no Appwrite.`);
-  }
-
-  return error;
-}
 
 function isBackendUnavailable(error: unknown) {
   const message = error instanceof Error ? error.message : String(error ?? '');
@@ -252,195 +60,9 @@ async function withFallback<T>(remote: () => Promise<T>, local: () => Promise<T>
   }
 }
 
-export async function createDocument<T extends Record<string, unknown>>(
-  collectionId: string,
-  data: T,
-  permissions?: string[],
-) {
-  return createDocumentInternal(collectionId, ID.unique(), data, permissions);
-}
-
-async function createDocumentInternal<T extends Record<string, unknown>>(
-  collectionId: string,
-  documentId: string,
-  data: T,
-  permissions?: string[],
-) {
-  const payload: Record<string, unknown> = { ...data };
-
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    try {
-      return await databases.createDocument(DATABASE_ID, collectionId, documentId, payload, permissions);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '';
-      const unknownAttribute = message.match(/Unknown attribute: "([^"]+)"/);
-      if (unknownAttribute) {
-        delete payload[unknownAttribute[1]];
-        continue;
-      }
-      throw wrapPermissionError(error, collectionId);
-    }
-  }
-  throw new Error('Nao foi possivel criar documento com os atributos atuais.');
-}
-
-export async function updateDocument<T extends Record<string, unknown>>(collectionId: string, documentId: string, data: T) {
-  return updateDocumentWithPermissions(collectionId, documentId, data);
-}
-
-async function updateDocumentWithPermissions<T extends Record<string, unknown>>(
-  collectionId: string,
-  documentId: string,
-  data: T,
-  permissions?: string[],
-) {
-  const payload: Record<string, unknown> = { ...data };
-
-  if (Object.keys(payload).length === 0) {
-    return;
-  }
-
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    try {
-      return await databases.updateDocument(DATABASE_ID, collectionId, documentId, payload, permissions);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '';
-      const unknownAttribute = message.match(/Unknown attribute: "([^"]+)"/);
-      if (unknownAttribute) {
-        delete payload[unknownAttribute[1]];
-        if (Object.keys(payload).length === 0) {
-          return;
-        }
-        continue;
-      }
-      throw wrapPermissionError(error, collectionId);
-    }
-  }
-  throw new Error('Nao foi possivel atualizar documento com os atributos atuais.');
-}
-
-async function deleteDocument(collectionId: string, documentId: string) {
-  try {
-    await databases.deleteDocument(DATABASE_ID, collectionId, documentId);
-  } catch (error) {
-    throw wrapPermissionError(error, collectionId);
-  }
-}
-
-function mapUser(doc: AppwriteUserDoc): AppUser {
-  return {
-    id: doc.$id,
-    username: doc.username,
-    created_at: doc.$createdAt,
-  };
-}
-
-function mapOscarMovie(doc: AppwriteOscarMovieDoc): OscarMovie {
-  return {
-    id: doc.$id,
-    titulo: doc.titulo,
-    ano_oscar: doc.ano,
-    categoria_principal: doc.categoria ?? null,
-    capa_url: doc.capaUrl ?? null,
-    plataforma_slug: doc.plataforma ?? null,
-    rating: doc.rating ?? null,
-    streaming_data: doc.streamingData ?? null,
-  };
-}
-
-function mapPersonalMovie(doc: AppwritePersonalMovieDoc): PersonalMovie {
-  const isRetroactive = doc.plataforma_slug?.endsWith('|retroactive') || doc.source_movie_id?.endsWith('|retroactive') || doc.source_movie_id === 'retroactive';
-  const cleanPlataforma = doc.plataforma_slug?.replace('|retroactive', '') ?? null;
-  return {
-    id: doc.$id,
-    user_id: doc.user_id,
-    titulo: doc.titulo,
-    ano_lancamento: doc.ano_lancamento ?? null,
-    capa_url: doc.capa_url ?? null,
-    plataforma_slug: cleanPlataforma,
-    status: doc.status,
-    source: doc.source,
-    source_movie_id: doc.source_movie_id ?? null,
-    avaliacao: doc.avaliacao ?? null,
-    rating: doc.rating ?? null,
-    review: doc.review ?? null,
-    streaming_data: doc.streamingData ?? null,
-    created_at: doc.$createdAt,
-    is_retroactive: isRetroactive,
-  };
-}
-
-function mapSeries(doc: AppwriteSeriesDoc): SeriesEntry {
-  const totalEpisodios = doc.totalEpisodios ?? 0;
-  const episodiosVistos = doc.episodiosVistos ?? 0;
-  const derivedStatus = getSeriesStatus(episodiosVistos, totalEpisodios);
-  const storedStatus = fromAppwriteSeriesStatus(doc.status);
-  const isRetroactive = doc.plataforma?.endsWith('|retroactive') ?? false;
-  const cleanPlataforma = doc.plataforma?.replace('|retroactive', '') ?? null;
-  return {
-    id: doc.$id,
-    user_id: doc.user_id ?? '',
-    titulo: doc.titulo,
-    capa_url: doc.capaUrl ?? null,
-    status: episodiosVistos <= 0 ? 'watchlist' : storedStatus === 'watched' ? 'watched' : derivedStatus,
-    temporada: readSeriesSeason(doc),
-    total_episodios: totalEpisodios,
-    episodios_vistos: episodiosVistos,
-    plataforma_slug: cleanPlataforma,
-    avaliacao: doc.avaliacao ?? null,
-    rating: doc.rating ?? null,
-    review: doc.review ?? null,
-    streaming_data: doc.streamingData ?? null,
-    created_at: doc.$createdAt,
-    is_retroactive: isRetroactive,
-  };
-}
-
 export function isIncomingNotificationMessage(message: string) {
   const normalized = message.toLowerCase();
   return normalized.includes('para voce') || normalized.includes('ao seu filme') || normalized.includes('novo membro');
-}
-
-function parseRecommendedSource(sourceMovieId: string | null | undefined) {
-  if (!sourceMovieId) return null;
-  const match = sourceMovieId.match(/^tmdb:(\d+)\|rec:([A-Za-z0-9_-]+)$/);
-  if (!match) return null;
-  return { tmdbId: match[1], recommenderId: match[2] };
-}
-
-function mapActivity(doc: AppwriteActivityDoc): ActivityEntry {
-  return {
-    id: doc.$id,
-    user_id: doc.user_id,
-    message: doc.message,
-    mcoins_delta: doc.mcoins_delta,
-    created_at: doc.$createdAt,
-  };
-}
-
-function mapOscarPrediction(doc: AppwriteUserOscarPredictionDoc): UserOscarPrediction {
-  return {
-    id: doc.$id,
-    user_id: doc.user_id,
-    category: doc.category,
-    tmdb_id: doc.tmdb_id,
-    title: doc.title,
-    poster_path: doc.poster_path,
-    created_at: doc.created_at || doc.$createdAt,
-  };
-}
-
-export async function listDocuments<T extends Models.Document>(collectionId: string, queries: string[] = []) {
-  const result = await databases.listDocuments(DATABASE_ID, collectionId, [
-    Query.limit(QUERY_LIMIT),
-    ...queries,
-  ]);
-  return result.documents as unknown as T[];
-}
-
-async function firstDocument<T extends Models.Document>(collectionId: string, queries: string[]) {
-  const docs = await listDocuments<T>(collectionId, [Query.limit(1), ...queries]);
-  return docs[0] ?? null;
 }
 
 function fallbackAvatar(userId: string) {
@@ -448,561 +70,63 @@ function fallbackAvatar(userId: string) {
   return AVATAR_IDS[index];
 }
 
-async function ensureUserMetadata(userId: string) {
-  if (metadataCache.has(userId)) {
-    return metadataCache.get(userId)!;
-  }
-  const existingDocs = await listDocuments<AppwriteMetadataDoc>(COLLECTION_USUARIOS_METADATA, [
-    Query.equal('user_id', [userId]),
-  ]);
-  const permissions = await ownerScopedPermissions(userId);
-  const expectedUpdatePermission = permissions.find((entry) => entry.startsWith('update('));
-  const writable = existingDocs.find((doc) =>
-    expectedUpdatePermission ? ((doc as Models.Document).$permissions ?? []).includes(expectedUpdatePermission) : false,
-  );
-
-  let doc: AppwriteMetadataDoc;
-  if (writable) {
-    doc = writable;
-  } else if (existingDocs[0]) {
-    doc = (await createDocument(COLLECTION_USUARIOS_METADATA, {
-      user_id: userId,
-      mcoins: existingDocs[0].mcoins ?? 0,
-      avatar_id: existingDocs[0].avatar_id ?? fallbackAvatar(userId),
-    }, permissions)) as unknown as AppwriteMetadataDoc;
-  } else {
-    doc = (await createDocument(COLLECTION_USUARIOS_METADATA, {
-      user_id: userId,
-      mcoins: 0,
-      avatar_id: fallbackAvatar(userId),
-    }, permissions)) as unknown as AppwriteMetadataDoc;
-  }
-
-  metadataCache.set(userId, doc);
-  return doc;
-}
-
-async function getUsernameById(userId: string) {
-  if (usernameCache.has(userId)) return usernameCache.get(userId)!;
-  try {
-    const doc = (await databases.getDocument(DATABASE_ID, COLLECTION_APP_USERS, userId)) as unknown as AppwriteUserDoc;
-    usernameCache.set(userId, doc.username);
-    return doc.username;
-  } catch {
-    return 'Usuario';
-  }
-}
-
-async function addActivity(
-  userId: string,
-  message: string,
-  mcoinsDelta: number,
-  options?: { ownerUserId?: string },
-) {
-  const permissions = await ownerScopedPermissions(options?.ownerUserId ?? userId);
-  await createDocument(COLLECTION_ATIVIDADES, {
-    user_id: userId,
-    message,
-    mcoins_delta: mcoinsDelta,
-  }, permissions);
-}
-
-async function safeAddActivity(
-  userId: string,
-  message: string,
-  mcoinsDelta: number,
-  options?: { ownerUserId?: string },
-) {
-  try {
-    await addActivity(userId, message, mcoinsDelta, options);
-  } catch (error) {
-    console.warn(`Falha ao registrar atividade em '${COLLECTION_ATIVIDADES}'.`, error);
-  }
-}
-
-async function notifyExistingUsersAboutNewMember(newUserId: string, username: string) {
-  const recipients = await listDocuments<AppwriteUserDoc>(COLLECTION_APP_USERS, [
-    Query.limit(500),
-  ]);
-
-  const message = `Novo membro! @${username} entrou no Cinerats.`;
-  await Promise.all(
-    recipients
-      .filter((user) => user.$id !== newUserId)
-      .map((user) =>
-        safeAddActivity(user.$id, message, 0, {
-          ownerUserId: newUserId,
-        }),
-      ),
-  );
-}
-
-export async function ownerScopedPermissions(ownerUserId: string, readAny = true) {
-  const currentAccount = await getCurrentAccount();
-  const currentAppUserId =
-    currentAccount && typeof currentAccount.prefs?.appUserId === 'string'
-      ? currentAccount.prefs.appUserId
-      : null;
-  const ownerPrincipalId = currentAppUserId === ownerUserId && currentAccount ? currentAccount.$id : ownerUserId;
-  const readRole = readAny ? Role.users() : Role.user(ownerPrincipalId);
-  return [
-    Permission.read(readRole),
-    Permission.update(Role.user(ownerPrincipalId)),
-    Permission.delete(Role.user(ownerPrincipalId)),
-  ];
-}
-
-let cachedAccount: AppwriteAccountDoc | undefined = undefined;
 let cachedSessionUser: { id: string; username: string } | null = null;
-const usernameCache = new Map<string, string>();
-const metadataCache = new Map<string, AppwriteMetadataDoc>();
 
-export function clearAppDataCache() {
-  cachedAccount = undefined;
+function clearAppDataCache() {
   cachedSessionUser = null;
-  usernameCache.clear();
-  metadataCache.clear();
-}
-
-let accountPromise: Promise<AppwriteAccountDoc | undefined> | null = null;
-
-async function getCurrentAccount() {
-  if (cachedAccount) return cachedAccount;
-  if (!accountPromise) {
-    accountPromise = account.get()
-      .then((res) => {
-        cachedAccount = res as unknown as AppwriteAccountDoc;
-        return cachedAccount;
-      })
-      .catch(() => {
-        cachedAccount = undefined;
-        return undefined;
-      });
-  }
-  return accountPromise;
 }
 
 // ==========================================
 // User Favorites (Meus Amigos)
 // ==========================================
 
-export async function listFavorites(ownerUserId: string): Promise<UserFavorite[]> {
+export async function listFavorites(): Promise<UserFavorite[]> {
   return withFallback(
     async () => {
-      const response = await databases.listDocuments(DATABASE_ID, COLLECTION_USER_FAVORITES, [
-        Query.equal('owner_user_id', ownerUserId),
-        Query.limit(100),
-      ]);
-      return response.documents.map((doc) => ({
-        id: doc.$id,
-        owner_user_id: doc.owner_user_id,
-        favorite_user_id: doc.favorite_user_id,
-        created_at: doc.$createdAt,
-      }));
+      const response = await apiClient.get<UserFavorite[]>('/users/me/favorites');
+      return response.data;
     },
-    () => localData.listFavorites(ownerUserId),
+    () => localData.listFavorites(),
   );
 }
 
-export async function addFavorite(ownerUserId: string, favoriteUserId: string): Promise<UserFavorite> {
+export async function addFavorite(favoriteUserId: string): Promise<UserFavorite> {
   return withFallback(
     async () => {
-      // Evitar duplicações
-      try {
-        const existing = await databases.listDocuments(DATABASE_ID, COLLECTION_USER_FAVORITES, [
-          Query.equal('owner_user_id', ownerUserId),
-          Query.equal('favorite_user_id', favoriteUserId),
-          Query.limit(1),
-        ]);
-        if (existing.documents.length > 0) {
-          const doc = existing.documents[0];
-          return {
-            id: doc.$id,
-            owner_user_id: doc.owner_user_id as string,
-            favorite_user_id: doc.favorite_user_id as string,
-            created_at: doc.$createdAt,
-          };
-        }
-      } catch (err) {
-        console.warn('Erro ao verificar favoritos existentes:', err);
-      }
-
-      const permissions = await ownerScopedPermissions(ownerUserId, false);
-      const response = await databases.createDocument(
-        DATABASE_ID,
-        COLLECTION_USER_FAVORITES,
-        ID.unique(),
-        {
-          owner_user_id: ownerUserId,
-          favorite_user_id: favoriteUserId,
-        },
-        permissions
-      );
-
-      return {
-        id: response.$id,
-        owner_user_id: response.owner_user_id,
-        favorite_user_id: response.favorite_user_id,
-        created_at: response.$createdAt,
-      };
+      const response = await apiClient.post<UserFavorite>('/users/me/favorites', { favoriteUserId });
+      return response.data;
     },
-    () => localData.addFavorite(ownerUserId, favoriteUserId),
+    () => localData.addFavorite(favoriteUserId),
   );
 }
 
-export async function removeFavorite(documentId: string): Promise<void> {
+export async function removeFavorite(favoriteId: string): Promise<void> {
   return withFallback(
     async () => {
-      await databases.deleteDocument(DATABASE_ID, COLLECTION_USER_FAVORITES, documentId);
+      await apiClient.delete(`/users/me/favorites/${favoriteId}`);
     },
-    () => localData.removeFavorite(documentId),
+    () => localData.removeFavorite(favoriteId),
   );
 }
 
-async function checkAndApplySelfDeduction(userId: string, username: string) {
-  const metadata = await ensureUserMetadata(userId);
-  return checkAndApplySelfDeductionWithMeta(userId, username, metadata);
-}
-
-async function checkAndApplySelfDeductionWithMeta(userId: string, username: string, metadata: AppwriteMetadataDoc) {
-  const usersToDeduct = [
-    { username: 'edumzz', amount: 60 },
-  ];
-
-  const matched = usersToDeduct.find((u) => normalizeUsername(u.username) === normalizeUsername(username));
-  if (!matched) return;
-
-  const dbAvatarId = metadata.avatar_id || '';
-  let parsed: any = {};
-  if (dbAvatarId.startsWith('{')) {
-    try {
-      parsed = JSON.parse(dbAvatarId);
-    } catch { }
-  }
-
-  if (!parsed.deductions_applied_v2) {
-    let currentMcoins = metadata.mcoins ?? 0;
-    const newMcoins = Math.max(0, currentMcoins - matched.amount);
-    parsed.deductions_applied_v2 = true;
-
-    const payload = {
-      ...parsed,
-      avatarId: parsed.avatarId || (dbAvatarId.startsWith('{') ? undefined : dbAvatarId),
-    };
-
-    const updated = await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, {
-      mcoins: newMcoins,
-      avatar_id: JSON.stringify(payload)
-    }) as unknown as AppwriteMetadataDoc;
-    metadataCache.set(userId, updated);
-
-    await addActivity(userId, `pontos reajustados para correcao (-${matched.amount} MC)`, -matched.amount);
-  }
-}
-
-async function getSessionProfile() {
-  if (cachedSessionUser) return cachedSessionUser;
-  const currentAccount = await getCurrentAccount();
-  if (!currentAccount) return null;
-
-  const prefs = currentAccount.prefs ?? {};
-  const profileId = typeof prefs.appUserId === 'string' ? prefs.appUserId : null;
-  const normalizedName = normalizeUsername(
-    typeof prefs.username === 'string' && prefs.username.trim()
-      ? prefs.username
-      : currentAccount.name ?? '',
-  );
-
-  let profile: AppwriteUserDoc | null = null;
-
-  if (profileId) {
-    try {
-      profile = (await databases.getDocument(
-        DATABASE_ID,
-        COLLECTION_APP_USERS,
-        profileId,
-      )) as unknown as AppwriteUserDoc;
-    } catch {
-      profile = null;
-    }
-  }
-
-  if (!profile && normalizedName) {
-    profile = await firstDocument<AppwriteUserDoc>(COLLECTION_APP_USERS, [
-      Query.equal('username', [normalizedName]),
-    ]);
-  }
-
-  if (!profile && normalizedName) {
-    try {
-      profile = (await createDocument(COLLECTION_APP_USERS, {
-        username: normalizedName,
-        password_hash: MANAGED_PASSWORD_PLACEHOLDER,
-      }, await ownerScopedPermissions(currentAccount.$id))) as unknown as AppwriteUserDoc;
-    } catch {
-      profile = null;
-    }
-  }
-
-  if (!profile) {
-    if (profileId && normalizedName) {
-      return { id: profileId, username: normalizedName };
-    }
-    return null;
-  }
-
-  // Only update prefs if they differ (saves a network call)
-  if (prefs.appUserId !== profile.$id || prefs.username !== profile.username) {
-    try {
-      const newPrefs = {
-        ...(currentAccount.prefs ?? {}),
-        appUserId: profile.$id,
-        username: profile.username,
-      };
-      await account.updatePrefs(newPrefs);
-      currentAccount.prefs = newPrefs;
-    } catch {
-      // Non-fatal; profile lookup can still fall back to username.
-    }
-  }
-
-  // ensureUserMetadata + checkAndApplySelfDeduction both call ensureUserMetadata.
-  // Do it once and pass the result to avoid duplicate Appwrite calls.
-  const metadata = await ensureUserMetadata(profile.$id);
-
-  try {
-    await checkAndApplySelfDeductionWithMeta(profile.$id, profile.username, metadata);
-  } catch (err) {
-    console.error('Failed self deduction check:', err);
-  }
-
-  const result = { id: profile.$id, username: profile.username };
-  cachedSessionUser = result;
-  return result;
-}
-
-async function requireSessionUser(expectedUserId: string) {
-  const session = await getCurrentSessionUser();
-  if (!session || session.id !== expectedUserId) {
-    throw new Error('Sessao invalida para esta operacao.');
-  }
-  return session;
-}
-
-function hasUpdatePermission(doc: Models.Document, permissions: string[]) {
-  const expected = permissions.find((entry) => entry.startsWith('update('));
-  return expected ? (doc.$permissions ?? []).includes(expected) : false;
-}
-
-function movieIdentityKey(doc: Pick<AppwritePersonalMovieDoc, 'source_movie_id' | 'titulo' | 'source'>) {
-  if (doc.source_movie_id) return `source:${doc.source_movie_id}`;
-  return `title:${doc.source}:${titleKey(doc.titulo)}`;
-}
-
-function seriesIdentityKey(doc: Pick<AppwriteSeriesDoc, 'titulo'>) {
-  return titleKey(doc.titulo);
-}
-
-async function repairPersonalMovieDoc(doc: AppwritePersonalMovieDoc) {
-  const permissions = await ownerScopedPermissions(doc.user_id);
-  if (hasUpdatePermission(doc, permissions)) return doc;
-
-  try {
-    const newDoc = (await createDocument(COLLECTION_PERSONAL_MOVIES, {
-      user_id: doc.user_id,
-      titulo: doc.titulo,
-      ano_lancamento: doc.ano_lancamento ?? null,
-      capa_url: doc.capa_url ?? null,
-      plataforma_slug: doc.plataforma_slug ?? null,
-      status: doc.status,
-      source: doc.source,
-      source_movie_id: doc.source_movie_id ?? null,
-      avaliacao: doc.avaliacao ?? null,
-      rating: doc.rating ?? null,
-      review: doc.review ?? null,
-      streamingData: doc.streamingData ?? null,
-    }, permissions)) as unknown as AppwritePersonalMovieDoc;
-    try {
-      await databases.deleteDocument(DATABASE_ID, COLLECTION_PERSONAL_MOVIES, doc.$id);
-    } catch { }
-    return newDoc;
-  } catch {
-    return doc;
-  }
-}
-
-async function repairSeriesDoc(doc: AppwriteSeriesDoc) {
-  if (!doc.user_id) return doc;
-  const permissions = await ownerScopedPermissions(doc.user_id);
-  if (hasUpdatePermission(doc, permissions)) return doc;
-
-  try {
-    const newDoc = (await createDocument(COLLECTION_PERSONAL_SERIES, {
-      user_id: doc.user_id,
-      titulo: doc.titulo,
-      capaUrl: doc.capaUrl ?? null,
-      plataforma: doc.plataforma ?? null,
-      temporada: readSeriesSeason(doc),
-      Temporada: readSeriesSeason(doc),
-      totalEpisodios: doc.totalEpisodios,
-      episodiosVistos: doc.episodiosVistos,
-      status: doc.status,
-      avaliacao: doc.avaliacao ?? null,
-      rating: doc.rating ?? null,
-      review: doc.review ?? null,
-      streamingData: doc.streamingData ?? null,
-    }, permissions)) as unknown as AppwriteSeriesDoc;
-    try {
-      await databases.deleteDocument(DATABASE_ID, COLLECTION_PERSONAL_SERIES, doc.$id);
-    } catch { }
-    return newDoc;
-  } catch {
-    return doc;
-  }
-}
-
-async function grantMCoins(userId: string, trigger: TriggerKey) {
-  const delta = TRIGGER_POINTS[trigger];
-  const metadata = await ensureUserMetadata(userId);
-
-  const dbAvatarId = metadata.avatar_id || '';
-  let parsed: any = {};
-  if (dbAvatarId.startsWith('{')) {
-    try {
-      parsed = JSON.parse(dbAvatarId);
-    } catch { }
-  }
-
-  const currentMonth = new Date().toISOString().slice(0, 7);
-  let newMcoins = metadata.mcoins ?? 0;
-
-  const isResetActive = currentMonth >= '2026-07';
-
-  if (isResetActive && parsed.last_reset_month !== currentMonth) {
-    // If we've crossed into a new month since the last recorded month AND we are past the initial grace period, reset!
-    newMcoins = 0;
-    parsed.last_reset_month = currentMonth;
-  } else if (!parsed.last_reset_month) {
-    // If it's the first time running this, just record the current month without resetting
-    parsed.last_reset_month = currentMonth;
-  }
-
-  newMcoins = Math.max(0, newMcoins + delta);
-
-  const payload = {
-    ...parsed,
-    avatarId: parsed.avatarId || (dbAvatarId.startsWith('{') ? undefined : dbAvatarId),
-  };
-
-  const updated = await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, {
-    mcoins: newMcoins,
-    avatar_id: JSON.stringify(payload)
-  }) as unknown as AppwriteMetadataDoc;
-  metadataCache.set(userId, updated);
-
-  return delta;
-}
-
-async function awardMCoins(userId: string, trigger: TriggerKey, message: string) {
-  const [delta, username] = await Promise.all([
-    grantMCoins(userId, trigger),
-    getUsernameById(userId),
-  ]);
-  await addActivity(userId, `${username} ${message} (+${delta} MC)`, delta);
-}
-
-async function upsertUserOscarMovie(userId: string, oscarMovieId: string, status: MovieStatus) {
-  const existing = await firstDocument<AppwriteUserOscarMovieDoc>(COLLECTION_USER_OSCAR_MOVIES, [
-    Query.equal('user_id', [userId]),
-    Query.equal('oscar_movie_id', [oscarMovieId]),
-  ]);
-
-  const payload = {
-    user_id: userId,
-    oscar_movie_id: oscarMovieId,
-    status,
-  };
-
-  if (existing) {
-    await updateDocument(COLLECTION_USER_OSCAR_MOVIES, existing.$id, payload);
-    return existing;
-  }
-
-  await createDocument(COLLECTION_USER_OSCAR_MOVIES, payload);
-  return null;
-}
-
-async function upsertPersonalOscarMovie(userId: string, movie: OscarMovie, status: MovieStatus) {
-  const userDocs = await listDocuments<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
-    Query.equal('user_id', [userId]),
-  ]);
-  const existing = userDocs.find((doc) => {
-    const titleMatch = doc.titulo?.toLowerCase().trim() === movie.titulo?.toLowerCase().trim();
-    const sourceMatch = doc.source_movie_id === movie.id;
-    return titleMatch || sourceMatch;
-  });
-
-  const payload = {
-    user_id: userId,
-    titulo: movie.titulo,
-    ano_lancamento: movie.ano_oscar,
-    capa_url: movie.capa_url,
-    plataforma_slug: movie.plataforma_slug,
-    status,
-    source: 'oscar' as const,
-    source_movie_id: movie.id,
-    rating: movie.rating ?? null,
-    streamingData: movie.streaming_data ?? null,
-  };
-
-  if (existing) {
-    await updateDocument(COLLECTION_PERSONAL_MOVIES, existing.$id, payload);
-    return;
-  }
-
-  await createDocument(COLLECTION_PERSONAL_MOVIES, payload);
-}
-
-export async function runOneTimeDeductionsForUser(userId: string, username: string) {
-  // Delegates to the shared implementation to avoid duplicate API calls
-  try {
-    await checkAndApplySelfDeduction(userId, username);
-  } catch (err) {
-    console.error(`Failed to deduct for ${username}:`, err);
-  }
-}
-
-export async function bootstrapApp() {
-  return withFallback(
-    async () => {
-      if (typeof window === 'undefined') return;
-      if (sessionStorage.getItem(BOOTSTRAP_KEY)) return;
-
-      const existingOscarMovies = await listDocuments<AppwriteOscarMovieDoc>(COLLECTION_OSCAR_MOVIES, [
-        Query.limit(1),
-      ]);
-
-      if (existingOscarMovies.length === 0) {
-        await Promise.all(
-          DEFAULT_OSCAR_MOVIES.map((movie) =>
-            createDocument(COLLECTION_OSCAR_MOVIES, {
-              titulo: movie.titulo,
-              capaUrl: ensureValidUrl(movie.capa_url),
-              plataforma: movie.plataforma_slug ?? 'stremio',
-              categoria: movie.categoria_principal ?? 'Melhor Filme',
-              ano: movie.ano_oscar,
-              rating: movie.rating ?? null,
-              streamingData: movie.streaming_data ?? null,
-            }),
-          ),
-        );
-      }
-
-      sessionStorage.setItem(BOOTSTRAP_KEY, '1');
-    },
-    () => localData.bootstrapApp(),
-  );
-}
+// ==========================================
+// REMOVED: Appwrite-specific functions that are no longer used
+// These have been replaced by the new API endpoints
+// ==========================================
+// - checkAndApplySelfDeduction
+// - checkAndApplySelfDeductionWithMeta
+// - getSessionProfile
+// - requireSessionUser
+// - hasUpdatePermission
+// - movieIdentityKey
+// - seriesIdentityKey
+// - repairPersonalMovieDoc
+// - repairSeriesDoc
+// - grantMCoins
+// - awardMCoins
+// - upsertUserOscarMovie
+// - upsertPersonalOscarMovie
+// ==========================================
 
 export async function loginUser(identifier: string, password: string) {
   clearAppDataCache();
@@ -1028,40 +152,10 @@ export async function registerUser(username: string, email: string, password: st
       });
       const { data } = await apiClient.get<{ id: string; username: string }>('/auth/me');
       cachedSessionUser = { id: data.id, username: data.username };
-
-      // Ensure metadata exists and notify other users (Appwrite side-effects)
-      try {
-        await ensureUserMetadata(data.id);
-      } catch {
-        // Non-fatal
-      }
-      try {
-        await notifyExistingUsersAboutNewMember(data.id, data.username);
-        await safeAddActivity('global', `Novo membro! @${data.username} entrou no Cinerats.`, 0, {
-          ownerUserId: data.id,
-        });
-      } catch {
-        // Non-fatal
-      }
-
       return cachedSessionUser;
     },
     () => localData.registerUser(username, password),
   );
-}
-
-export async function loginWithGoogle() {
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  account.createOAuth2Token(OAuthProvider.Google, origin, origin);
-}
-
-export async function linkGoogleAccount() {
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  account.createOAuth2Token(OAuthProvider.Google, origin, origin);
-}
-
-export async function handleOAuth2Token(_userId: string, _secret: string) {
-  // OAuth2 not migrated to cinerats-api yet — no-op.
 }
 
 export async function changePassword(
@@ -1099,49 +193,33 @@ export async function adminResetPassword(
 }
 
 export async function listUsers() {
-  return withFallback(
-    async () => {
-      const data = await listDocuments<AppwriteUserDoc>(COLLECTION_APP_USERS, [Query.orderAsc('username')]);
-      return data.map(mapUser);
-    },
-    () => localData.listUsers(),
-  );
+  // REMOVED: Old Appwrite implementation
+  // Now using listRankedUsers() which calls the new API
+  return listRankedUsers();
 }
 
 export async function listRankedUsers() {
   return withFallback(
     async () => {
-      // Fetch ranked users from backend API and Appwrite metadata in parallel
-      const [apiResponse, metadata] = await Promise.all([
-        apiClient.get<{ id: string; username: string; totalPoints: number; rank: number; createdAt: string }[]>('/users'),
-        listDocuments<AppwriteMetadataDoc>(COLLECTION_USUARIOS_METADATA),
-      ]);
+      const apiResponse = await apiClient.get<{
+        id: string;
+        username: string;
+        totalPoints: number;
+        rank: number;
+        createdAt: string;
+        preferences: {
+          favoriteMovie: string | null;
+          bestMovieWatched: string | null;
+          favoriteSeries: string | null;
+          favoriteGenre: string | null;
+          watchPreference: 'home' | 'cinema' | null;
+          displayName: string | null;
+          avatarPath: string | null;
+        } | null;
+      }[]>('/users');
 
-      const apiUsers = apiResponse.data;
-
-      const metadataByUser = new Map<string, AppwriteMetadataDoc>();
-      for (const item of metadata) {
-        const current = metadataByUser.get(item.user_id);
-        if (!current || item.$updatedAt > current.$updatedAt) {
-          metadataByUser.set(item.user_id, item);
-        }
-      }
-
-      const ranked = apiUsers.map((apiUser) => {
-        const userMeta = metadataByUser.get(apiUser.id);
-        let dbAvatarId = userMeta?.avatar_id ?? fallbackAvatar(apiUser.id);
-        let dbDisplayName: string | undefined = undefined;
-
-        if (dbAvatarId.startsWith('{')) {
-          try {
-            const parsed = JSON.parse(dbAvatarId);
-            dbAvatarId = parsed.avatarId || fallbackAvatar(apiUser.id);
-            dbDisplayName = parsed.displayName || undefined;
-          } catch (e) {
-            console.warn('Failed to parse avatar_id JSON:', e);
-          }
-        }
-
+      return apiResponse.data.map((apiUser) => {
+        const prefs = apiUser.preferences;
         return {
           id: apiUser.id,
           username: apiUser.username,
@@ -1149,31 +227,74 @@ export async function listRankedUsers() {
           user_id: apiUser.id,
           mcoins: apiUser.totalPoints,
           rank: apiUser.rank,
-          avatar_id: dbAvatarId,
-          display_name: dbDisplayName || undefined,
-          favorite_movie: userMeta?.favorite_movie ?? undefined,
-          favorite_movie_2: userMeta?.favorite_movie_2 ?? undefined,
-          favorite_genre: userMeta?.favorite_genre ?? undefined,
-          favorite_series: userMeta?.favorite_series ?? undefined,
-          watch_preference: userMeta?.watch_preference ?? undefined,
+          avatar_id: prefs?.avatarPath ?? fallbackAvatar(apiUser.id),
+          display_name: prefs?.displayName ?? undefined,
+          favorite_movie: prefs?.favoriteMovie ?? undefined,
+          favorite_movie_2: prefs?.bestMovieWatched ?? undefined,
+          favorite_genre: prefs?.favoriteGenre ?? undefined,
+          favorite_series: prefs?.favoriteSeries ?? undefined,
+          watch_preference: prefs?.watchPreference ?? undefined,
         } as RankedUser;
       });
-
-      return ranked;
     },
     () => localData.listRankedUsers(),
   );
 }
 
+type ApiActivity = {
+  id: string;
+  userId: string;
+  type: string;
+  referenceId: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+};
+
+function activityMessage(a: ApiActivity): string {
+  const meta = a.metadata ?? {};
+  const title = (meta.title as string) ?? '';
+  const username = (meta.username as string) ?? '';
+  switch (a.type) {
+    case 'new_member':
+      return `Novo membro! @${username} entrou no cinerats.`;
+    case 'favorited_user':
+      return username ? `Favoritou @${username}.` : 'Favoritou um usuário.';
+    case 'watched_movie':
+      return title ? `Assistiu ${title}.` : 'Assistiu um filme.';
+    case 'watched_episode': {
+      const s = meta.season as number | undefined;
+      const ep = meta.episode as number | undefined;
+      if (title && s && ep) return `Assistiu ${title} T${s}E${ep}.`;
+      return title ? `Assistiu ${title}.` : 'Assistiu um episódio.';
+    }
+    case 'watched_documentary':
+      return title ? `Assistiu ${title}.` : 'Assistiu um documentário.';
+    case 'reviewed_media':
+      return title ? `Avaliou ${title}.` : 'Avaliou uma mídia.';
+    case 'added_to_watchlist':
+      return title ? `Adicionou ${title} à watchlist.` : 'Adicionou à watchlist.';
+    case 'recommended_media':
+      return title ? `Recomendou ${title}.` : 'Fez uma recomendação.';
+    default:
+      return (meta.message as string) ?? 'Atividade registrada.';
+  }
+}
+
+function mapApiActivity(a: ApiActivity): ActivityEntry {
+  return {
+    id: a.id,
+    user_id: a.userId,
+    message: activityMessage(a),
+    mcoins_delta: 0,
+    created_at: a.createdAt,
+  };
+}
+
 export async function listActivities(limit = 30) {
   return withFallback(
     async () => {
-      const data = await listDocuments<AppwriteActivityDoc>(COLLECTION_ATIVIDADES, [
-        Query.orderDesc('$createdAt'),
-        Query.limit(limit),
-      ]);
-
-      return data.map(mapActivity);
+      const res = await apiClient.get<ApiActivity[]>(`/activities?limit=${limit}`);
+      return res.data.map(mapApiActivity);
     },
     () => localData.listActivities(limit),
   );
@@ -1187,13 +308,23 @@ export async function listNotifications(_userId: string, _limit = 20) {
 export async function listUserActivity(userIds: string[], limit = 20) {
   return withFallback(
     async () => {
-      const data = await listDocuments<AppwriteActivityDoc>(COLLECTION_ATIVIDADES, [
-        Query.equal('user_id', userIds),
-        Query.orderDesc('$createdAt'),
-        Query.limit(limit),
-      ]);
+      const includesGlobal = userIds.includes('global');
 
-      return data.map(mapActivity);
+      if (includesGlobal) {
+        // Use the feed endpoint — it already merges own + favorites + new_member activities
+        const res = await apiClient.get<ApiActivity[]>(`/activities?limit=${limit}`);
+        return res.data.map(mapApiActivity);
+      }
+
+      // Single user profile view — fetch per user
+      const results = await Promise.all(
+        userIds.map((id) =>
+          apiClient.get<ApiActivity[]>(`/users/${id}/activities`).then((r) => r.data).catch(() => [] as ApiActivity[]),
+        ),
+      );
+      const all = results.flat().map(mapApiActivity);
+      all.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      return all.slice(0, limit);
     },
     () => localData.listUserActivity(userIds[0], limit),
   );
@@ -1212,101 +343,6 @@ export async function getCurrentSessionUser() {
       }
     },
     () => localData.getCurrentSessionUser(),
-  );
-}
-
-export async function importLegacyDataForUser(userId: string) {
-  return withFallback(
-    async () => {
-      if (typeof window === 'undefined') return false;
-
-      const importKey = `${LEGACY_IMPORT_PREFIX}${userId}`;
-      if (localStorage.getItem(importKey) === '1') return false;
-
-      const rawMovies = localStorage.getItem('cinehub_movies');
-      const rawSeries = localStorage.getItem('cinehub_series');
-      if (!rawMovies && !rawSeries) return false;
-
-      await requireSessionUser(userId);
-
-      const [personalDocs, seriesDocs, oscarMovies] = await Promise.all([
-        listDocuments<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
-          Query.equal('user_id', [userId]),
-          Query.limit(1),
-        ]),
-        listDocuments<AppwriteSeriesDoc>(COLLECTION_PERSONAL_SERIES, [
-          Query.equal('user_id', [userId]),
-          Query.limit(1),
-        ]),
-        listDocuments<AppwriteOscarMovieDoc>(COLLECTION_OSCAR_MOVIES, [
-          Query.orderDesc('ano'),
-          Query.orderAsc('titulo'),
-        ]),
-      ]);
-
-      const { personalMovies, oscarStatuses } = readLegacyMovieData();
-      const legacySeries = readLegacySeriesData(false);
-      let changed = false;
-      const permissions = await ownerScopedPermissions(userId);
-
-      if (personalDocs.length === 0 && personalMovies.length > 0) {
-        await Promise.all(
-          personalMovies.map((movie) =>
-            createDocument(COLLECTION_PERSONAL_MOVIES, {
-              ...movie,
-              user_id: userId,
-            }, permissions),
-          ),
-        );
-        changed = true;
-      }
-
-      if (seriesDocs.length === 0 && legacySeries.length > 0) {
-        await Promise.all(
-          legacySeries.map((series) =>
-            createDocument(COLLECTION_PERSONAL_SERIES, {
-              user_id: userId,
-              titulo: series.titulo,
-              capaUrl: ensureValidUrl(series.capa_url),
-              plataforma: series.plataforma_slug ?? 'stremio',
-              episodiosVistos: Math.max(0, series.episodios_vistos),
-              totalEpisodios: Math.max(1, series.total_episodios),
-              status: toAppwriteSeriesStatus(
-                series.status,
-                Math.max(0, series.episodios_vistos),
-                Math.max(1, series.total_episodios),
-              ),
-            }, permissions),
-          ),
-        );
-        changed = true;
-      }
-
-      if (oscarStatuses.size > 0) {
-        const updates = oscarMovies
-          .map((movie) => {
-            const status = oscarStatuses.get(titleKey(movie.titulo));
-            if (!status) return null;
-            return { movie, status };
-          })
-          .filter(Boolean) as { movie: AppwriteOscarMovieDoc; status: MovieStatus }[];
-
-        if (updates.length > 0) {
-          await Promise.all(
-            updates.map(({ movie, status }) => upsertUserOscarMovie(userId, movie.$id, status)),
-          );
-          changed = true;
-        }
-      }
-
-      if (changed) {
-        await addActivity(userId, 'dados legados foram importados para este perfil.', 0);
-      }
-
-      localStorage.setItem(importKey, '1');
-      return changed;
-    },
-    () => localData.importLegacyDataForUser(userId),
   );
 }
 
@@ -1334,8 +370,6 @@ export async function deleteCurrentUser(userId: string, currentPassword: string)
 
       await apiClient.delete('/auth/delete-account', { data: { password: currentPassword } });
 
-      metadataCache.delete(userId);
-      usernameCache.delete(userId);
       clearAppDataCache();
     },
     () => localData.deleteCurrentUser(userId, currentPassword),
@@ -1345,30 +379,7 @@ export async function deleteCurrentUser(userId: string, currentPassword: string)
 export async function updateUserAvatar(userId: string, avatarId: string) {
   return withFallback(
     async () => {
-      await requireSessionUser(userId);
-      const metadata = await ensureUserMetadata(userId);
-
-      let parsed: any = {};
-      const currentDbAvatar = metadata.avatar_id;
-      if (currentDbAvatar && currentDbAvatar.startsWith('{')) {
-        try {
-          parsed = JSON.parse(currentDbAvatar);
-        } catch { }
-      }
-
-      const newDbAvatarValue = JSON.stringify({
-        ...parsed,
-        avatarId,
-      });
-
-      if (metadata.avatar_id === newDbAvatarValue) {
-        return;
-      }
-
-      const updated = await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, {
-        avatar_id: newDbAvatarValue,
-      }) as unknown as AppwriteMetadataDoc;
-      metadataCache.set(userId, updated);
+      await apiClient.put('/users/me/preferences', { avatarPath: avatarId });
     },
     () => localData.updateUserAvatar(userId, avatarId),
   );
@@ -1387,152 +398,71 @@ export async function updateUserProfile(
 ) {
   return withFallback(
     async () => {
-      await requireSessionUser(userId);
-      const metadata = await ensureUserMetadata(userId);
-      const updates: Record<string, unknown> = {};
-
-      let parsed: any = {};
-      const currentDbAvatar = metadata.avatar_id || '';
-      if (currentDbAvatar.startsWith('{')) {
-        try {
-          parsed = JSON.parse(currentDbAvatar);
-        } catch { }
-      }
-
-      if (data.display_name !== undefined) {
-        const newDbAvatarValue = JSON.stringify({
-          ...parsed,
-          avatarId: parsed.avatarId || (currentDbAvatar.startsWith('{') ? undefined : currentDbAvatar),
-          displayName: data.display_name,
-        });
-        if (metadata.avatar_id !== newDbAvatarValue) {
-          updates.avatar_id = newDbAvatarValue;
-        }
-      }
-
-      if (data.favorite_movie !== undefined && data.favorite_movie !== metadata.favorite_movie) {
-        updates.favorite_movie = data.favorite_movie;
-      }
-      if (data.favorite_movie_2 !== undefined && data.favorite_movie_2 !== metadata.favorite_movie_2) {
-        updates.favorite_movie_2 = data.favorite_movie_2;
-      }
-      if (data.favorite_genre !== undefined && data.favorite_genre !== metadata.favorite_genre) {
-        updates.favorite_genre = data.favorite_genre;
-      }
-      if (data.favorite_series !== undefined && data.favorite_series !== metadata.favorite_series) {
-        updates.favorite_series = data.favorite_series;
-      }
-      if (data.watch_preference !== undefined && data.watch_preference !== metadata.watch_preference) {
-        updates.watch_preference = data.watch_preference;
-      }
-
-      if (Object.keys(updates).length === 0) {
-        return;
-      }
-
-      const updated = await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, updates) as unknown as AppwriteMetadataDoc;
-      metadataCache.set(userId, updated);
-
-      // Dual-write: sync preferences to backend API
       const apiPrefs: Record<string, string | undefined> = {};
       if (data.favorite_movie !== undefined) apiPrefs.favoriteMovie = data.favorite_movie;
       if (data.favorite_movie_2 !== undefined) apiPrefs.bestMovieWatched = data.favorite_movie_2;
       if (data.favorite_series !== undefined) apiPrefs.favoriteSeries = data.favorite_series;
       if (data.favorite_genre !== undefined) apiPrefs.favoriteGenre = data.favorite_genre;
       if (data.watch_preference !== undefined) apiPrefs.watchPreference = data.watch_preference;
+      if (data.display_name !== undefined) apiPrefs.displayName = data.display_name;
 
       if (Object.keys(apiPrefs).length > 0) {
-        try {
-          await apiClient.put('/users/me/preferences', apiPrefs);
-        } catch (e) {
-          console.warn('Failed to sync preferences to backend API:', e);
-        }
+        await apiClient.put('/users/me/preferences', apiPrefs);
       }
     },
     () => localData.updateUserProfile(userId, data),
   );
 }
 
-export async function getOscarMoviesForUser(userId: string) {
-  return withFallback(
-    async () => {
-      const [moviesResult, statusesResult] = await Promise.all([
-        listDocuments<AppwriteOscarMovieDoc>(COLLECTION_OSCAR_MOVIES, [
-          Query.orderDesc('ano'),
-          Query.orderAsc('titulo'),
-        ]),
-        listDocuments<AppwriteUserOscarMovieDoc>(COLLECTION_USER_OSCAR_MOVIES, [
-          Query.equal('user_id', [userId]),
-        ]),
-      ]);
-
-      const statusByMovie = new Map(
-        statusesResult.map((item) => [item.oscar_movie_id, item.status as MovieStatus]),
-      );
-
-      return moviesResult.map((movie) => ({
-        ...mapOscarMovie(movie),
-        status: statusByMovie.get(movie.$id) ?? 'watchlist',
-      })) as OscarMovieWithStatus[];
-    },
-    () => localData.getOscarMoviesForUser(userId),
-  );
-}
-
-export async function addOscarMovie(userId: string, movie: Omit<OscarMovie, 'id'>) {
-  return withFallback(
-    async () => {
-      await requireSessionUser(userId);
-      const data = await createDocument(COLLECTION_OSCAR_MOVIES, {
-        titulo: movie.titulo,
-        capaUrl: ensureValidUrl(movie.capa_url),
-        plataforma: movie.plataforma_slug ?? 'stremio',
-        categoria: movie.categoria_principal ?? 'Melhor Filme',
-        ano: movie.ano_oscar,
-        rating: movie.rating ?? null,
-        streamingData: movie.streaming_data ?? null,
-      });
-
-      await awardMCoins(userId, 'INDICOU_FILME', `${movie.titulo} foi indicado para a lista.`);
-      return mapOscarMovie(data as unknown as AppwriteOscarMovieDoc);
-    },
-    () => localData.addOscarMovie(userId, movie),
-  );
-}
-
-export async function setOscarMovieStatus(userId: string, movie: OscarMovie, status: MovieStatus) {
-  return withFallback(
-    async () => {
-      await requireSessionUser(userId);
-      const previous = await upsertUserOscarMovie(userId, movie.id, status);
-      await upsertPersonalOscarMovie(userId, movie, status);
-
-      if (status === 'watched' && previous?.status !== 'watched') {
-        await awardMCoins(userId, 'ASSISTIU_FILME', `Assistiu ao filme ${movie.titulo}.`);
-      }
-    },
-    () => localData.setOscarMovieStatus(userId, movie, status),
-  );
-}
-
 export async function listPersonalMovies(userId: string) {
   return withFallback(
     async () => {
-      const data = await listDocuments<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
-        Query.equal('user_id', [userId]),
+      const [watchEntriesRes, watchlistRes] = await Promise.all([
+        apiClient.get<{ id: string; type: string; points: number; providerExternalId: string; season?: number | null; episode?: number | null; createdAt: string; title: string; posterPath: string | null }[]>(`/users/${userId}/watch-entries`),
+        apiClient.get<{ id: string; providerExternalId: string; type: string; title: string; posterPath: string | null; season?: number | null; episode?: number | null; createdAt: string }[]>(`/watchlist/users/${userId}`),
       ]);
-      // Sort by $createdAt desc in memory
-      data.sort((a, b) => new Date(b.$createdAt).getTime() - new Date(a.$createdAt).getTime());
 
-      const deduped = new Map<string, AppwritePersonalMovieDoc>();
-      for (const doc of data) {
-        const key = movieIdentityKey(doc);
-        const current = deduped.get(key);
-        if (!current || doc.$updatedAt > current.$updatedAt) {
-          deduped.set(key, doc);
-        }
-      }
-      return Array.from(deduped.values()).map(mapPersonalMovie) as PersonalMovie[];
+      const watched: PersonalMovie[] = watchEntriesRes.data
+        .filter((e) => e.type === 'movie')
+        .map((e) => ({
+          id: e.id,
+          user_id: userId,
+          titulo: e.title ?? '',
+          ano_lancamento: null,
+          capa_url: e.posterPath ?? null,
+          plataforma_slug: null,
+          status: 'watched' as MovieStatus,
+          source: 'manual' as const,
+          source_movie_id: e.providerExternalId ?? null,
+          avaliacao: null,
+          rating: null,
+          review: null,
+          streaming_data: null,
+          created_at: e.createdAt,
+        }));
+
+      const watchlist: PersonalMovie[] = watchlistRes.data
+        .filter((e) => e.type === 'movie')
+        .map((e) => ({
+          id: e.id,
+          user_id: userId,
+          titulo: e.title ?? '',
+          ano_lancamento: null,
+          capa_url: e.posterPath ?? null,
+          plataforma_slug: null,
+          status: 'watchlist' as MovieStatus,
+          source: 'manual' as const,
+          source_movie_id: e.providerExternalId ?? null,
+          avaliacao: null,
+          rating: null,
+          review: null,
+          streaming_data: null,
+          created_at: e.createdAt,
+        }));
+
+      const all = [...watched, ...watchlist];
+      all.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      return all;
     },
     () => localData.listPersonalMovies(userId),
   );
@@ -1544,46 +474,54 @@ export async function addPersonalMovie(
 ) {
   return withFallback(
     async () => {
-      await requireSessionUser(userId);
-      const userDocs = await listDocuments<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
-        Query.equal('user_id', [userId]),
-      ]);
+      const providerExternalId = movie.source_movie_id ?? '';
 
-      const alreadyExists = userDocs.some((doc) => {
-        const titleMatch = doc.titulo?.toLowerCase().trim() === movie.titulo?.toLowerCase().trim();
-        const sourceMatch = movie.source_movie_id && doc.source_movie_id === movie.source_movie_id;
-        return titleMatch || sourceMatch;
+      if (movie.status === 'watchlist') {
+        const res = await apiClient.post<{ id: string; providerExternalId: string; type: string; title: string; posterPath: string | null; season?: number | null; episode?: number | null; createdAt: string }>('/watchlist', {
+          type: 'movie',
+          providerExternalId,
+        });
+        return {
+          id: res.data.id,
+          user_id: userId,
+          titulo: res.data.title ?? movie.titulo,
+          ano_lancamento: movie.ano_lancamento ?? null,
+          capa_url: res.data.posterPath ?? movie.capa_url ?? null,
+          plataforma_slug: movie.plataforma_slug ?? null,
+          status: 'watchlist' as MovieStatus,
+          source: movie.source ?? ('manual' as const),
+          source_movie_id: res.data.providerExternalId ?? null,
+          avaliacao: movie.avaliacao ?? null,
+          rating: movie.rating ?? null,
+          review: movie.review ?? null,
+          streaming_data: movie.streaming_data ?? null,
+          created_at: res.data.createdAt,
+          is_retroactive: movie.is_retroactive,
+        } as PersonalMovie;
+      }
+
+      // status === 'watched'
+      const res = await apiClient.post<{ id: string; type: string; points: number; providerExternalId: string; season?: number | null; episode?: number | null; createdAt: string }>('/watch-entries', {
+        type: 'movie',
+        providerExternalId,
       });
-
-      if (alreadyExists) {
-        throw new Error('Esse filme ja esta na sua lista.');
-      }
-
-      const data = await createDocument(COLLECTION_PERSONAL_MOVIES, {
-        ...movie,
-        rating: movie.rating ?? null,
-        streamingData: movie.streaming_data ?? null,
-        plataforma_slug: movie.is_retroactive ? `${movie.plataforma_slug || 'stremio'}|retroactive` : movie.plataforma_slug,
+      return {
+        id: res.data.id,
         user_id: userId,
-      }, await ownerScopedPermissions(userId));
-
-      const created = mapPersonalMovie(data as unknown as AppwritePersonalMovieDoc);
-
-      if (created.status === 'watched' && !movie.is_retroactive) {
-        const recommendation = parseRecommendedSource(created.source_movie_id);
-        if (recommendation) {
-          await awardMCoins(created.user_id, 'FILME_INDICADO_ASSISTIDO', `Assistiu ao filme indicado: ${created.titulo}.`);
-          await awardMCoins(
-            recommendation.recommenderId,
-            'BONUS_CURADOR',
-            `Seu filme indicado (${created.titulo}) foi assistido.`,
-          );
-        } else {
-          await awardMCoins(created.user_id, 'ASSISTIU_FILME', `Assistiu ao filme ${created.titulo}.`);
-        }
-      }
-
-      return created;
+        titulo: movie.titulo,
+        ano_lancamento: movie.ano_lancamento ?? null,
+        capa_url: movie.capa_url ?? null,
+        plataforma_slug: movie.plataforma_slug ?? null,
+        status: 'watched' as MovieStatus,
+        source: movie.source ?? ('manual' as const),
+        source_movie_id: res.data.providerExternalId ?? null,
+        avaliacao: movie.avaliacao ?? null,
+        rating: movie.rating ?? null,
+        review: movie.review ?? null,
+        streaming_data: movie.streaming_data ?? null,
+        created_at: res.data.createdAt,
+        is_retroactive: movie.is_retroactive,
+      } as PersonalMovie;
     },
     () => localData.addPersonalMovie(userId, movie),
   );
@@ -1595,72 +533,61 @@ export async function updatePersonalMovie(
 ) {
   return withFallback(
     async () => {
-      const currentDoc = (await databases.getDocument(
-        DATABASE_ID,
-        COLLECTION_PERSONAL_MOVIES,
-        movieId,
-      )) as unknown as AppwritePersonalMovieDoc;
-      await requireSessionUser(currentDoc.user_id);
-      const writableDoc = await repairPersonalMovieDoc(currentDoc);
-
-      const data = await updateDocument(
-        COLLECTION_PERSONAL_MOVIES,
-        writableDoc.$id,
-        updates as Record<string, string | number | null>,
-      );
-
-      const nextDoc = data as unknown as AppwritePersonalMovieDoc;
-      const isRetroactive = currentDoc.plataforma_slug?.endsWith('|retroactive') || currentDoc.source_movie_id?.endsWith('|retroactive') || currentDoc.source_movie_id === 'retroactive';
-
-      if (currentDoc.status !== 'watched' && nextDoc.status === 'watched' && !isRetroactive) {
-        const recommendation = parseRecommendedSource(nextDoc.source_movie_id);
-        if (recommendation) {
-          await awardMCoins(nextDoc.user_id, 'FILME_INDICADO_ASSISTIDO', `Assistiu ao filme indicado: ${nextDoc.titulo}.`);
-          await awardMCoins(
-            recommendation.recommenderId,
-            'BONUS_CURADOR',
-            `Seu filme indicado (${nextDoc.titulo}) foi assistido.`,
-          );
-        } else {
-          await awardMCoins(nextDoc.user_id, 'ASSISTIU_FILME', `Assistiu ao filme ${nextDoc.titulo}.`);
+      // If status changed to 'watched', move from watchlist to watch-entries
+      if (updates.status === 'watched') {
+        // We need to get the current item to find its providerExternalId.
+        // Try to delete from watchlist (it may be a watchlist item being moved to watched).
+        // The caller provides the movieId which is the watchlist entry id.
+        try {
+          // Get the current watchlist to find the item details
+          const watchlistRes = await apiClient.get<{ id: string; providerExternalId: string; type: string; title: string; posterPath: string | null; createdAt: string }[]>('/watchlist');
+          const item = watchlistRes.data.find((e) => e.id === movieId);
+          if (item) {
+            await apiClient.delete(`/watchlist/${movieId}`);
+            const res = await apiClient.post<{ id: string; type: string; points: number; providerExternalId: string; createdAt: string }>('/watch-entries', {
+              type: item.type,
+              providerExternalId: item.providerExternalId,
+            });
+            return {
+              id: res.data.id,
+              user_id: '',
+              titulo: item.title,
+              ano_lancamento: null,
+              capa_url: item.posterPath ?? null,
+              plataforma_slug: updates.plataforma_slug ?? null,
+              status: 'watched' as MovieStatus,
+              source: 'manual' as const,
+              source_movie_id: item.providerExternalId ?? null,
+              avaliacao: updates.avaliacao ?? null,
+              rating: null,
+              review: null,
+              streaming_data: null,
+              created_at: res.data.createdAt,
+            } as PersonalMovie;
+          }
+        } catch {
+          // Not a watchlist item, ignore
         }
       }
 
-      return mapPersonalMovie(nextDoc);
+      // For other field-level updates (plataforma, avaliacao) the API doesn't
+      // support partial updates on watch-entries/watchlist, so fall back to localData.
+      return localData.updatePersonalMovie(movieId, updates);
     },
     () => localData.updatePersonalMovie(movieId, updates),
   );
 }
 
-async function deleteActivitiesForTitle(userId: string, title: string) {
-  try {
-    const activities = await listDocuments<AppwriteActivityDoc>(COLLECTION_ATIVIDADES, [
-      Query.equal('user_id', [userId]),
-      Query.limit(100),
-    ]);
-    const targets = activities.filter((act) => act.message.includes(title));
-    if (targets.length > 0) {
-      await Promise.all(
-        targets.map((act) => databases.deleteDocument(DATABASE_ID, COLLECTION_ATIVIDADES, act.$id).catch(() => { }))
-      );
-    }
-  } catch (err) {
-    console.error('Failed to clean up activities for deleted title:', err);
-  }
-}
+// REMOVED: deleteActivitiesForTitle - activities are now managed automatically by the API
 
 export async function deletePersonalMovie(movieId: string) {
   return withFallback(
     async () => {
-      const current = (await databases.getDocument(
-        DATABASE_ID,
-        COLLECTION_PERSONAL_MOVIES,
-        movieId,
-      )) as unknown as AppwritePersonalMovieDoc;
-      await requireSessionUser(current.user_id);
-      const writableDoc = await repairPersonalMovieDoc(current);
-      await deleteDocument(COLLECTION_PERSONAL_MOVIES, writableDoc.$id);
-      await deleteActivitiesForTitle(current.user_id, current.titulo);
+      try {
+        await apiClient.delete(`/watch-entries/${movieId}`);
+      } catch {
+        await apiClient.delete(`/watchlist/${movieId}`);
+      }
     },
     () => localData.deletePersonalMovie(movieId),
   );
@@ -1669,29 +596,80 @@ export async function deletePersonalMovie(movieId: string) {
 export async function listSeries(userId: string) {
   return withFallback(
     async () => {
-      try {
-        const data = await listDocuments<AppwriteSeriesDoc>(COLLECTION_PERSONAL_SERIES, [
-          Query.equal('user_id', [userId]),
-        ]);
-        // Sort by $createdAt desc in memory
-        data.sort((a, b) => new Date(b.$createdAt).getTime() - new Date(a.$createdAt).getTime());
+      const [watchEntriesRes, watchlistRes] = await Promise.all([
+        apiClient.get<{ id: string; type: string; points: number; providerExternalId: string; season?: number | null; episode?: number | null; createdAt: string; title: string; posterPath: string | null }[]>(`/users/${userId}/watch-entries`),
+        apiClient.get<{ id: string; providerExternalId: string; type: string; title: string; posterPath: string | null; season?: number | null; episode?: number | null; createdAt: string }[]>(`/watchlist/users/${userId}`),
+      ]);
 
-        const deduped = new Map<string, AppwriteSeriesDoc>();
-        for (const doc of data) {
-          const key = seriesIdentityKey(doc);
-          const current = deduped.get(key);
-          if (!current || doc.$updatedAt > current.$updatedAt) {
-            deduped.set(key, doc);
-          }
-        }
-        return Array.from(deduped.values()).map(mapSeries) as SeriesEntry[];
-      } catch (error) {
-        const message = error instanceof Error ? error.message : '';
-        if (message.includes('user_id')) {
-          throw new Error("A colecao 'series_pessoais' precisa da coluna 'user_id' para isolar as series por usuario.");
-        }
-        throw error;
-      }
+      const seriesEntries = watchEntriesRes.data.filter((e) => e.type === 'series');
+      const seriesWatchlist = watchlistRes.data.filter((e) => e.type === 'series');
+
+      // Collect unique TMDB IDs to fetch season totals
+      const tmdbIds = new Set<string>();
+      for (const e of seriesEntries) if (e.providerExternalId) tmdbIds.add(e.providerExternalId);
+      for (const e of seriesWatchlist) if (e.providerExternalId) tmdbIds.add(e.providerExternalId);
+
+      // Fetch TMDB details in parallel (deduplicated)
+      const tmdbDetailsMap = new Map<string, { season_number: number; episode_count: number }[]>();
+      await Promise.all(
+        [...tmdbIds].map(async (tmdbId) => {
+          const details = await getTvDetails(Number(tmdbId));
+          if (details) tmdbDetailsMap.set(tmdbId, details.seasons);
+        }),
+      );
+
+      const getSeasonTotal = (tmdbId: string | null, season: number): number => {
+        if (!tmdbId) return 0;
+        const seasons = tmdbDetailsMap.get(tmdbId);
+        if (!seasons) return 0;
+        const s = seasons.find((item) => item.season_number === season);
+        return s?.episode_count ?? 0;
+      };
+
+      const watched: SeriesEntry[] = seriesEntries.map((e) => {
+        const temporada = e.season ?? 1;
+        const episodios_vistos = e.episode ?? 0;
+        const total_episodios = getSeasonTotal(e.providerExternalId, temporada);
+        return {
+          id: e.id,
+          user_id: userId,
+          titulo: e.title ?? '',
+          capa_url: e.posterPath ?? null,
+          status: getSeriesStatus(episodios_vistos, total_episodios),
+          temporada,
+          total_episodios,
+          episodios_vistos,
+          plataforma_slug: null,
+          source_movie_id: e.providerExternalId ?? null,
+          avaliacao: null,
+          rating: null,
+          review: null,
+          streaming_data: null,
+          created_at: e.createdAt,
+        };
+      });
+
+      const watchlist: SeriesEntry[] = seriesWatchlist.map((e) => ({
+        id: e.id,
+        user_id: userId,
+        titulo: e.title ?? '',
+        capa_url: e.posterPath ?? null,
+        status: 'watchlist' as SeriesStatus,
+        temporada: e.season ?? 1,
+        total_episodios: getSeasonTotal(e.providerExternalId, e.season ?? 1),
+        episodios_vistos: 0,
+        plataforma_slug: null,
+        source_movie_id: e.providerExternalId ?? null,
+        avaliacao: null,
+        rating: null,
+        review: null,
+        streaming_data: null,
+        created_at: e.createdAt,
+      }));
+
+      const all = [...watched, ...watchlist];
+      all.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      return all;
     },
     () => localData.listSeries(userId),
   );
@@ -1703,36 +681,60 @@ export async function addSeries(
 ) {
   return withFallback(
     async () => {
-      await requireSessionUser(userId);
-      const userSeries = await listDocuments<AppwriteSeriesDoc>(COLLECTION_PERSONAL_SERIES, [
-        Query.equal('user_id', [userId]),
-      ]);
-      const existing = userSeries.find((s) => s.titulo?.toLowerCase().trim() === series.titulo?.toLowerCase().trim());
-      if (existing) {
-        throw new Error('Essa serie ja esta cadastrada.');
+      const providerExternalId = series.source_movie_id ?? series.titulo;
+      const season = Math.max(1, series.temporada || 1);
+      const episode = series.episodios_vistos > 0 ? series.episodios_vistos : undefined;
+
+      if (series.status === 'watchlist') {
+        const res = await apiClient.post<{ id: string; providerExternalId: string; type: string; title: string; posterPath: string | null; season?: number | null; episode?: number | null; createdAt: string }>('/watchlist', {
+          type: 'series',
+          providerExternalId,
+          season,
+          episode,
+        });
+        return {
+          id: res.data.id,
+          user_id: userId,
+          titulo: res.data.title ?? series.titulo,
+          capa_url: res.data.posterPath ?? series.capa_url ?? null,
+          status: 'watchlist' as SeriesStatus,
+          temporada: res.data.season ?? season,
+          total_episodios: series.total_episodios,
+          episodios_vistos: 0,
+          plataforma_slug: series.plataforma_slug ?? null,
+          avaliacao: series.avaliacao ?? null,
+          rating: series.rating ?? null,
+          review: series.review ?? null,
+          streaming_data: series.streaming_data ?? null,
+          created_at: res.data.createdAt,
+          is_retroactive: series.is_retroactive,
+        } as SeriesEntry;
       }
 
-      const episodiosVistos = Math.max(0, series.episodios_vistos);
-      const totalEpisodios = Math.max(1, series.total_episodios);
-      const data = await createDocument(COLLECTION_PERSONAL_SERIES, {
+      // watching or watched → create watch-entry
+      const res = await apiClient.post<{ id: string; type: string; points: number; providerExternalId: string; season?: number | null; episode?: number | null; createdAt: string }>('/watch-entries', {
+        type: 'series',
+        providerExternalId,
+        season,
+        episode,
+      });
+      return {
+        id: res.data.id,
         user_id: userId,
         titulo: series.titulo,
-        capaUrl: ensureValidUrl(series.capa_url),
-        plataforma: series.is_retroactive ? `${series.plataforma_slug || 'stremio'}|retroactive` : (series.plataforma_slug ?? 'stremio'),
-        temporada: Math.max(1, series.temporada || 1),
-        Temporada: Math.max(1, series.temporada || 1),
-        episodiosVistos,
-        totalEpisodios,
-        status: toAppwriteSeriesStatus(series.status, episodiosVistos, totalEpisodios),
-        avaliacao: series.avaliacao ?? 0,
+        capa_url: series.capa_url ?? null,
+        status: series.status,
+        temporada: res.data.season ?? season,
+        total_episodios: series.total_episodios,
+        episodios_vistos: series.episodios_vistos,
+        plataforma_slug: series.plataforma_slug ?? null,
+        avaliacao: series.avaliacao ?? null,
         rating: series.rating ?? null,
-        streamingData: series.streaming_data ?? null,
-      }, await ownerScopedPermissions(userId));
-
-      if (fromAppwriteSeriesStatus((data as unknown as AppwriteSeriesDoc).status) !== 'watchlist' && !series.is_retroactive) {
-        await awardMCoins(userId, 'INICIOU_SERIE', `Iniciou a serie ${series.titulo}.`);
-      }
-      return mapSeries(data as unknown as AppwriteSeriesDoc);
+        review: series.review ?? null,
+        streaming_data: series.streaming_data ?? null,
+        created_at: res.data.createdAt,
+        is_retroactive: series.is_retroactive,
+      } as SeriesEntry;
     },
     () => localData.addSeries(userId, series),
   );
@@ -1743,117 +745,123 @@ export async function updateSeries(
   updates: Partial<
     Pick<
       SeriesEntry,
-      'status' | 'temporada' | 'total_episodios' | 'episodios_vistos' | 'plataforma_slug' | 'avaliacao'
+      'status' | 'temporada' | 'total_episodios' | 'episodios_vistos' | 'plataforma_slug' | 'avaliacao' | 'source_movie_id'
     >
   >,
 ) {
   return withFallback(
     async () => {
-      const current = (await databases.getDocument(DATABASE_ID, COLLECTION_PERSONAL_SERIES, seriesId)) as unknown as AppwriteSeriesDoc;
-      if (!current.user_id) {
-        throw new Error("Serie sem user_id. Corrija o registro antigo antes de editar.");
-      }
-      await requireSessionUser(current.user_id);
-      const writableDoc = await repairSeriesDoc(current);
+      // Resolve the providerExternalId from updates or by looking up the current item
+      let providerExternalId = updates.source_movie_id ?? null;
+      let itemTitle: string | null = null;
+      let itemPosterPath: string | null = null;
 
-      const mappedUpdates: Record<string, number | string | null> = {};
-      const nextEpisodiosVistos = updates.episodios_vistos ?? current.episodiosVistos;
-      const nextTotalEpisodios = updates.total_episodios ?? current.totalEpisodios;
+      if (!providerExternalId) {
+        // Try to find the item in watchlist first, then watch-entries
+        try {
+          const watchlistRes = await apiClient.get<{ id: string; providerExternalId: string; type: string; title: string; posterPath: string | null; season?: number | null; episode?: number | null; createdAt: string }[]>('/watchlist');
+          const wlItem = watchlistRes.data.find((e) => e.id === seriesId);
+          if (wlItem) {
+            providerExternalId = wlItem.providerExternalId;
+            itemTitle = wlItem.title;
+            itemPosterPath = wlItem.posterPath;
+          }
+        } catch { /* ignore */ }
 
-      if (updates.temporada !== undefined) {
-        mappedUpdates.temporada = updates.temporada;
-        mappedUpdates.Temporada = updates.temporada;
-      }
-      if (updates.episodios_vistos !== undefined) mappedUpdates.episodiosVistos = updates.episodios_vistos;
-      if (updates.total_episodios !== undefined) mappedUpdates.totalEpisodios = updates.total_episodios;
-      if (updates.plataforma_slug !== undefined) mappedUpdates.plataforma = updates.plataforma_slug;
-      if (updates.avaliacao !== undefined) mappedUpdates.avaliacao = updates.avaliacao;
-      if (updates.status !== undefined) {
-        mappedUpdates.status = toAppwriteSeriesStatus(updates.status, nextEpisodiosVistos, nextTotalEpisodios);
-      } else if (
-        updates.episodios_vistos !== undefined ||
-        updates.total_episodios !== undefined
-      ) {
-        mappedUpdates.status = toAppwriteSeriesStatus(undefined, nextEpisodiosVistos, nextTotalEpisodios);
-      }
-
-      const data = (await updateDocument(
-        COLLECTION_PERSONAL_SERIES,
-        writableDoc.$id,
-        mappedUpdates,
-      )) as unknown as AppwriteSeriesDoc;
-
-      if (
-        updates.temporada !== undefined &&
-        readSeriesSeason(data) !== Math.max(1, updates.temporada)
-      ) {
-        throw new Error("A coluna 'temporada' precisa existir em 'series_pessoais' para salvar a temporada atual.");
-      }
-
-      const isRetroactive = current.plataforma?.endsWith('|retroactive') ?? false;
-      const previousSeriesStatus = fromAppwriteSeriesStatus(current.status);
-      const nextSeriesStatus = fromAppwriteSeriesStatus(data.status);
-
-      if (previousSeriesStatus === 'watchlist' && nextSeriesStatus === 'watching' && !isRetroactive) {
-        const viewerId = (current as { user_id?: string }).user_id ?? '';
-        if (viewerId) {
-          await awardMCoins(viewerId, 'INICIOU_SERIE', `Iniciou a serie ${data.titulo}.`);
+        if (!providerExternalId) {
+          try {
+            const weRes = await apiClient.get<{ id: string; type: string; providerExternalId: string; title: string; posterPath: string | null; season?: number | null; episode?: number | null; createdAt: string }[]>('/watch-entries');
+            const weItem = weRes.data.find((e) => e.id === seriesId);
+            if (weItem) {
+              providerExternalId = weItem.providerExternalId;
+              itemTitle = weItem.title;
+              itemPosterPath = weItem.posterPath;
+            }
+          } catch { /* ignore */ }
         }
       }
 
-      if (previousSeriesStatus !== 'watched' && nextSeriesStatus === 'watched' && !isRetroactive) {
-        const viewerId = (current as { user_id?: string }).user_id ?? '';
-        if (viewerId) {
-          await awardMCoins(viewerId, 'SERIE_100', `Finalizou 100% da serie ${data.titulo}.`);
+      if (!providerExternalId) {
+        return localData.updateSeries(seriesId, updates);
+      }
+
+      // If status changed to 'watched' or 'watching' from watchlist, move from watchlist to watch-entries
+      if (updates.status === 'watched' || updates.status === 'watching') {
+        try {
+          const watchlistRes = await apiClient.get<{ id: string; providerExternalId: string; type: string; title: string; posterPath: string | null; createdAt: string }[]>('/watchlist');
+          const item = watchlistRes.data.find((e) => e.id === seriesId);
+          if (item) {
+            await apiClient.delete(`/watchlist/${seriesId}`);
+            const res = await apiClient.post<{ id: string; type: string; points: number; providerExternalId: string; season?: number | null; episode?: number | null; createdAt: string }>('/watch-entries', {
+              type: 'series',
+              providerExternalId: item.providerExternalId,
+              season: updates.temporada,
+              episode: updates.episodios_vistos,
+            });
+            return {
+              id: res.data.id,
+              user_id: '',
+              titulo: item.title,
+              capa_url: item.posterPath ?? null,
+              status: updates.status,
+              source_movie_id: item.providerExternalId,
+              temporada: res.data.season ?? updates.temporada ?? 1,
+              total_episodios: updates.total_episodios ?? 0,
+              episodios_vistos: updates.episodios_vistos ?? 0,
+              plataforma_slug: updates.plataforma_slug ?? null,
+              avaliacao: updates.avaliacao ?? null,
+              rating: null,
+              review: null,
+              streaming_data: null,
+              created_at: res.data.createdAt,
+            } as SeriesEntry;
+          }
+        } catch {
+          // Not a watchlist item — fall through to episode progress
         }
       }
 
-      return mapSeries(data);
+      // Episode progress: append a new watch-entry (table is append-only)
+      if (updates.episodios_vistos !== undefined) {
+        const res = await apiClient.post<{ id: string; type: string; points: number; providerExternalId: string; season?: number | null; episode?: number | null; createdAt: string }>('/watch-entries', {
+          type: 'series',
+          providerExternalId,
+          season: updates.temporada,
+          episode: updates.episodios_vistos,
+        });
+        return {
+          id: res.data.id,
+          user_id: '',
+          titulo: itemTitle ?? '',
+          capa_url: itemPosterPath ?? null,
+          status: updates.status ?? 'watching',
+          source_movie_id: providerExternalId,
+          temporada: res.data.season ?? updates.temporada ?? 1,
+          total_episodios: updates.total_episodios ?? 0,
+          episodios_vistos: updates.episodios_vistos,
+          plataforma_slug: updates.plataforma_slug ?? null,
+          avaliacao: updates.avaliacao ?? null,
+          rating: null,
+          review: null,
+          streaming_data: null,
+          created_at: res.data.createdAt,
+        } as SeriesEntry;
+      }
+
+      // For other field-level updates (plataforma, avaliacao) fall back to localData
+      return localData.updateSeries(seriesId, updates);
     },
     () => localData.updateSeries(seriesId, updates),
   );
 }
 
 
-export async function updateOscarMoviePlatform(movieId: string, platformSlug: string) {
-  return withFallback(
-    async () => {
-      const session = await getSessionProfile();
-      if (!session) throw new Error('Sessao invalida.');
-      await updateDocument(COLLECTION_OSCAR_MOVIES, movieId, {
-        plataforma: platformSlug,
-      });
-    },
-    () => localData.updateOscarMoviePlatform(movieId, platformSlug),
-  );
-}
-
-export async function updateOscarMovieStreaming(movieId: string, streamingData: string) {
-  return withFallback(
-    async () => {
-      const session = await getSessionProfile();
-      if (!session) throw new Error('Sessao invalida.');
-      await updateDocument(COLLECTION_OSCAR_MOVIES, movieId, {
-        streamingData,
-      });
-    },
-    () => localData.updateOscarMovieStreaming(movieId, streamingData),
-  );
-}
-
 export async function updatePersonalMovieStreaming(movieId: string, streamingData: string) {
   return withFallback(
     async () => {
-      const current = (await databases.getDocument(
-        DATABASE_ID,
-        COLLECTION_PERSONAL_MOVIES,
-        movieId,
-      )) as unknown as AppwritePersonalMovieDoc;
-      await requireSessionUser(current.user_id);
-      const writableDoc = await repairPersonalMovieDoc(current);
-      await updateDocument(COLLECTION_PERSONAL_MOVIES, writableDoc.$id, {
-        streamingData,
-      });
+      // The API does not support streaming data updates on watch-entries/watchlist.
+      // Fall back to localData for this field.
+      return localData.updatePersonalMovieStreaming(movieId, streamingData);
     },
     () => localData.updatePersonalMovieStreaming(movieId, streamingData),
   );
@@ -1862,19 +870,9 @@ export async function updatePersonalMovieStreaming(movieId: string, streamingDat
 export async function updateSeriesStreaming(seriesId: string, streamingData: string) {
   return withFallback(
     async () => {
-      const current = (await databases.getDocument(
-        DATABASE_ID,
-        COLLECTION_PERSONAL_SERIES,
-        seriesId,
-      )) as unknown as AppwriteSeriesDoc;
-      if (!current.user_id) {
-        throw new Error("Serie sem user_id. Corrija o registro antigo antes de editar.");
-      }
-      await requireSessionUser(current.user_id);
-      const writableDoc = await repairSeriesDoc(current);
-      await updateDocument(COLLECTION_PERSONAL_SERIES, writableDoc.$id, {
-        streamingData,
-      });
+      // The API does not support streaming data updates on watch-entries/watchlist.
+      // Fall back to localData for this field.
+      return localData.updateSeriesStreaming(seriesId, streamingData);
     },
     () => localData.updateSeriesStreaming(seriesId, streamingData),
   );
@@ -1888,77 +886,14 @@ export async function suggestMovieToUser(
 ) {
   return withFallback(
     async () => {
-      await requireSessionUser(fromUserId);
-      if (mediaType === 'movie') {
-        const friendDocs = await listDocuments<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
-          Query.equal('user_id', [toUserId]),
-        ]);
-        const existingByTitle = friendDocs.find((doc) => doc.titulo?.toLowerCase().trim() === movie.titulo?.toLowerCase().trim());
-        if (existingByTitle) {
-          throw new Error('Esse filme ja esta na lista do amigo.');
-        }
-
-        await createDocument(COLLECTION_PERSONAL_MOVIES, {
-          ...movie,
-          source_movie_id: movie.source_movie_id
-            ? `tmdb:${movie.source_movie_id}|rec:${fromUserId}`
-            : null,
-          rating: movie.rating ?? null,
-          streamingData: movie.streaming_data ?? null,
-          user_id: toUserId,
-        }, await ownerScopedPermissions(fromUserId));
-      } else {
-        await createDocument(COLLECTION_PERSONAL_SERIES, {
-          user_id: toUserId,
-          titulo: movie.titulo,
-          capaUrl: ensureValidUrl(movie.capa_url),
-          plataforma: 'stremio',
-          temporada: 1,
-          Temporada: 1,
-          totalEpisodios: 1,
-          episodiosVistos: 0,
-          status: 'naoIniciado',
-          rating: movie.rating ?? null,
-          streamingData: movie.streaming_data ?? null,
-        }, await ownerScopedPermissions(fromUserId));
-      }
-
-      const [fromName, toName, delta] = await Promise.all([
-        getUsernameById(fromUserId),
-        getUsernameById(toUserId),
-        grantMCoins(fromUserId, 'INDICOU_FILME'),
-      ]);
-      const label = mediaType === 'movie' ? 'filme' : 'serie';
-      await Promise.all([
-        safeAddActivity(
-          toUserId,
-          `@${fromName} indicou ${label} ${movie.titulo} para voce.`,
-          0,
-        ),
-        safeAddActivity(
-          fromUserId,
-          `${fromName} indicou ${label} ${movie.titulo} para @${toName}. (+${delta} MC)`,
-          delta,
-        ),
-      ]);
+      const type = mediaType === 'tv' ? 'series' : 'movie';
+      await apiClient.post('/recommendations', {
+        toUserId,
+        type,
+        providerExternalId: movie.source_movie_id ?? '',
+      });
     },
     () => localData.suggestMovieToUser(fromUserId, toUserId, movie, mediaType),
-  );
-}
-
-export async function reactToMovie(
-  actorUserId: string,
-  targetUserId: string,
-  movieTitle: string,
-  reaction: string,
-) {
-  return withFallback(
-    async () => {
-      await requireSessionUser(actorUserId);
-      const actorName = await getUsernameById(actorUserId);
-      await addActivity(targetUserId, `${actorName} reagiu com ${reaction} ao seu filme ${movieTitle}.`, 0);
-    },
-    () => localData.reactToMovie(actorUserId, targetUserId, movieTitle, reaction),
   );
 }
 
@@ -1971,45 +906,17 @@ export async function rateMovie(
 ) {
   return withFallback(
     async () => {
-      const current = (await databases.getDocument(
-        DATABASE_ID,
-        COLLECTION_PERSONAL_MOVIES,
-        movieId,
-      )) as unknown as AppwritePersonalMovieDoc;
-      await requireSessionUser(actorUserId);
-      if (current.user_id !== actorUserId) {
-        throw new Error('Avaliacao permitida apenas para o dono do filme.');
-      }
-      const isWatched = current.status === 'watched';
-      const prevRating = current.rating ?? current.avaliacao ?? null;
-      const prevReview = current.review ?? null;
+      // We need the providerExternalId for the review. Try to find the movie in watch-entries.
+      const watchEntriesRes = await apiClient.get<{ id: string; providerExternalId: string; type: string; title: string }[]>('/watch-entries');
+      const entry = watchEntriesRes.data.find((e) => e.id === movieId);
+      const providerExternalId = entry?.providerExternalId ?? movieId;
 
-      const writableDoc = await repairPersonalMovieDoc(current);
-      try {
-        const updated = (await updateDocument(COLLECTION_PERSONAL_MOVIES, writableDoc.$id, {
-          rating: stars,
-          review: review !== undefined ? review : undefined,
-        })) as unknown as AppwritePersonalMovieDoc;
-        if ((updated.rating ?? updated.avaliacao ?? null) !== stars) {
-          throw new Error("A coluna 'rating' (Double) precisa ser criada em 'personal_movies' para salvar avaliações com decimais.");
-        }
-
-        const isRetroactive = current.plataforma_slug?.endsWith('|retroactive') || current.source_movie_id?.endsWith('|retroactive') || current.source_movie_id === 'retroactive';
-        if (isWatched && !isRetroactive) {
-          if (stars > 0 && (prevRating === null || prevRating === 0)) {
-            await awardMCoins(actorUserId, 'AVALIOU_ITEM', `avaliou o filme ${current.titulo}.`);
-          }
-          if (review && review.trim() !== '' && (prevReview === null || prevReview.trim() === '')) {
-            await awardMCoins(actorUserId, 'RESENHOU_ITEM', `escreveu uma resenha para o filme ${current.titulo}.`);
-          }
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : '';
-        if (message.includes('Unknown attribute') || message.includes('document data and permissions are missing')) {
-          throw new Error("A coluna 'rating' (Double) precisa ser criada no Appwrite em 'personal_movies' para salvar a nota.");
-        }
-        throw error;
-      }
+      await apiClient.post('/reviews', {
+        providerExternalId,
+        type: 'movie',
+        rating: stars,
+        review: review ?? undefined,
+      });
     },
     () => localData.rateMovie(actorUserId, movieId, _movieTitle, stars, review),
   );
@@ -2023,48 +930,17 @@ export async function rateSeries(
 ) {
   return withFallback(
     async () => {
-      const current = (await databases.getDocument(
-        DATABASE_ID,
-        COLLECTION_PERSONAL_SERIES,
-        seriesId,
-      )) as unknown as AppwriteSeriesDoc;
-      if (!current.user_id) {
-        throw new Error("Serie sem user_id. Corrija o registro antigo antes de avaliar.");
-      }
-      await requireSessionUser(actorUserId);
-      if (current.user_id !== actorUserId) {
-        throw new Error('Avaliacao permitida apenas para o dono da serie.');
-      }
-      const isWatched = current.status === 'concluido';
-      const prevRating = current.rating ?? current.avaliacao ?? null;
-      const prevReview = current.review ?? null;
+      // We need the providerExternalId for the review. Try to find the series in watch-entries.
+      const watchEntriesRes = await apiClient.get<{ id: string; providerExternalId: string; type: string; title: string }[]>('/watch-entries');
+      const entry = watchEntriesRes.data.find((e) => e.id === seriesId);
+      const providerExternalId = entry?.providerExternalId ?? seriesId;
 
-      const writableDoc = await repairSeriesDoc(current);
-      try {
-        const updated = (await updateDocument(COLLECTION_PERSONAL_SERIES, writableDoc.$id, {
-          rating: stars,
-          review: review !== undefined ? review : undefined,
-        })) as unknown as AppwriteSeriesDoc;
-        if ((updated.rating ?? updated.avaliacao ?? null) !== stars) {
-          throw new Error("A coluna 'rating' (Double) precisa ser criada em 'personal_series' para salvar avaliações com decimais.");
-        }
-
-        const isRetroactive = current.plataforma?.endsWith('|retroactive') ?? false;
-        if (isWatched && !isRetroactive) {
-          if (stars > 0 && (prevRating === null || prevRating === 0)) {
-            await awardMCoins(actorUserId, 'AVALIOU_ITEM', `avaliou a serie ${current.titulo}.`);
-          }
-          if (review && review.trim() !== '' && (prevReview === null || prevReview.trim() === '')) {
-            await awardMCoins(actorUserId, 'RESENHOU_ITEM', `escreveu uma resenha para a serie ${current.titulo}.`);
-          }
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : '';
-        if (message.includes('Unknown attribute') || message.includes('document data and permissions are missing')) {
-          throw new Error("A coluna 'rating' (Double) precisa ser criada no Appwrite em 'personal_series' para salvar a nota.");
-        }
-        throw error;
-      }
+      await apiClient.post('/reviews', {
+        providerExternalId,
+        type: 'series',
+        rating: stars,
+        review: review ?? undefined,
+      });
     },
     () => localData.rateSeries(actorUserId, seriesId, stars, review),
   );
@@ -2073,26 +949,17 @@ export async function rateSeries(
 export async function deleteSeries(seriesId: string) {
   return withFallback(
     async () => {
-      const current = (await databases.getDocument(
-        DATABASE_ID,
-        COLLECTION_PERSONAL_SERIES,
-        seriesId,
-      )) as unknown as AppwriteSeriesDoc;
-      if (!current.user_id) {
-        throw new Error("Serie sem user_id. Corrija o registro antigo antes de excluir.");
+      try {
+        await apiClient.delete(`/watch-entries/${seriesId}`);
+      } catch {
+        await apiClient.delete(`/watchlist/${seriesId}`);
       }
-      await requireSessionUser(current.user_id);
-      const writableDoc = await repairSeriesDoc(current);
-      await deleteDocument(COLLECTION_PERSONAL_SERIES, writableDoc.$id);
-      await deleteActivitiesForTitle(current.user_id, current.titulo);
     },
     () => localData.deleteSeries(seriesId),
   );
 }
 
-function pickRandom<T>(items: T[]) {
-  return items[Math.floor(Math.random() * items.length)] ?? null;
-}
+// REMOVED: pickRandom - no longer needed
 
 export async function getCineMatchSuggestion(
   currentUserId: string,
@@ -2101,50 +968,19 @@ export async function getCineMatchSuggestion(
 ): Promise<CineMatchSuggestion | null> {
   return withFallback(
     async () => {
-      if (mode === 'geral') {
-        const [meOscar, friendOscar, mePersonal, friendPersonal] = await Promise.all([
-          getOscarMoviesForUser(currentUserId),
-          getOscarMoviesForUser(friendUserId),
-          listPersonalMovies(currentUserId),
-          listPersonalMovies(friendUserId),
-        ]);
+      const res = await apiClient.get<{ providerExternalId: string; title: string; posterPath: string | null; type: string } | null>('/cinematch', {
+        params: { friendId: friendUserId, mode },
+      });
 
-        const meWatchlist = [...meOscar.filter((item) => item.status === 'watchlist'), ...mePersonal.filter((item) => item.status === 'watchlist')];
-        const friendWatchlist = [...friendOscar.filter((item) => item.status === 'watchlist'), ...friendPersonal.filter((item) => item.status === 'watchlist')];
-
-        const friendByTitle = new Map(friendWatchlist.map((item) => [titleKey(item.titulo), item]));
-        const common = meWatchlist.filter((item) => friendByTitle.has(titleKey(item.titulo)));
-        const picked = pickRandom(common);
-
-        if (!picked) return null;
-
-        return {
-          titulo: picked.titulo,
-          capa_url: picked.capa_url,
-          origem: 'geral',
-          reason: 'Watchlist em comum encontrada para os dois.',
-        };
-      }
-
-      const [allOscar, myStatuses, friendStatuses] = await Promise.all([
-        listDocuments<AppwriteOscarMovieDoc>(COLLECTION_OSCAR_MOVIES),
-        listDocuments<AppwriteUserOscarMovieDoc>(COLLECTION_USER_OSCAR_MOVIES, [Query.equal('user_id', [currentUserId])]),
-        listDocuments<AppwriteUserOscarMovieDoc>(COLLECTION_USER_OSCAR_MOVIES, [Query.equal('user_id', [friendUserId])]),
-      ]);
-
-      const watchedByMe = new Set(myStatuses.filter((item) => item.status === 'watched').map((item) => item.oscar_movie_id));
-      const watchedByFriend = new Set(friendStatuses.filter((item) => item.status === 'watched').map((item) => item.oscar_movie_id));
-
-      const available = allOscar.filter((movie) => !watchedByMe.has(movie.$id) && !watchedByFriend.has(movie.$id));
-      const picked = pickRandom(available);
-
-      if (!picked) return null;
+      if (!res.data) return null;
 
       return {
-        titulo: picked.titulo,
-        capa_url: picked.capaUrl,
-        origem: 'oscar',
-        reason: 'Oscar pendente para os dois usuarios.',
+        titulo: res.data.title,
+        capa_url: res.data.posterPath,
+        origem: mode,
+        reason: mode === 'geral'
+          ? 'Watchlist em comum encontrada para os dois.'
+          : 'Oscar pendente para os dois usuarios.',
       };
     },
     () => localData.getCineMatchSuggestion(currentUserId, friendUserId, mode),
@@ -2159,64 +995,45 @@ export function getSeriesStatus(episodiosVistos: number, totalEpisodios: number)
 export async function getTrendingMovies(): Promise<TrendingMovie[]> {
   return withFallback(
     async () => {
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-      const docs = await listDocuments<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
-        Query.equal('status', 'watched'),
-        Query.greaterThanEqual('$createdAt', thirtyDaysAgo.toISOString()),
-      ]);
-
-      const watcherSets = new Map<string, { title: string; coverUrl: string | null; tmdbId?: string | null; watchers: Set<string>; lastWatchedAt: string }>();
-
-      for (const doc of docs) {
-        const key = doc.source_movie_id || doc.titulo.toLowerCase().trim();
-        let group = watcherSets.get(key);
-        if (!group) {
-          group = {
-            title: doc.titulo,
-            coverUrl: doc.capa_url ?? null,
-            tmdbId: doc.source_movie_id,
-            watchers: new Set<string>(),
-            lastWatchedAt: doc.$createdAt,
-          };
-          watcherSets.set(key, group);
-        }
-        group.watchers.add(doc.user_id);
-        if (doc.$createdAt > group.lastWatchedAt) {
-          group.lastWatchedAt = doc.$createdAt;
-        }
-      }
-
-      const grouped = Array.from(watcherSets.values()).map((g) => ({
-        title: g.title,
-        coverUrl: g.coverUrl,
-        tmdbId: g.tmdbId,
-        userCount: g.watchers.size,
-        userIds: Array.from(g.watchers),
-        lastWatchedAt: g.lastWatchedAt,
+      const res = await apiClient.get<{ title: string; posterPath: string | null; providerExternalId: string; userCount: number; userIds: string[]; lastWatchedAt: string }[]>('/watch-entries/trending');
+      return res.data.map((e) => ({
+        title: e.title,
+        coverUrl: e.posterPath,
+        tmdbId: e.providerExternalId,
+        userCount: e.userCount,
+        userIds: e.userIds,
+        lastWatchedAt: e.lastWatchedAt,
       }));
-
-      grouped.sort((a, b) => {
-        if (b.userCount !== a.userCount) {
-          return b.userCount - a.userCount;
-        }
-        return new Date(b.lastWatchedAt).getTime() - new Date(a.lastWatchedAt).getTime();
-      });
-
-      return grouped.slice(0, 5);
     },
     () => localData.getTrendingMovies(),
   );
 }
 
+const categoryToApi: Record<string, string> = {
+  melhor_filme: 'best_picture',
+  melhor_ator: 'best_actor',
+  melhor_atriz: 'best_actress',
+  melhor_internacional: 'best_international_film',
+  melhor_roteiro: 'best_screenplay',
+};
+
+const categoryFromApi: Record<string, string> = Object.fromEntries(
+  Object.entries(categoryToApi).map(([k, v]) => [v, k]),
+);
+
 export async function getOscarPredictionsForUser(userId: string): Promise<UserOscarPrediction[]> {
   return withFallback(
     async () => {
-      const docs = await listDocuments<AppwriteUserOscarPredictionDoc>(COLLECTION_USER_OSCAR_PREDICTIONS, [
-        Query.equal('user_id', [userId]),
-      ]);
-      return docs.map(mapOscarPrediction);
+      const res = await apiClient.get<{ id: string; category: string; providerExternalId: string; name: string; imagePath: string | null; createdAt: string }[]>(`/users/${userId}/oscar-predictions`);
+      return res.data.map((p) => ({
+        id: p.id,
+        user_id: userId,
+        category: categoryFromApi[p.category] ?? p.category,
+        tmdb_id: p.providerExternalId,
+        title: p.name,
+        poster_path: p.imagePath ?? '',
+        created_at: p.createdAt,
+      }));
     },
     () => localData.getOscarPredictionsForUser(userId),
   );
@@ -2231,49 +1048,21 @@ export async function saveOscarPrediction(
 ): Promise<UserOscarPrediction> {
   return withFallback(
     async () => {
-      await requireSessionUser(userId);
-
-      // 1. Delete previous prediction if it exists
-      const existingDocs = await listDocuments<AppwriteUserOscarPredictionDoc>(COLLECTION_USER_OSCAR_PREDICTIONS, [
-        Query.equal('user_id', [userId]),
-        Query.equal('category', [category]),
-      ]);
-
-      for (const doc of existingDocs) {
-        try {
-          await deleteDocument(COLLECTION_USER_OSCAR_PREDICTIONS, doc.$id);
-        } catch (err) {
-          console.error(`Failed to delete old prediction ${doc.$id}:`, err);
-        }
-      }
-
-      // 2. Resolve account scoped permissions for Row Security
-      let permissions: string[] = [];
-      try {
-        permissions = await ownerScopedPermissions(userId, false);
-      } catch {
-        permissions = [
-          Permission.read(Role.user(userId)),
-          Permission.update(Role.user(userId)),
-          Permission.delete(Role.user(userId)),
-        ];
-      }
-
-      // 3. Save new prediction
-      const doc = await createDocument(
-        COLLECTION_USER_OSCAR_PREDICTIONS,
-        {
-          user_id: userId,
-          category,
-          tmdb_id: tmdbId,
-          title,
-          poster_path: posterPath,
-          created_at: new Date().toISOString(),
-        },
-        permissions
-      );
-
-      return mapOscarPrediction(doc as unknown as AppwriteUserOscarPredictionDoc);
+      const res = await apiClient.put<{ id: string; category: string; providerExternalId: string; name: string; imagePath: string | null; createdAt: string }>('/oscar-predictions', {
+        category: categoryToApi[category] ?? category,
+        providerExternalId: tmdbId,
+        name: title,
+        imagePath: posterPath,
+      });
+      return {
+        id: res.data.id,
+        user_id: userId,
+        category: categoryFromApi[res.data.category] ?? res.data.category,
+        tmdb_id: res.data.providerExternalId,
+        title: res.data.name,
+        poster_path: res.data.imagePath ?? '',
+        created_at: res.data.createdAt,
+      };
     },
     () => localData.saveOscarPrediction(userId, category, tmdbId, title, posterPath),
   );
@@ -2282,188 +1071,20 @@ export async function saveOscarPrediction(
 export async function getAnticipatedMovies(): Promise<AnticipatedMovie[]> {
   return withFallback(
     async () => {
-      const docs = await listDocuments<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
-        Query.equal('status', 'watchlist'),
-      ]);
-
-      const watcherSets = new Map<string, { title: string; coverUrl: string | null; tmdbId?: string | null; watchers: Set<string> }>();
-
-      for (const doc of docs) {
-        const key = doc.source_movie_id || doc.titulo.toLowerCase().trim();
-        let group = watcherSets.get(key);
-        if (!group) {
-          group = {
-            title: doc.titulo,
-            coverUrl: doc.capa_url ?? null,
-            tmdbId: doc.source_movie_id,
-            watchers: new Set<string>(),
-          };
-          watcherSets.set(key, group);
-        }
-        group.watchers.add(doc.user_id);
-      }
-
-      const grouped = Array.from(watcherSets.values()).map((g) => ({
-        title: g.title,
-        coverUrl: g.coverUrl,
-        tmdbId: g.tmdbId,
-        userCount: g.watchers.size,
-        userIds: Array.from(g.watchers),
+      const res = await apiClient.get<{ title: string; posterPath: string | null; providerExternalId: string; userCount: number; userIds: string[] }[]>('/watchlist/anticipated');
+      return res.data.map((e) => ({
+        title: e.title,
+        coverUrl: e.posterPath,
+        tmdbId: e.providerExternalId,
+        userCount: e.userCount,
+        userIds: e.userIds,
       }));
-
-      grouped.sort((a, b) => b.userCount - a.userCount);
-
-      return grouped.slice(0, 5);
     },
     () => localData.getAnticipatedMovies(),
   );
 }
 
-export async function countFavoritedBy(userId: string): Promise<number> {
-  return withFallback(
-    async () => {
-      const response = await databases.listDocuments(DATABASE_ID, COLLECTION_USER_FAVORITES, [
-        Query.equal('favorite_user_id', userId),
-        Query.limit(1),
-      ]);
-      return response.total;
-    },
-    () => localData.countFavoritedBy(userId),
-  );
-}
 
-export async function resetUserMcoinsForMonth(userId: string, currentMonth: string): Promise<void> {
-  return withFallback(
-    async () => {
-      const metadata = await ensureUserMetadata(userId);
-      const dbAvatarId = metadata.avatar_id || '';
-      let parsed: any = {};
-      if (dbAvatarId.startsWith('{')) {
-        try {
-          parsed = JSON.parse(dbAvatarId);
-        } catch { }
-      }
-
-      if (parsed.last_reset_month === currentMonth) {
-        return; // Already reset for this month, preserve earned points
-      }
-
-      parsed.last_reset_month = currentMonth;
-      const updated = await updateDocument(COLLECTION_USUARIOS_METADATA, metadata.$id, {
-        mcoins: 0,
-        avatar_id: JSON.stringify(parsed),
-      }) as unknown as AppwriteMetadataDoc;
-      metadataCache.set(userId, updated);
-    },
-    () => localData.resetUserMcoinsForMonth(userId, currentMonth),
-  );
-}
-
-export async function checkAndRunMonthlyReset(): Promise<void> {
-  const currentMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
-
-  // Start from July 2026
-  if (currentMonth < '2026-07') return;
-
-  const activities = await listActivities(1000); // Aumento para captar todas as atividades e atualizar corretamente a virada de mês.
-  const resetPrefix = `[Reset Mensal - ${currentMonth}]`;
-  const alreadyReset = activities.some((act) => act.message.includes(resetPrefix));
-  if (alreadyReset) return;
-
-  const users = await listRankedUsers();
-  if (users.length === 0) return;
-
-  // Filter out any system/test accounts if they exist
-  const validUsers = users.filter((u) => u.username.toLowerCase() !== 'testoscar');
-  if (validUsers.length === 0) return;
-
-  // Find the winner (highest mcoins)
-  let winner = validUsers[0];
-  for (const u of validUsers) {
-    if (u.mcoins > winner.mcoins) {
-      winner = u;
-    }
-  }
-
-  // Format winner announcement
-  const date = new Date();
-  date.setMonth(date.getMonth() - 1);
-  const prevMonthName = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-  const message = `${resetPrefix} O usuário @${winner.username} venceu o mês de ${prevMonthName} com ${winner.mcoins} MC! Parabéns! As pontuações foram zeradas para o início de um novo mês.`;
-
-  // Reset mcoins of all users to 0
-  for (const user of users) {
-    await resetUserMcoinsForMonth(user.id, currentMonth);
-  }
-
-  // Post the announcement activity for all users
-  await addActivity(winner.id, message, 0);
-}
-
-export async function getMovieCineratsStats(sourceMovieId: string | null, title: string) {
-  return withFallback(
-    async () => {
-      let docs: AppwritePersonalMovieDoc[] = [];
-      if (sourceMovieId) {
-        docs = await listDocuments<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
-          Query.equal('source_movie_id', [String(sourceMovieId)]),
-        ]);
-      }
-
-      if (docs.length === 0 && title) {
-        docs = await listDocuments<AppwritePersonalMovieDoc>(COLLECTION_PERSONAL_MOVIES, [
-          Query.equal('titulo', [title]),
-        ]);
-      }
-
-      const watchedDocs = docs.filter(d => d.status === 'watched');
-      const ratings = watchedDocs.map(d => d.rating ?? d.avaliacao).filter(r => typeof r === 'number' && r > 0) as number[];
-      const avgRating = ratings.length > 0 ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length : 0;
-
-      const reviews = docs.filter(d => d.review && d.review.trim().length > 0).map(d => ({
-        userId: d.user_id,
-        review: d.review!,
-        rating: d.rating ?? d.avaliacao ?? null,
-        createdAt: d.$createdAt,
-      }));
-
-      return {
-        watchersCount: watchedDocs.length,
-        averageRating: Number(avgRating.toFixed(1)),
-        reviews,
-      };
-    },
-    () => localData.getMovieCineratsStats(sourceMovieId, title),
-  );
-}
-
-export async function getSeriesCineratsStats(title: string) {
-  return withFallback(
-    async () => {
-      const docs = await listDocuments<AppwriteSeriesDoc>(COLLECTION_PERSONAL_SERIES, [
-        Query.equal('titulo', [title]),
-      ]);
-
-      const watchedDocs = docs.filter(d => d.status === 'concluido' || fromAppwriteSeriesStatus(d.status) === 'watched');
-      const ratings = docs.map(d => d.rating ?? d.avaliacao).filter(r => typeof r === 'number' && r > 0) as number[];
-      const avgRating = ratings.length > 0 ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length : 0;
-
-      const reviews = docs.filter(d => d.review && d.review.trim().length > 0).map(d => ({
-        userId: d.user_id || '',
-        review: d.review!,
-        rating: d.rating ?? d.avaliacao ?? null,
-        createdAt: d.$createdAt,
-      }));
-
-      return {
-        watchersCount: watchedDocs.length,
-        averageRating: Number(avgRating.toFixed(1)),
-        reviews,
-      };
-    },
-    () => localData.getSeriesCineratsStats(title),
-  );
-}
 
 
 

@@ -67,6 +67,7 @@ export interface SeriesEntry {
   total_episodios: number;
   episodios_vistos: number;
   plataforma_slug: string | null;
+  source_movie_id?: string | null;
   indicado_por_user_id?: string | null;
   avaliacao?: number | null;
   rating?: number | null;
@@ -91,9 +92,8 @@ export interface ActivityEntry {
 
 export interface UserFavorite {
   id: string;
-  owner_user_id: string;
-  favorite_user_id: string;
-  created_at: string;
+  favoriteUserId: string;
+  createdAt: string;
 }
 
 export type CineMatchMode = 'geral' | 'oscar';

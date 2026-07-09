@@ -2,7 +2,8 @@ import { useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import clsx from 'clsx';
 import { ImageUp, UserRound, X } from 'lucide-react';
-import { AVATAR_OPTIONS, createCustomAvatarId, isCustomAvatar } from '../../lib/avatars';
+import { AVATAR_OPTIONS, isCustomAvatar } from '../../lib/avatars';
+import { uploadAvatarImage } from '../../lib/appData';
 import AvatarDisplay from './AvatarDisplay';
 
 interface ProfileAvatarModalProps {
@@ -55,54 +56,6 @@ export default function ProfileAvatarModal({
     }
   };
 
-  const readImageFile = (file: File) =>
-    new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result ?? ''));
-      reader.onerror = () => reject(new Error('Falha ao ler imagem.'));
-      reader.readAsDataURL(file);
-    });
-
-  const loadImage = (src: string) =>
-    new Promise<HTMLImageElement>((resolve, reject) => {
-      const image = new Image();
-      image.onload = () => resolve(image);
-      image.onerror = () => reject(new Error('Imagem invalida.'));
-      image.src = src;
-    });
-
-  const buildAvatarDataUrl = async (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      throw new Error('Envie um arquivo de imagem.');
-    }
-
-    const source = await readImageFile(file);
-    const image = await loadImage(source);
-    let size = 96;
-    let quality = 0.76;
-
-    for (let attempt = 0; attempt < 8; attempt += 1) {
-      const canvas = document.createElement('canvas');
-      canvas.width = size;
-      canvas.height = size;
-      const context = canvas.getContext('2d');
-      if (!context) throw new Error('Nao foi possivel processar a imagem.');
-
-      const cropSize = Math.min(image.naturalWidth, image.naturalHeight);
-      const cropX = (image.naturalWidth - cropSize) / 2;
-      const cropY = (image.naturalHeight - cropSize) / 2;
-      context.drawImage(image, cropX, cropY, cropSize, cropSize, 0, 0, size, size);
-
-      const dataUrl = canvas.toDataURL('image/webp', quality);
-      if (dataUrl.length <= 12000 || size <= 56) return dataUrl;
-
-      size -= 8;
-      quality = Math.max(0.48, quality - 0.06);
-    }
-
-    throw new Error('A imagem ficou grande demais. Tente uma imagem mais simples.');
-  };
-
   const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -110,9 +63,25 @@ export default function ProfileAvatarModal({
 
     setError(null);
     setIsProcessingUpload(true);
+
     try {
-      const dataUrl = await buildAvatarDataUrl(file);
-      setSelected(createCustomAvatarId(dataUrl));
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+      if (!allowedTypes.includes(file.type)) {
+        throw new Error('Formato inválido. Use JPEG, PNG ou WebP.');
+      }
+
+      // Validate file size (2MB max)
+      const maxSize = 2 * 1024 * 1024;
+      if (file.size > maxSize) {
+        throw new Error('Arquivo muito grande. Tamanho máximo: 2MB.');
+      }
+
+      // Upload to API
+      const avatarPath = await uploadAvatarImage(file);
+
+      // Set the returned path as the selected avatar
+      setSelected(avatarPath);
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : 'Falha ao carregar imagem.');
     } finally {
@@ -177,27 +146,31 @@ export default function ProfileAvatarModal({
 
             <label
               className={clsx(
-                'mt-3 flex items-center justify-between gap-3 rounded-lg border border-dashed px-3 py-3 text-xs uppercase tracking-[0.14em] transition',
+                'mt-3 flex items-center justify-between gap-3 rounded-lg border border-dashed px-3 py-3 text-xs uppercase tracking-[0.14em] transition cursor-pointer',
                 isCustomAvatar(selected)
                   ? 'border-brand-gold bg-brand-gold/10 text-brand-gold'
                   : 'border-[#222] text-brand-text-muted hover:border-brand-gold/40 hover:text-brand-gold',
+                isProcessingUpload && 'opacity-50 cursor-not-allowed'
               )}
             >
               <span className="inline-flex items-center gap-2">
                 <ImageUp size={15} />
-                {isProcessingUpload ? 'Processando...' : 'Enviar imagem'}
+                {isProcessingUpload ? 'Enviando...' : isCustomAvatar(selected) ? 'Imagem Personalizada' : 'Enviar Imagem'}
               </span>
               {isCustomAvatar(selected) ? (
                 <AvatarDisplay avatarId={selected} className="w-8 h-8" emojiClassName="text-lg" />
               ) : null}
               <input
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp"
                 className="sr-only"
                 onChange={(event) => void handleUpload(event)}
                 disabled={isProcessingUpload}
               />
             </label>
+            <p className="text-xs text-brand-text-muted/60 mt-1">
+              Formatos: JPEG, PNG, WebP • Tamanho máximo: 2MB
+            </p>
             </div>
 
             {error ? <p className="text-xs text-red-300 mt-3">{error}</p> : null}

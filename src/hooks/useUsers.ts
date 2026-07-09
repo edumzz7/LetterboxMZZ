@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { listRankedUsers, updateUserAvatar } from '../lib/appData';
+import { listRankedUsers, updateUserAvatar, uploadAvatarImage } from '../lib/appData';
 
 export function useUsers(isAuthenticated: boolean = true) {
   return useQuery({
@@ -16,6 +16,17 @@ export function useAvatarMutation() {
   return useMutation({
     mutationFn: ({ userId, avatarId }: { userId: string; avatarId: string }) =>
       updateUserAvatar(userId, avatarId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
+}
+
+export function useAvatarUploadMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (file: File) => uploadAvatarImage(file),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['users'] });
     },

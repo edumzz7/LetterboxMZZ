@@ -18,12 +18,28 @@ export const AVATAR_OPTIONS = [
 ] as const;
 
 export function isCustomAvatar(avatarId: string | null | undefined) {
-  return Boolean(avatarId?.startsWith(CUSTOM_AVATAR_PREFIX));
+  // Support both legacy data URLs and new uploaded paths
+  return Boolean(
+    avatarId?.startsWith(CUSTOM_AVATAR_PREFIX) ||
+    avatarId?.startsWith('uploads/avatars/') ||
+    avatarId?.startsWith('/uploads/avatars/')
+  );
 }
 
 export function customAvatarSrc(avatarId: string | null | undefined) {
-  if (!isCustomAvatar(avatarId)) return null;
-  const value = avatarId?.slice(CUSTOM_AVATAR_PREFIX.length) ?? '';
+  if (!avatarId) return null;
+
+  // New API uploaded images (absolute or relative paths)
+  if (avatarId.startsWith('uploads/avatars/') || avatarId.startsWith('/uploads/avatars/')) {
+    // Ensure it starts with / for proper URL
+    const path = avatarId.startsWith('/') ? avatarId : `/${avatarId}`;
+    return path;
+  }
+
+  // Legacy custom avatars (data URLs stored locally or inline)
+  if (!avatarId.startsWith(CUSTOM_AVATAR_PREFIX)) return null;
+
+  const value = avatarId.slice(CUSTOM_AVATAR_PREFIX.length);
   if (value.startsWith('data:image/')) return value;
   if (typeof localStorage === 'undefined') return null;
   return localStorage.getItem(`${CUSTOM_AVATAR_STORAGE_PREFIX}${value}`);

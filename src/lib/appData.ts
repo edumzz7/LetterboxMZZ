@@ -385,6 +385,32 @@ export async function updateUserAvatar(userId: string, avatarId: string) {
   );
 }
 
+export async function uploadAvatarImage(file: File): Promise<string> {
+  return withFallback(
+    async () => {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await apiClient.put<{ avatarPath: string }>('/users/me/avatar', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      return response.data.avatarPath;
+    },
+    async () => {
+      // Fallback: create data URL for local mode
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result ?? ''));
+        reader.onerror = () => reject(new Error('Falha ao ler imagem.'));
+        reader.readAsDataURL(file);
+      });
+    },
+  );
+}
+
 export async function updateUserProfile(
   userId: string,
   data: {

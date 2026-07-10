@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Star, Tv, Clapperboard, Heart, Film } from 'lucide-react';
 import { usePersonalMoviesQuery } from '../../hooks/usePersonalMovies';
 import { useSeriesQuery } from '../../hooks/useSeries';
+import { useUserReviews } from '../../hooks/useReviews';
 import type { RankedUser } from '../../types/app';
 
 interface DashboardTabProps {
@@ -31,62 +32,34 @@ function formatDate(dateStr?: string) {
 export default function DashboardTab({ user, isOwnDashboard }: DashboardTabProps) {
   const moviesQuery = usePersonalMoviesQuery(user.id);
   const seriesQuery = useSeriesQuery(user.id);
+  const reviewsQuery = useUserReviews(user.id);
 
   const averageRating = useMemo(() => {
-    const movies = moviesQuery.data || [];
-    const series = seriesQuery.data || [];
+    const reviews = reviewsQuery.data || [];
+    const validReviews = reviews.filter((r) => typeof r.rating === 'number' && r.rating > 0);
 
-    let totalScore = 0;
-    let count = 0;
+    if (validReviews.length === 0) return null;
 
-    for (const m of movies) {
-      if (typeof m.avaliacao === 'number' && m.avaliacao > 0) {
-        totalScore += m.avaliacao;
-        count++;
-      }
-    }
-
-    for (const s of series) {
-      if (typeof s.avaliacao === 'number' && s.avaliacao > 0) {
-        totalScore += s.avaliacao;
-        count++;
-      }
-    }
-
-    if (count === 0) return null;
-    return (totalScore / count).toFixed(1);
-  }, [moviesQuery.data, seriesQuery.data]);
+    const totalScore = validReviews.reduce((sum, r) => sum + r.rating, 0);
+    return (totalScore / validReviews.length).toFixed(1);
+  }, [reviewsQuery.data]);
 
   const latestReviews = useMemo(() => {
-    const movies = moviesQuery.data || [];
-    const series = seriesQuery.data || [];
+    const reviews = reviewsQuery.data || [];
 
-    const movieReviews = movies
-      .filter((m) => m.review && m.review.trim().length > 0)
-      .map((m) => ({
-        id: m.id,
-        title: m.titulo,
-        type: 'movie' as const,
-        rating: m.rating ?? m.avaliacao ?? 0,
-        review: m.review!,
-        date: m.created_at,
-      }));
-
-    const seriesReviews = series
-      .filter((s) => s.review && s.review.trim().length > 0)
-      .map((s) => ({
-        id: s.id,
-        title: s.titulo,
-        type: 'series' as const,
-        rating: s.rating ?? s.avaliacao ?? 0,
-        review: s.review!,
-        date: s.created_at,
-      }));
-
-    return [...movieReviews, ...seriesReviews]
+    return reviews
+      .filter((r) => r.review && r.review.trim().length > 0 && typeof r.rating === 'number')
+      .map((r) => ({
+        id: r.id,
+        title: r.title,
+        type: r.type,
+        rating: r.rating || 0,
+        review: r.review!,
+        date: r.createdAt,
+      }))
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 6);
-  }, [moviesQuery.data, seriesQuery.data]);
+  }, [reviewsQuery.data]);
 
   const EmptyStateShortcut = () => (
     isOwnDashboard ? (
@@ -199,7 +172,7 @@ export default function DashboardTab({ user, isOwnDashboard }: DashboardTabProps
 
                     <div className="flex items-center gap-1 text-[11px] text-brand-gold-alt mb-3">
                       <Star size={10} className="fill-brand-gold-alt text-brand-gold-alt" />
-                      <span>{item.rating.toFixed(1)} / 5.0</span>
+                      <span>{(item.rating || 0).toFixed(1)} / 5.0</span>
                       <span className="text-brand-text-muted/40 mx-1">•</span>
                       <span className="text-brand-text-muted uppercase text-[9px] tracking-wider font-semibold">
                         {item.type === 'movie' ? 'Filme' : 'Série'}

@@ -19,8 +19,6 @@ import type {
 const AVATAR_IDS = ['avatar_clapper', 'avatar_popcorn', 'avatar_projector', 'avatar_girl', 'avatar_robot'];
 
 // Backend availability tracking
-let runtimeLocalMode = false;
-
 function isBackendUnavailable(error: unknown) {
   const message = error instanceof Error ? error.message : String(error ?? '');
   return (
@@ -31,25 +29,12 @@ function isBackendUnavailable(error: unknown) {
   );
 }
 
-function shouldUseLocalMode() {
-  return runtimeLocalMode;
-}
-
-function activateLocalMode() {
-  runtimeLocalMode = true;
-}
-
 async function withFallback<T>(remote: () => Promise<T>, local: () => Promise<T>) {
-  if (shouldUseLocalMode()) {
-    return local();
-  }
-
   try {
     return await remote();
   } catch (error) {
     if (isBackendUnavailable(error)) {
-      console.warn('API indisponível. Ativando modo local.', error);
-      activateLocalMode();
+      console.warn('API indisponível. Usando modo local para esta requisição.', error);
       return local();
     }
     throw error;
@@ -215,6 +200,22 @@ export async function listRankedUsers() {
 
       return apiResponse.data.map((apiUser) => {
         const prefs = apiUser.preferences;
+
+        // Parse avatarPath if it's a JSON string
+        let avatarId = prefs?.avatarPath ?? fallbackAvatar(apiUser.id);
+        let displayName = prefs?.displayName ?? undefined;
+
+        if (avatarId && avatarId.startsWith('{')) {
+          try {
+            const parsed = JSON.parse(avatarId);
+            avatarId = parsed.avatarId ?? fallbackAvatar(apiUser.id);
+            displayName = parsed.displayName ?? displayName;
+          } catch {
+            // If parsing fails, use fallback
+            avatarId = fallbackAvatar(apiUser.id);
+          }
+        }
+
         return {
           id: apiUser.id,
           username: apiUser.username,
@@ -222,8 +223,8 @@ export async function listRankedUsers() {
           user_id: apiUser.id,
           mcoins: apiUser.totalPoints,
           rank: apiUser.rank,
-          avatar_id: prefs?.avatarPath ?? fallbackAvatar(apiUser.id),
-          display_name: prefs?.displayName ?? undefined,
+          avatar_id: avatarId,
+          display_name: displayName,
           favorite_movie: prefs?.favoriteMovie ?? undefined,
           favorite_movie_2: prefs?.bestMovieWatched ?? undefined,
           favorite_genre: prefs?.favoriteGenre ?? undefined,
@@ -438,29 +439,40 @@ export async function updateUserProfile(
 export async function listPersonalMovies(userId: string) {
   return withFallback(
     async () => {
-      const [watchEntriesRes, watchlistRes] = await Promise.all([
+      const [watchEntriesRes, watchlistRes, reviewsRes] = await Promise.all([
         apiClient.get<{ id: string; type: string; points: number; providerExternalId: string; season?: number | null; episode?: number | null; createdAt: string; title: string; posterPath: string | null }[]>(`/users/${userId}/watch-entries`),
         apiClient.get<{ id: string; providerExternalId: string; type: string; title: string; posterPath: string | null; season?: number | null; episode?: number | null; createdAt: string }[]>(`/watchlist/users/${userId}`),
+        apiClient.get<{ id: string; mediaItemId: string; providerExternalId: string; type: 'movie' | 'series'; rating: number; review: string | null; createdAt: string; title: string; posterPath: string | null }[]>(`/users/${userId}/reviews`),
       ]);
+
+      // Create a map of reviews by providerExternalId for movies
+      const reviewsMap = new Map(
+        reviewsRes.data
+          .filter((r) => r.type === 'movie')
+          .map((r) => [r.providerExternalId, r])
+      );
 
       const watched: PersonalMovie[] = watchEntriesRes.data
         .filter((e) => e.type === 'movie')
-        .map((e) => ({
-          id: e.id,
-          user_id: userId,
-          titulo: e.title ?? '',
-          ano_lancamento: null,
-          capa_url: e.posterPath ?? null,
-          plataforma_slug: null,
-          status: 'watched' as MovieStatus,
-          source: 'manual' as const,
-          source_movie_id: e.providerExternalId ?? null,
-          avaliacao: null,
-          rating: null,
-          review: null,
-          streaming_data: null,
-          created_at: e.createdAt,
-        }));
+        .map((e) => {
+          const review = reviewsMap.get(e.providerExternalId);
+          return {
+            id: e.id,
+            user_id: userId,
+            titulo: e.title ?? '',
+            ano_lancamento: null,
+            capa_url: e.posterPath ?? null,
+            plataforma_slug: null,
+            status: 'watched' as MovieStatus,
+            source: 'manual' as const,
+            source_movie_id: e.providerExternalId ?? null,
+            avaliacao: review?.rating ?? null,
+            rating: review?.rating ?? null,
+            review: review?.review ?? null,
+            streaming_data: null,
+            created_at: e.createdAt,
+          };
+        });
 
       const watchlist: PersonalMovie[] = watchlistRes.data
         .filter((e) => e.type === 'movie')
@@ -525,6 +537,7 @@ export async function addPersonalMovie(
       const res = await apiClient.post<{ id: string; type: string; points: number; providerExternalId: string; season?: number | null; episode?: number | null; createdAt: string }>('/watch-entries', {
         type: 'movie',
         providerExternalId,
+        isRetroactive: movie.is_retroactive ?? false,
       });
       return {
         id: res.data.id,
@@ -568,6 +581,7 @@ export async function updatePersonalMovie(
             const res = await apiClient.post<{ id: string; type: string; points: number; providerExternalId: string; createdAt: string }>('/watch-entries', {
               type: item.type,
               providerExternalId: item.providerExternalId,
+              isRetroactive: false,
             });
             return {
               id: res.data.id,
@@ -617,13 +631,21 @@ export async function deletePersonalMovie(movieId: string) {
 export async function listSeries(userId: string) {
   return withFallback(
     async () => {
-      const [watchEntriesRes, watchlistRes] = await Promise.all([
+      const [watchEntriesRes, watchlistRes, reviewsRes] = await Promise.all([
         apiClient.get<{ id: string; type: string; points: number; providerExternalId: string; season?: number | null; episode?: number | null; createdAt: string; title: string; posterPath: string | null }[]>(`/users/${userId}/watch-entries`),
         apiClient.get<{ id: string; providerExternalId: string; type: string; title: string; posterPath: string | null; season?: number | null; episode?: number | null; createdAt: string }[]>(`/watchlist/users/${userId}`),
+        apiClient.get<{ id: string; mediaItemId: string; providerExternalId: string; type: 'movie' | 'series'; rating: number; review: string | null; createdAt: string; title: string; posterPath: string | null }[]>(`/users/${userId}/reviews`),
       ]);
 
       const seriesEntries = watchEntriesRes.data.filter((e) => e.type === 'series');
       const seriesWatchlist = watchlistRes.data.filter((e) => e.type === 'series');
+
+      // Create a map of reviews by providerExternalId for series
+      const reviewsMap = new Map(
+        reviewsRes.data
+          .filter((r) => r.type === 'series')
+          .map((r) => [r.providerExternalId, r])
+      );
 
       // Collect unique TMDB IDs to fetch season totals
       const tmdbIds = new Set<string>();
@@ -651,6 +673,7 @@ export async function listSeries(userId: string) {
         const temporada = e.season ?? 1;
         const episodios_vistos = e.episode ?? 0;
         const total_episodios = getSeasonTotal(e.providerExternalId, temporada);
+        const review = reviewsMap.get(e.providerExternalId);
         return {
           id: e.id,
           user_id: userId,
@@ -662,9 +685,9 @@ export async function listSeries(userId: string) {
           episodios_vistos,
           plataforma_slug: null,
           source_movie_id: e.providerExternalId ?? null,
-          avaliacao: null,
-          rating: null,
-          review: null,
+          avaliacao: review?.rating ?? null,
+          rating: review?.rating ?? null,
+          review: review?.review ?? null,
           streaming_data: null,
           created_at: e.createdAt,
         };
@@ -738,6 +761,7 @@ export async function addSeries(
         providerExternalId,
         season,
         episode,
+        isRetroactive: series.is_retroactive ?? false,
       });
       return {
         id: res.data.id,
@@ -818,6 +842,7 @@ export async function updateSeries(
               providerExternalId: item.providerExternalId,
               season: updates.temporada,
               episode: updates.episodios_vistos,
+              isRetroactive: false,
             });
             return {
               id: res.data.id,
@@ -849,6 +874,7 @@ export async function updateSeries(
           providerExternalId,
           season: updates.temporada,
           episode: updates.episodios_vistos,
+          isRetroactive: false,
         });
         return {
           id: res.data.id,
@@ -971,16 +997,20 @@ export async function listMediaReviews(providerExternalId: string, type: 'movie'
   return withFallback(
     async () => {
       const { data } = await apiClient.get<{
-        id: string;
-        userId: string;
-        username: string;
-        rating: number;
-        review: string | null;
-        createdAt: string;
-      }[]>('/reviews', {
+        watchersCount: number;
+        averageRating: number;
+        reviews: {
+          id: string;
+          userId: string;
+          username: string;
+          rating: number;
+          review: string | null;
+          createdAt: string;
+        }[];
+      }>('/reviews', {
         params: { providerExternalId, type },
       });
-      return data;
+      return data.reviews;
     },
     async () => {
       // Local mode: return empty array since we don't have review data locally
@@ -1000,8 +1030,8 @@ export async function listUserReviews(userId: string) {
         rating: number;
         review: string | null;
         createdAt: string;
-        mediaTitle?: string;
-        mediaPosterPath?: string;
+        title: string;
+        posterPath: string | null;
       }[]>(`/users/${userId}/reviews`);
       return data;
     },

@@ -31,9 +31,17 @@ export function customAvatarSrc(avatarId: string | null | undefined) {
 
   // New API uploaded images (absolute or relative paths)
   if (avatarId.startsWith('uploads/avatars/') || avatarId.startsWith('/uploads/avatars/')) {
-    // Ensure it starts with / for proper URL
+    // Get the API base URL and construct the full URL for the uploaded image
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+
+    // Remove /api/v1 suffix if present to get the server base URL
+    const serverBaseUrl = apiBaseUrl.replace(/\/api\/v1$/, '');
+
+    // Ensure the path starts with /
     const path = avatarId.startsWith('/') ? avatarId : `/${avatarId}`;
-    return path;
+
+    // Construct the full URL
+    return `${serverBaseUrl}${path}`;
   }
 
   // Legacy custom avatars (data URLs stored locally or inline)

@@ -414,7 +414,7 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
                             )}
                           />
                         ))}
-                        <span className="text-[10px] text-brand-gold ml-1 font-light">{rev.rating.toFixed(1)}</span>
+                        <span className="text-[10px] text-brand-gold ml-1 font-light">{(rev.rating || 0).toFixed(1)}</span>
                       </div>
                     )}
 

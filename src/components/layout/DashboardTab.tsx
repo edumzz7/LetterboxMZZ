@@ -1,7 +1,5 @@
 import { useMemo } from 'react';
 import { Star, Tv, Clapperboard, Heart, Film } from 'lucide-react';
-import { usePersonalMoviesQuery } from '../../hooks/usePersonalMovies';
-import { useSeriesQuery } from '../../hooks/useSeries';
 import { useUserReviews } from '../../hooks/useReviews';
 import type { RankedUser } from '../../types/app';
 
@@ -30,8 +28,6 @@ function formatDate(dateStr?: string) {
 }
 
 export default function DashboardTab({ user, isOwnDashboard }: DashboardTabProps) {
-  const moviesQuery = usePersonalMoviesQuery(user.id);
-  const seriesQuery = useSeriesQuery(user.id);
   const reviewsQuery = useUserReviews(user.id);
 
   const averageRating = useMemo(() => {

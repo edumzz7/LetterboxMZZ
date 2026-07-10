@@ -289,7 +289,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
                 disabled={isPending}
               />
               <span className="text-xs font-bold text-brand-gold">
-                {(userSeriesDoc?.rating || userSeriesDoc?.avaliacao) ? `${(userSeriesDoc.rating ?? userSeriesDoc.avaliacao ?? 0).toFixed(1)} / 5.0` : 'Sem nota'}
+                {(userSeriesDoc?.rating || userSeriesDoc?.avaliacao) ? `${Number(userSeriesDoc.rating ?? userSeriesDoc.avaliacao ?? 0).toFixed(1)} / 5.0` : 'Sem nota'}
               </span>
             </div>
           )}
@@ -319,7 +319,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
                 <span className="text-[10px] uppercase tracking-widest text-brand-text-muted block">Média CineRats</span>
                 <span className="text-2xl font-bold text-brand-gold flex items-center justify-center gap-1.5 mt-1">
                   <Star size={18} className="fill-brand-gold text-brand-gold shrink-0" />
-                  {cineratsStats.averageRating > 0 ? cineratsStats.averageRating.toFixed(1) : '-'}
+                  {cineratsStats.averageRating > 0 ? Number(cineratsStats.averageRating).toFixed(1) : '-'}
                 </span>
               </div>
               <div className="text-center pl-4 flex flex-col justify-center">
@@ -510,7 +510,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
                             )}
                           />
                         ))}
-                        <span className="text-[10px] text-brand-gold ml-1 font-light">{(rev.rating || 0).toFixed(1)}</span>
+                        <span className="text-[10px] text-brand-gold ml-1 font-light">{Number(rev.rating || 0).toFixed(1)}</span>
                       </div>
                     )}
 

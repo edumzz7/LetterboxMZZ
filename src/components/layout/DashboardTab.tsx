@@ -168,7 +168,7 @@ export default function DashboardTab({ user, isOwnDashboard }: DashboardTabProps
 
                     <div className="flex items-center gap-1 text-[11px] text-brand-gold-alt mb-3">
                       <Star size={10} className="fill-brand-gold-alt text-brand-gold-alt" />
-                      <span>{(item.rating || 0).toFixed(1)} / 5.0</span>
+                      <span>{Number(item.rating || 0).toFixed(1)} / 5.0</span>
                       <span className="text-brand-text-muted/40 mx-1">•</span>
                       <span className="text-brand-text-muted uppercase text-[9px] tracking-wider font-semibold">
                         {item.type === 'movie' ? 'Filme' : 'Série'}

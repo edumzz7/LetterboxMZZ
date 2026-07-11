@@ -328,7 +328,6 @@ export async function listActivities(limit = 30) {
       const res = await apiClient.get<ApiActivity[]>(`/activities?limit=${limit}`);
 
       // Fetch users to enrich activities with usernames
-      const userIds = [...new Set(res.data.map((a) => a.userId))];
       const usersMap = new Map<string, string>();
 
       try {
@@ -375,7 +374,6 @@ export async function listUserActivity(userIds: string[], limit = 20) {
       }
 
       // Fetch users to enrich activities with usernames
-      const activityUserIds = [...new Set(activities.map((a) => a.userId))];
       const usersMap = new Map<string, string>();
 
       try {

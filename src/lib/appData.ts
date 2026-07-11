@@ -250,39 +250,75 @@ function activityMessage(a: ApiActivity): string {
   const meta = a.metadata ?? {};
   const title = (meta.title as string) ?? '';
   const username = (meta.username as string) ?? '';
+  const targetUsername = (meta.targetUsername as string) ?? '';
+
   switch (a.type) {
     case 'new_member':
       return `Novo membro! @${username} entrou no cinerats.`;
     case 'favorited_user':
-      return username ? `Favoritou @${username}.` : 'Favoritou um usuário.';
+      if (username && targetUsername) return `@${username} favoritou @${targetUsername}.`;
+      if (targetUsername) return `Favoritou @${targetUsername}.`;
+      if (username) return `@${username} favoritou um usuário.`;
+      return 'Favoritou um usuário.';
     case 'watched_movie':
-      return title ? `Assistiu ${title}.` : 'Assistiu um filme.';
+      if (username && title) return `@${username} assistiu ${title}.`;
+      if (title) return `Assistiu ${title}.`;
+      if (username) return `@${username} assistiu um filme.`;
+      return 'Assistiu um filme.';
     case 'watched_episode': {
       const s = meta.season as number | undefined;
       const ep = meta.episode as number | undefined;
+      if (username && title && s && ep) return `@${username} assistiu ${title} T${s}E${ep}.`;
       if (title && s && ep) return `Assistiu ${title} T${s}E${ep}.`;
-      return title ? `Assistiu ${title}.` : 'Assistiu um episódio.';
+      if (username && title) return `@${username} assistiu ${title}.`;
+      if (title) return `Assistiu ${title}.`;
+      if (username) return `@${username} assistiu um episódio.`;
+      return 'Assistiu um episódio.';
     }
     case 'watched_documentary':
-      return title ? `Assistiu ${title}.` : 'Assistiu um documentário.';
+      if (username && title) return `@${username} assistiu ${title}.`;
+      if (title) return `Assistiu ${title}.`;
+      if (username) return `@${username} assistiu um documentário.`;
+      return 'Assistiu um documentário.';
     case 'reviewed_media':
-      return title ? `Avaliou ${title}.` : 'Avaliou uma mídia.';
+      if (username && title) return `@${username} avaliou ${title}.`;
+      if (title) return `Avaliou ${title}.`;
+      if (username) return `@${username} avaliou uma mídia.`;
+      return 'Avaliou uma mídia.';
     case 'added_to_watchlist':
-      return title ? `Adicionou ${title} à watchlist.` : 'Adicionou à watchlist.';
+      if (username && title) return `@${username} adicionou ${title} à watchlist.`;
+      if (title) return `Adicionou ${title} à watchlist.`;
+      if (username) return `@${username} adicionou à watchlist.`;
+      return 'Adicionou à watchlist.';
     case 'recommended_media':
-      return title ? `Recomendou ${title}.` : 'Fez uma recomendação.';
+      if (username && title) return `@${username} recomendou ${title}.`;
+      if (title) return `Recomendou ${title}.`;
+      if (username) return `@${username} fez uma recomendação.`;
+      return 'Fez uma recomendação.';
     default:
       return (meta.message as string) ?? 'Atividade registrada.';
   }
 }
 
-function mapApiActivity(a: ApiActivity): ActivityEntry {
+function mapApiActivity(a: ApiActivity, usersMap?: Map<string, string>): ActivityEntry {
+  // Enrich metadata with username from users map if available
+  const enrichedActivity = { ...a };
+  if (usersMap && !enrichedActivity.metadata?.username) {
+    const username = usersMap.get(a.userId);
+    if (username) {
+      enrichedActivity.metadata = {
+        ...enrichedActivity.metadata,
+        username,
+      };
+    }
+  }
+
   return {
-    id: a.id,
-    user_id: a.userId,
-    message: activityMessage(a),
+    id: enrichedActivity.id,
+    user_id: enrichedActivity.userId,
+    message: activityMessage(enrichedActivity),
     mcoins_delta: 0,
-    created_at: a.createdAt,
+    created_at: enrichedActivity.createdAt,
   };
 }
 
@@ -290,7 +326,21 @@ export async function listActivities(limit = 30) {
   return withFallback(
     async () => {
       const res = await apiClient.get<ApiActivity[]>(`/activities?limit=${limit}`);
-      return res.data.map(mapApiActivity);
+
+      // Fetch users to enrich activities with usernames
+      const userIds = [...new Set(res.data.map((a) => a.userId))];
+      const usersMap = new Map<string, string>();
+
+      try {
+        const rankedUsers = await listRankedUsers();
+        rankedUsers.forEach((user) => {
+          usersMap.set(user.id, user.display_name || user.username);
+        });
+      } catch (err) {
+        console.error('Failed to fetch users for activities:', err);
+      }
+
+      return res.data.map((activity) => mapApiActivity(activity, usersMap));
     },
     () => localData.listActivities(limit),
   );
@@ -306,21 +356,38 @@ export async function listUserActivity(userIds: string[], limit = 20) {
     async () => {
       const includesGlobal = userIds.includes('global');
 
+      let activities: ApiActivity[];
+
       if (includesGlobal) {
         // Use the feed endpoint — it already merges own + favorites + new_member activities
         const res = await apiClient.get<ApiActivity[]>(`/activities?limit=${limit}`);
-        return res.data.map(mapApiActivity);
+        activities = res.data;
+      } else {
+        // Single user profile view — fetch per user
+        const results = await Promise.all(
+          userIds.map((id) =>
+            apiClient.get<ApiActivity[]>(`/users/${id}/activities`).then((r) => r.data).catch(() => [] as ApiActivity[]),
+          ),
+        );
+        activities = results.flat();
+        activities.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        activities = activities.slice(0, limit);
       }
 
-      // Single user profile view — fetch per user
-      const results = await Promise.all(
-        userIds.map((id) =>
-          apiClient.get<ApiActivity[]>(`/users/${id}/activities`).then((r) => r.data).catch(() => [] as ApiActivity[]),
-        ),
-      );
-      const all = results.flat().map(mapApiActivity);
-      all.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      return all.slice(0, limit);
+      // Fetch users to enrich activities with usernames
+      const activityUserIds = [...new Set(activities.map((a) => a.userId))];
+      const usersMap = new Map<string, string>();
+
+      try {
+        const rankedUsers = await listRankedUsers();
+        rankedUsers.forEach((user) => {
+          usersMap.set(user.id, user.display_name || user.username);
+        });
+      } catch (err) {
+        console.error('Failed to fetch users for activities:', err);
+      }
+
+      return activities.map((activity) => mapApiActivity(activity, usersMap));
     },
     () => localData.listUserActivity(userIds[0], limit),
   );

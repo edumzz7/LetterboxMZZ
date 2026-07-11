@@ -32,11 +32,14 @@ export default function DashboardTab({ user, isOwnDashboard }: DashboardTabProps
 
   const averageRating = useMemo(() => {
     const reviews = reviewsQuery.data || [];
-    const validReviews = reviews.filter((r) => typeof r.rating === 'number' && r.rating > 0);
+    const validReviews = reviews.filter((r) => {
+      const rating = Number(r.rating);
+      return !isNaN(rating) && rating > 0;
+    });
 
     if (validReviews.length === 0) return null;
 
-    const totalScore = validReviews.reduce((sum, r) => sum + r.rating, 0);
+    const totalScore = validReviews.reduce((sum, r) => sum + Number(r.rating), 0);
     return (totalScore / validReviews.length).toFixed(1);
   }, [reviewsQuery.data]);
 

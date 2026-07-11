@@ -100,13 +100,13 @@ export default function MovieCard({
   const [synopsisModalOpen, setSynopsisModalOpen] = useState(false);
   const [resolvedTmdbId, setResolvedTmdbId] = useState<number | null>(null);
   const [ratingError, setRatingError] = useState<string | null>(null);
-  const [localRating, setLocalRating] = useState<number>(movie.rating ?? movie.avaliacao ?? 0);
+  const [localRating, setLocalRating] = useState<number>(Number(movie.rating ?? movie.avaliacao) || 0);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [pendingRating, setPendingRating] = useState<number>(localRating);
   const showReadOnlyRating = isWatched && (canRate || localRating > 0);
   const providersRef = useRef<HTMLDivElement | null>(null);
 
-  const currentRatingValue = movie.rating ?? movie.avaliacao ?? 0;
+  const currentRatingValue = Number(movie.rating ?? movie.avaliacao) || 0;
   useEffect(() => {
     setLocalRating(currentRatingValue);
   }, [currentRatingValue]);

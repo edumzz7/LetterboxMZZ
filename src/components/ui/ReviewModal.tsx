@@ -28,7 +28,7 @@ export default function ReviewModal({
   onSave,
   onSkip,
 }: ReviewModalProps) {
-  const [rating, setRating] = useState(initialRating);
+  const [rating, setRating] = useState(Number(initialRating) || 0);
   const [review, setReview] = useState(initialReview);
   const [isSaving, setIsSaving] = useState(false);
   const [isSkipping, setIsSkipping] = useState(false);
@@ -36,7 +36,7 @@ export default function ReviewModal({
 
   useEffect(() => {
     if (isOpen) {
-      setRating(initialRating);
+      setRating(Number(initialRating) || 0);
       setReview(initialReview);
       setError(null);
     }
@@ -107,7 +107,7 @@ export default function ReviewModal({
                   disabled={isReadOnly}
                 />
                 <span className="text-xs text-brand-gold font-light">
-                  {rating > 0 ? rating.toFixed(1) : 'Sem nota'}
+                  {rating > 0 ? Number(rating).toFixed(1) : 'Sem nota'}
                 </span>
               </div>
             </div>

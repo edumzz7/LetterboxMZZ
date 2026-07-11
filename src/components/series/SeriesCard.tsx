@@ -80,7 +80,7 @@ export default function SeriesCard({
   const [isSaving, setIsSaving] = useState(false);
   const [ratingPending, setRatingPending] = useState<number | null>(null);
   const [ratingError, setRatingError] = useState<string | null>(null);
-  const [localRating, setLocalRating] = useState(series.rating ?? series.avaliacao ?? 0);
+  const [localRating, setLocalRating] = useState(Number(series.rating ?? series.avaliacao) || 0);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [pendingRating, setPendingRating] = useState<number>(localRating);
   const [synopsisModalOpen, setSynopsisModalOpen] = useState(false);

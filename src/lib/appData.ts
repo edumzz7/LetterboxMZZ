@@ -1070,7 +1070,7 @@ export async function getMovieCineratsStats(sourceMovieId: string | null, title:
       const watchersCount = trendingEntry ? 1 : reviews.length; // Approximate, API doesn't return count directly
 
       // Calculate average rating
-      const ratings = reviews.map((r) => r.rating).filter((r) => r > 0);
+      const ratings = reviews.map((r) => Number(r.rating)).filter((r) => r > 0);
       const averageRating = ratings.length > 0
         ? Number((ratings.reduce((sum, r) => sum + r, 0) / ratings.length).toFixed(1))
         : 0;
@@ -1103,7 +1103,7 @@ export async function getSeriesCineratsStats(sourceMovieId: string | null, title
       const reviews = await listMediaReviews(sourceMovieId, 'series');
 
       // Calculate stats
-      const ratings = reviews.map((r) => r.rating).filter((r) => r > 0);
+      const ratings = reviews.map((r) => Number(r.rating)).filter((r) => r > 0);
       const averageRating = ratings.length > 0
         ? Number((ratings.reduce((sum, r) => sum + r, 0) / ratings.length).toFixed(1))
         : 0;

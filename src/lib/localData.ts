@@ -1141,14 +1141,14 @@ export async function getMovieCineratsStats(sourceMovieId: string | null, title:
       titleKey(m.titulo) === titleKey(title)
   );
   const watchedDocs = docs.filter((m) => m.status === 'watched');
-  const ratings = watchedDocs.map((m) => m.rating ?? m.avaliacao).filter((r) => typeof r === 'number' && r > 0) as number[];
+  const ratings = watchedDocs.map((m) => Number(m.rating ?? m.avaliacao)).filter((r) => !isNaN(r) && r > 0);
   const avg = ratings.length > 0 ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length : 0;
   const reviews = docs
     .filter((m) => m.review && m.review.trim().length > 0)
     .map((m) => ({
       userId: m.user_id,
       review: m.review!,
-      rating: m.rating ?? m.avaliacao ?? null,
+      rating: Number(m.rating ?? m.avaliacao) || null,
       createdAt: m.created_at,
     }));
   return {
@@ -1161,14 +1161,14 @@ export async function getMovieCineratsStats(sourceMovieId: string | null, title:
 export async function getSeriesCineratsStats(title: string) {
   const docs = readSeries().filter((s) => titleKey(s.titulo) === titleKey(title));
   const watchedDocs = docs.filter((s) => s.status === 'watched' || s.status === 'concluido' as any);
-  const ratings = docs.map((s) => s.rating ?? s.avaliacao).filter((r) => typeof r === 'number' && r > 0) as number[];
+  const ratings = docs.map((s) => Number(s.rating ?? s.avaliacao)).filter((r) => !isNaN(r) && r > 0);
   const avg = ratings.length > 0 ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length : 0;
   const reviews = docs
     .filter((s) => s.review && s.review.trim().length > 0)
     .map((s) => ({
       userId: s.user_id,
       review: s.review!,
-      rating: s.rating ?? s.avaliacao ?? null,
+      rating: Number(s.rating ?? s.avaliacao) || null,
       createdAt: s.created_at,
     }));
   return {

@@ -47,12 +47,12 @@ export default function DashboardTab({ user, isOwnDashboard }: DashboardTabProps
     const reviews = reviewsQuery.data || [];
 
     return reviews
-      .filter((r) => r.review && r.review.trim().length > 0 && typeof r.rating === 'number')
+      .filter((r) => r.review && r.review.trim().length > 0)
       .map((r) => ({
         id: r.id,
         title: r.title,
         type: r.type,
-        rating: r.rating || 0,
+        rating: Number(r.rating) || 0,
         review: r.review!,
         date: r.createdAt,
       }))

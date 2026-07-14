@@ -315,11 +315,11 @@ export default function SeriesCard({
           setOpen(nextOpen);
         }}
       >
-        <div className="flex min-w-0 w-full flex-col gap-3 snap-center group">
+        <div className="group relative flex min-w-0 w-full flex-row gap-3 rounded-2xl border border-[#151b28] bg-[#06080d] p-2 md:flex-col md:gap-3 md:rounded-none md:border-0 md:bg-transparent md:p-0">
             <div
               onClick={handleCardClick}
               className={clsx(
-                'relative aspect-[2/3] w-full rounded-md overflow-hidden bg-brand-card border border-[#222] transition-all',
+                'static h-32 w-20 shrink-0 overflow-hidden rounded-md border border-[#222] bg-brand-card transition-all md:relative md:h-auto md:w-full md:aspect-[2/3]',
                 canEdit && 'hover:border-brand-gold-alt hover:shadow-[0_0_15px_rgba(212,175,55,0.15)] cursor-pointer',
                 isFriendCard && 'cursor-pointer',
               )}
@@ -437,22 +437,22 @@ export default function SeriesCard({
               </div>
             </div>
 
-            <div className="flex flex-col gap-2 px-0.5">
+            <div className="flex min-w-0 flex-1 flex-col gap-2 pr-6 md:px-0 md:pr-0">
               <h3 
                 onClick={handleCardClick}
-                className="text-sm font-medium text-brand-text line-clamp-1 hover:text-brand-gold cursor-pointer transition-colors" 
+                className="max-md:order-1 text-sm font-medium text-brand-text line-clamp-1 hover:text-brand-gold cursor-pointer transition-colors"
                 title={series.titulo}
               >
                 {series.titulo}
               </h3>
 
-              <div className="flex items-center justify-between mt-1 text-[10px] tracking-wider font-light uppercase">
+              <div className="max-md:order-2 flex items-center justify-between mt-1 text-[10px] tracking-wider font-light uppercase">
                 <span className="text-brand-text-muted">
                   T{series.temporada || 1} {'\u2022'} {series.episodios_vistos} / {limit > 0 ? limit : '?'} EPS
                 </span>
                 <span className="text-brand-gold">{progressPercent}%</span>
               </div>
-              <div className="w-full h-1 bg-[#0a0f1e] overflow-hidden rounded-full border border-[#222] mt-0.5">
+              <div className="max-md:order-3 w-full h-1 bg-[#0a0f1e] overflow-hidden rounded-full border border-[#222] mt-0.5">
                 <div
                   className="h-full bg-gradient-to-r from-brand-gold-alt to-brand-gold rounded-full transition-all duration-500"
                   style={{ width: `${progressPercent}%` }}
@@ -460,7 +460,7 @@ export default function SeriesCard({
               </div>
 
               {showRating ? (
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-1 max-md:order-4">
                   <div className="flex items-center gap-2 group/stars" onClick={(e) => e.stopPropagation()}>
                     <StarRatingInput
                       value={localRating}
@@ -507,7 +507,7 @@ export default function SeriesCard({
                 </div>
               ) : null}
 
-              <div className="relative" ref={providersRef}>
+              <div className="relative max-md:order-5" ref={providersRef}>
                 <button
                   type="button"
                   onClick={(event) => {

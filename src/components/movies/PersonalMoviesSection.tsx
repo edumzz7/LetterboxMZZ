@@ -24,6 +24,7 @@ export default function PersonalMoviesSection({
   const [filter, setFilter] = useState<'watchlist' | 'watched'>('watchlist');
   const [optimisticMovies, setOptimisticMovies] = useState<PersonalMovie[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [mobileVisibleCount, setMobileVisibleCount] = useState(10);
 
   const mergedMovies = [...optimisticMovies, ...(moviesQuery.data || [])];
   const filteredMovies = mergedMovies.filter((movie) => movie.status === filter);
@@ -31,6 +32,9 @@ export default function PersonalMoviesSection({
   const maxInitialItems = canEdit ? 11 : 12;
   const hasMore = filteredMovies.length > maxInitialItems;
   const displayedMovies = isExpanded ? filteredMovies : filteredMovies.slice(0, maxInitialItems);
+  const mobileMovieLimit = canEdit ? Math.max(0, mobileVisibleCount - 1) : mobileVisibleCount;
+  const mobileDisplayedMovies = filteredMovies.slice(0, mobileMovieLimit);
+  const mobileHasMore = filteredMovies.length > mobileDisplayedMovies.length;
 
   const handleToggleStatus = (movie: PersonalMovie, nextStatus: 'watchlist' | 'watched') => {
     updateStatusMutation.mutate({ id: movie.id, status: nextStatus });
@@ -91,7 +95,27 @@ export default function PersonalMoviesSection({
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-6 gap-4 md:gap-x-6 md:gap-y-8">
+          <div className="flex flex-col gap-3 md:hidden">
+            {canEdit && <AddMovieDialog mode="personal" layout="grid" isPending={addMovieMutation.isPending} defaultStatus={filter} onSubmit={handleAddMovie} />}
+            {mobileDisplayedMovies.map((movie) => (
+              <MovieCard
+                key={movie.id}
+                movie={movie}
+                layout="grid"
+                canEdit={canEdit}
+                showPlatformSelector
+                currentUserId={currentUserId}
+                onToggleStatus={(selectedMovie, nextStatus) => handleToggleStatus(selectedMovie, nextStatus)}
+                onDelete={(selectedMovie) => deleteMovieMutation.mutate(selectedMovie.id)}
+                onPlatformChange={(selectedMovie, platformId) => updatePlatformMutation.mutate({ id: selectedMovie.id, platform: platformId })}
+                onRate={async (selectedMovie, stars, review) => rateMutation.mutateAsync({ actorUserId: currentUserId, movieId: selectedMovie.id, movieTitle: selectedMovie.titulo, stars, review })}
+                isPending={movie.id.startsWith('optimistic-')}
+              />
+            ))}
+            {mobileHasMore && <button type="button" onClick={() => setMobileVisibleCount((count) => count + 10)} className="mt-1 border border-brand-gold bg-black px-4 py-3 text-xs uppercase tracking-widest text-white transition hover:bg-brand-gold/10">Ver mais</button>}
+          </div>
+
+          <div className="hidden md:grid md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-6 gap-4 md:gap-x-6 md:gap-y-8">
             {canEdit ? (
               <div className="flex">
                 <AddMovieDialog
@@ -137,7 +161,7 @@ export default function PersonalMoviesSection({
           </div>
 
           {hasMore && (
-            <div className="flex justify-center mt-6">
+            <div className="hidden md:flex justify-center mt-6">
               <button
                 onClick={() => setIsExpanded(!isExpanded)}
                 className="text-xs uppercase tracking-widest text-brand-text-muted hover:text-brand-gold transition-colors py-2 px-4 bg-transparent border-none cursor-pointer focus:outline-none"

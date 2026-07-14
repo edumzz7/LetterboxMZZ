@@ -116,6 +116,7 @@ interface UserAchievementsProps {
   users: RankedUser[];
   userId: string;
   isLoading?: boolean;
+  maxVisible?: number;
 }
 
 export default function UserAchievements({
@@ -124,7 +125,9 @@ export default function UserAchievements({
   users,
   userId,
   isLoading = false,
+  maxVisible,
 }: UserAchievementsProps) {
+  const [showAll, setShowAll] = useState(false);
   const { predictionsQuery } = useOscarPredictions(userId);
   const isPredictionsLoading = predictionsQuery.isLoading;
   const predictions = predictionsQuery.data || [];
@@ -172,11 +175,18 @@ export default function UserAchievements({
   // Sort by rarity: level 3 (Épica/Secreta) first, then level 2 (Rara), then level 1 (Simples)
   const sorted = [...unlocked].sort((a, b) => b.level - a.level);
 
+  const visibleAchievements = maxVisible && !showAll ? sorted.slice(0, maxVisible) : sorted;
+
   return (
     <div className="flex flex-wrap items-center gap-2 py-1">
-      {sorted.map((ach) => (
+      {visibleAchievements.map((ach) => (
         <AchievementBadge key={ach.id} achievement={ach} />
       ))}
+      {maxVisible && sorted.length > maxVisible && (
+        <button type="button" onClick={() => setShowAll((current) => !current)} className="text-[9px] uppercase tracking-[0.12em] text-brand-gold-alt hover:text-brand-gold">
+          {showAll ? 'Mostrar menos' : `+${sorted.length - maxVisible} mais`}
+        </button>
+      )}
     </div>
   );
 }

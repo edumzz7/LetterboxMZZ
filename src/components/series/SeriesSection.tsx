@@ -17,12 +17,16 @@ export default function SeriesSection({ userId, canEdit, currentUserId }: Series
     useSeries(userId);
   const [filter, setFilter] = useState<SeriesStatus>('watched');
   const [isExpanded, setIsExpanded] = useState(false);
+  const [mobileVisibleCount, setMobileVisibleCount] = useState(10);
 
   const filteredSeries = (seriesQuery.data || []).filter((series) => series.status === filter);
 
   const maxInitialItems = canEdit ? 11 : 12;
   const hasMore = filteredSeries.length > maxInitialItems;
   const displayedSeries = isExpanded ? filteredSeries : filteredSeries.slice(0, maxInitialItems);
+  const mobileSeriesLimit = canEdit ? Math.max(0, mobileVisibleCount - 1) : mobileVisibleCount;
+  const mobileDisplayedSeries = filteredSeries.slice(0, mobileSeriesLimit);
+  const mobileHasMore = filteredSeries.length > mobileDisplayedSeries.length;
 
   return (
     <section className="flex flex-col gap-6">
@@ -74,7 +78,23 @@ export default function SeriesSection({ userId, canEdit, currentUserId }: Series
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-y-8 md:gap-x-6">
+          <div className="flex flex-col gap-3 md:hidden">
+            {canEdit && <AddSeriesDialog defaultStatus={filter} onSubmit={(series) => addSeriesMutation.mutateAsync(series)} isPending={addSeriesMutation.isPending} />}
+            {mobileDisplayedSeries.map((series) => (
+              <SeriesCard
+                key={series.id}
+                series={series}
+                canEdit={canEdit}
+                currentUserId={currentUserId}
+                onSaveProgress={(payload) => updateProgressMutation.mutateAsync(payload)}
+                onDelete={(seriesId) => deleteSeriesMutation.mutate(seriesId)}
+                onRate={(seriesId, stars, review) => rateSeriesMutation.mutateAsync({ actorUserId: currentUserId, seriesId, stars, review })}
+              />
+            ))}
+            {mobileHasMore && <button type="button" onClick={() => setMobileVisibleCount((count) => count + 10)} className="mt-1 border border-brand-gold bg-black px-4 py-3 text-xs uppercase tracking-widest text-white transition hover:bg-brand-gold/10">Ver mais</button>}
+          </div>
+
+          <div className="hidden md:grid md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-y-8 md:gap-x-6">
             {canEdit ? (
               <div className="flex">
                 <AddSeriesDialog
@@ -106,7 +126,7 @@ export default function SeriesSection({ userId, canEdit, currentUserId }: Series
           </div>
 
           {hasMore && (
-            <div className="flex justify-center mt-6">
+            <div className="hidden md:flex justify-center mt-6">
               <button
                 onClick={() => setIsExpanded(!isExpanded)}
                 className="text-xs uppercase tracking-widest text-brand-text-muted hover:text-brand-gold transition-colors py-2 px-4 bg-transparent border-none cursor-pointer focus:outline-none"

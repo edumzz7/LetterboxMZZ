@@ -111,7 +111,7 @@ export default function UserEventBell({
   const emptyLabel = 'Nenhuma atividade recente por enquanto.';
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className={clsx('relative', open && 'z-[100]')}>
       <button
         type="button"
         onClick={() =>
@@ -127,10 +127,11 @@ export default function UserEventBell({
             return next;
           })
         }
-        className="relative inline-flex items-center gap-2 px-3 py-2 border border-brand-gold/40 rounded-lg text-xs uppercase tracking-[0.14em] text-brand-gold hover:bg-brand-gold/10 transition"
+        aria-label={buttonLabel}
+        title={buttonLabel}
+        className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-brand-gold bg-black text-white transition hover:bg-brand-gold/10"
       >
         <Bell size={14} />
-        {buttonLabel}
         {isOwnDashboard && unseenCount > 0 ? (
           <span className="absolute -top-2 -right-2 min-w-5 h-5 px-1 rounded-full bg-brand-gold text-[#0f172a] text-[10px] font-semibold flex items-center justify-center">
             +{unseenCount}
@@ -146,7 +147,7 @@ export default function UserEventBell({
             onClick={() => setOpen(false)}
           />
           {/* Panel: centered on mobile, dropdown on desktop */}
-          <div className="fixed inset-x-4 top-[50%] -translate-y-[50%] z-50 sm:translate-y-0 sm:inset-x-auto sm:absolute sm:right-0 sm:top-[calc(100%+10px)] w-auto sm:w-[min(92vw,360px)] rounded-2xl border border-[#222] bg-[#070a10] shadow-[0_18px_60px_rgba(0,0,0,0.55)] overflow-hidden max-h-[80vh] sm:max-h-none">
+          <div className="fixed inset-x-4 top-[50%] z-[110] w-auto max-h-[80vh] -translate-y-[50%] overflow-hidden rounded-2xl border border-[#151b28] bg-[#06080d] shadow-[0_18px_60px_rgba(0,0,0,0.55)] sm:absolute sm:inset-x-auto sm:right-0 sm:top-[calc(100%+10px)] sm:w-[min(92vw,360px)] sm:max-h-none sm:translate-y-0">
             <div className="px-4 py-3 border-b border-[#161616] text-xs uppercase tracking-[0.18em] text-brand-gold-alt">
               {title}
             </div>

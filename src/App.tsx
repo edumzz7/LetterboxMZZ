@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
-import { Film, Loader2, Star } from 'lucide-react';
+import { Film, Loader2, Menu, Shuffle } from 'lucide-react';
 import AppHeader from './components/layout/Header';
 import DashboardTab from './components/layout/DashboardTab';
 import UserSidebar from './components/layout/UserSidebar';
@@ -16,10 +16,10 @@ import { useAvatarMutation, useUsers } from './hooks/useUsers';
 import { useFavorites } from './hooks/useFavorites';
 import { usePersonalMovies } from './hooks/usePersonalMovies';
 import { useSeries } from './hooks/useSeries';
-import UserAchievements from './components/ui/UserAchievements';
 import AllAchievements from './components/ui/AllAchievements';
 import RankingScreen from './components/layout/RankingScreen';
-import clsx from 'clsx';
+import GlobalSearch from './components/layout/GlobalSearch';
+import ProfileSummary from './components/layout/ProfileSummary';
 import {
   changePassword,
   adminResetPassword,
@@ -30,7 +30,7 @@ import {
   registerUser,
   updateUserProfile,
 } from './lib/appData';
-import type { SessionUser } from './types/app';
+import type { RankedUser, SessionUser } from './types/app';
 
 const SESSION_KEY = 'letterboxmzz_session_v1';
 const ADMIN_USERNAME = import.meta.env.VITE_OSCAR_ADMIN_USERNAME as string | undefined;
@@ -47,7 +47,7 @@ function readStoredSession(): SessionUser | null {
 }
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'oscars' | 'personal'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'oscars' | 'movies' | 'series' | 'personal'>('dashboard');
   const storedSession = readStoredSession();
   const [session, setSession] = useState<SessionUser | null>(storedSession);
   const [location, setLocation] = useLocation();
@@ -58,11 +58,12 @@ function App() {
   const [authPending, setAuthPending] = useState(false);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const [deleteProfilePending, setDeleteProfilePending] = useState(false);
+  const [infoMenuOpen, setInfoMenuOpen] = useState(false);
+  const infoMenuRef = useRef<HTMLDetailsElement>(null);
   // If we have a stored session, skip the loading screen entirely
   const [isBootstrapping, setIsBootstrapping] = useState(!storedSession);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const { favorites, isUserFavorited, toggleFavorite } = useFavorites(session?.id || '');
+  const { favorites, toggleFavorite } = useFavorites(session?.id || '');
 
   const usersQuery = useUsers(Boolean(session?.id));
   const avatarMutation = useAvatarMutation();
@@ -106,6 +107,16 @@ function App() {
   }, []);
 
   useEffect(() => {
+    const closeInfoMenu = (event: MouseEvent) => {
+      if (infoMenuRef.current && !infoMenuRef.current.contains(event.target as Node)) {
+        setInfoMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', closeInfoMenu);
+    return () => document.removeEventListener('mousedown', closeInfoMenu);
+  }, []);
+
+  useEffect(() => {
     if (!session?.id) return;
     if (location === '/') setLocation(`/${session.username}`);
   }, [session, location, setLocation]);
@@ -132,7 +143,7 @@ function App() {
     return () => observer.disconnect();
   }, []);
 
-  const users = usersQuery.data || [];
+  const users: RankedUser[] = usersQuery.data || [];
   const urlUsername = match ? params.username : null;
   const viewedUser = urlUsername
     ? (users.find((user) => user.username === urlUsername) || null)
@@ -155,6 +166,7 @@ function App() {
     }
   }, [activeTab, canAccessOscars]);
 
+  /* Previous title block is no longer part of the persistent header.
   const headerCopy = useMemo(() => {
     if (matchMovie) {
       return {
@@ -219,6 +231,8 @@ function App() {
       ),
     };
   }, [viewedUser, urlUsername, isOwnDashboard, isUserFavorited, toggleFavorite]);
+  void headerCopy;
+  */
 
   const persistSession = (nextSession: SessionUser | null) => {
     setSession(nextSession);
@@ -330,6 +344,54 @@ function App() {
     );
   }
 
+  const authenticatedSession = session;
+
+  const selectUser = (id: string) => {
+    const user = users.find((candidate) => candidate.id === id);
+    if (user) setLocation(`/${user.username}`);
+  };
+  const isProfileRoute = Boolean(viewedUser && !matchMovie && !matchSerie && urlUsername !== 'ranking');
+
+  return (
+    <div className="min-h-screen bg-brand-bg text-brand-text">
+      <div className="mx-auto flex w-full max-w-[1700px] flex-col gap-6 px-3 py-4 sm:px-6 lg:px-8 lg:py-6">
+        <AppHeader
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          canAccessOscars={canAccessOscars}
+          onGoHome={() => setLocation(`/${authenticatedSession.username}`)}
+          searchSlot={<GlobalSearch users={users} onSelectUser={selectUser} />}
+          hideTabs={urlUsername === 'ranking' || Boolean(matchMovie) || Boolean(matchSerie)}
+          onBack={(matchMovie || matchSerie || (!isOwnDashboard && viewedUser && urlUsername !== 'ranking')) ? () => setLocation(`/${authenticatedSession.username}`) : undefined}
+          rightSlot={<>
+            <details ref={infoMenuRef} open={infoMenuOpen} onToggle={(event) => setInfoMenuOpen(event.currentTarget.open)} className="relative">
+              <summary className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-xl border border-brand-gold bg-black text-white transition hover:bg-brand-gold/10"><Menu size={18} /></summary>
+              <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-48 rounded-xl border border-[#151b28] bg-[#06080d] p-3 text-xs shadow-2xl"><p className="text-brand-text">Blog CineRats <span className="text-brand-gold-alt">(em breve)</span></p><p className="mt-2 text-brand-text">Grupos <span className="text-brand-gold-alt">(em breve)</span></p></div>
+            </details>
+            <UserDropdownMenu session={authenticatedSession} currentRankedUser={currentRankedUser} users={users} onLogout={handleLogout} avatarMutationPending={avatarMutation.isPending} adminUsername={ADMIN_USERNAME} onChangePassword={handleChangePassword} onAdminReset={handleAdminReset} onSaveAvatar={async (avatarId, displayName) => { await avatarMutation.mutateAsync({ userId: authenticatedSession.id, avatarId }); if (displayName !== currentRankedUser?.display_name) { await updateUserProfile(authenticatedSession.id, { display_name: displayName }); await refetchUsers(); } }} onSaveProfile={async (data) => { await updateUserProfile(authenticatedSession.id, data); await refetchUsers(); }} onDeleteProfile={handleDeleteProfile} deleteProfilePending={deleteProfilePending} />
+            <UserEventBell currentUserId={authenticatedSession.id} viewedUserId={viewedUser?.id ?? authenticatedSession.id} isOwnDashboard={isOwnDashboard} friendIds={favorites?.map((favorite) => favorite.favoriteUserId) || []} />
+            <button type="button" aria-label="Abrir CineMatch" title="CineMatch" onClick={() => window.dispatchEvent(new Event('open-cinematch'))} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-brand-gold bg-black text-white transition hover:bg-brand-gold/10"><Shuffle size={16} /></button>
+          </>}
+        />
+
+        {usersQuery.isLoading ? <div className="flex justify-center py-24 text-brand-gold"><Loader2 className="animate-spin" size={32} /></div> : (
+          <div className={isProfileRoute ? 'grid grid-cols-1 gap-6 xl:grid-cols-[260px_minmax(0,1fr)_260px]' : 'min-w-0'}>
+            {isProfileRoute && viewedUser && <aside className="contents xl:flex xl:flex-col xl:gap-5"><div className="order-1 xl:order-none"><ProfileSummary user={viewedUser} users={users} currentUserId={authenticatedSession.id} movies={personalMovies} series={userSeries} isLoading={achievementsLoading} onSelectUser={selectUser} /></div><div className="order-3 xl:order-none"><UserSidebar users={users} currentUserId={authenticatedSession.id} selectedUserId={selectedUserId || authenticatedSession.id} onSelectUser={selectUser} isOpen={false} onClose={() => undefined} section="discover" /></div></aside>}
+
+            <main className="order-2 min-w-0 rounded-3xl border border-[#151b28] bg-[#06080d] p-4 xl:order-none sm:p-7 lg:p-9">
+              {matchMovie ? <MovieDetailScreen id={movieParams.id} currentUserId={session.id} /> : matchSerie ? <SeriesDetailScreen id={serieParams.id} currentUserId={session.id} /> : urlUsername === 'ranking' ? <><AllAchievements /><RankingScreen users={users} currentUserId={session.id} favorites={favorites?.map((favorite) => favorite.favoriteUserId) || []} onToggleFavorite={toggleFavorite} onSelectUser={selectUser} onBack={() => setLocation(`/${session.username}`)} /></> : urlUsername && !viewedUser ? <div className="py-20 text-center text-brand-text-muted">Usuário não encontrado.</div> : viewedUser && <div className="animate-in fade-in duration-500">{activeTab === 'dashboard' ? <DashboardTab user={viewedUser} isOwnDashboard={isOwnDashboard} /> : activeTab === 'oscars' ? <OscarPredictionsSection userId={viewedUser.id} canEdit={isOwnDashboard} /> : activeTab === 'movies' ? <PersonalMoviesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /> : activeTab === 'series' ? <SeriesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /> : <><PersonalMoviesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /><SeriesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /></>}</div>}
+            </main>
+
+            {isProfileRoute && <aside className="order-4 flex flex-col gap-5 xl:order-none"><section className="rounded-3xl border border-[#151b28] bg-[#06080d] p-5"><h2 className="text-center text-xs font-semibold uppercase tracking-[0.18em] text-brand-gold">Blog CineRats</h2><p className="mt-4 text-sm leading-relaxed text-brand-text-muted">13/07 - O Blog CineRats está em construção, assim como o sistema de grupos, em breve teremos novidades!</p></section><UserSidebar users={users} currentUserId={session.id} selectedUserId={selectedUserId || session.id} onSelectUser={selectUser} onViewAll={() => setLocation('/ranking')} isOpen={false} onClose={() => undefined} section="ranking" /></aside>}
+          </div>
+        )}
+
+        <footer className="py-5 text-center text-xs text-brand-text-muted"><p className="flex items-center justify-center gap-2"><Film size={14} className="text-brand-gold-alt" />CineRats • {currentUser?.username || 'Sessão ativa'}</p></footer>
+      </div>
+    </div>
+  );
+
+  /* Legacy layout retained below temporarily for reference.
   return (
     <div className="min-h-screen bg-brand-bg text-brand-text">
       <div className="max-w-[1600px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex flex-col gap-12">
@@ -473,6 +535,7 @@ function App() {
       </div>
     </div>
   );
+  */
 }
 
 export default App;

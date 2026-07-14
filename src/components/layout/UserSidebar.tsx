@@ -166,12 +166,22 @@ function SidebarRecommendationItem({
 function SidebarMovieItem({ 
   movie, 
   currentUserId,
-  allUsers
+  allUsers,
+  interestLabel = false
 }: { 
   movie: TrendingMovie | AnticipatedMovie; 
   currentUserId: string;
   allUsers: RankedUser[];
+  interestLabel?: boolean;
 }) {
+  const userCountLabel = interestLabel
+    ? 'querem ver'
+    : movie.userCount === 1
+      ? 'visto'
+      : 'vistos';
+  const usersDialogTitle = interestLabel
+    ? 'Usuários que querem ver'
+    : 'Usuários que registraram';
   const [expanded, setExpanded] = useState(false);
   const [showWatchers, setShowWatchers] = useState(false);
   const { addMovieMutation } = usePersonalMovieMutations(currentUserId);
@@ -227,7 +237,7 @@ function SidebarMovieItem({
               </span>
               <div className="flex items-center justify-between mt-0.5">
                 <span className="text-[9px] uppercase tracking-wider text-brand-gold-alt font-light">
-                  {movie.userCount} {movie.userCount === 1 ? 'visto' : 'vistos'}
+              {movie.userCount} {userCountLabel}
                 </span>
                 <button 
                   onClick={handleAddToWatchlist}
@@ -268,7 +278,7 @@ function SidebarMovieItem({
                 onClick={() => setShowWatchers(true)}
                 className="text-xs uppercase tracking-wider text-brand-gold-alt mb-3 hover:underline text-left"
               >
-                {movie.userCount} {movie.userCount === 1 ? 'visto' : 'vistos'}
+                    {movie.userCount} {userCountLabel}
               </button>
               <button
                 onClick={handleAddToWatchlist}
@@ -300,7 +310,7 @@ function SidebarMovieItem({
           <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[80]" />
           <Dialog.Content className="fixed left-[50%] top-[50%] z-[90] w-[90vw] max-w-sm translate-x-[-50%] translate-y-[-50%] border border-[#222] bg-[#111] p-5 shadow-2xl rounded-xl">
             <Dialog.Title className="text-sm font-medium text-brand-text mb-4 uppercase tracking-widest text-center">
-              Usuários que registraram
+                  {usersDialogTitle}
             </Dialog.Title>
             <div className="flex flex-col gap-3 max-h-[60vh] overflow-y-auto pr-2">
               {allUsers.filter(u => movie.userIds.includes(u.id)).map(user => (
@@ -332,6 +342,7 @@ interface UserSidebarProps {
   onViewAll?: () => void;
   isOpen: boolean;
   onClose: () => void;
+  section?: 'ranking' | 'discover';
 }
 
 export default function UserSidebar({
@@ -340,8 +351,9 @@ export default function UserSidebar({
   selectedUserId,
   onSelectUser,
   onViewAll,
-  isOpen,
+  isOpen: _isOpen,
   onClose,
+  section = 'discover',
 }: UserSidebarProps) {
   const [rankingMode, setRankingMode] = useState<'geral' | 'amigos'>('geral');
   const [searchQuery, setSearchQuery] = useState('');
@@ -646,20 +658,10 @@ export default function UserSidebar({
 
   return (
     <>
-      <div
-        className={clsx(
-          'fixed inset-0 bg-black/60 z-40 xl:hidden transition-opacity',
-          isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
-        )}
-        onClick={onClose}
-      />
-
       <aside
-        className={clsx(
-          'z-50 xl:z-auto w-[280px] xl:w-[258px] max-w-[calc(100vw-2rem)] shrink-0 border border-[#151515] rounded-[24px] bg-[linear-gradient(180deg,_rgba(8,10,16,0.96),_rgba(3,3,3,0.98))] p-3 h-[calc(100vh-2rem)] xl:h-fit overflow-y-auto xl:sticky xl:top-8 fixed xl:relative left-4 xl:left-auto top-4 xl:top-auto transition-transform',
-          isOpen ? 'translate-x-0' : '-translate-x-[120%] xl:translate-x-0',
-        )}
+        className="w-full min-w-0 rounded-3xl border border-[#151b28] bg-[#06080d] p-3 shadow-[0_16px_40px_rgba(0,0,0,0.2)]"
       >
+        {section === 'ranking' && <>
         <div className="flex items-center justify-between gap-3 border-b border-[#171717] pb-3">
           <div>
             <p className="text-xs uppercase tracking-[0.25em] text-brand-text-muted">Ranking</p>
@@ -889,8 +891,11 @@ export default function UserSidebar({
           )}
         </div>
 
+        </>}
+
+        {section === 'discover' && <>
         {/* Collapsible Em Alta section */}
-        <div className="mt-4 pt-3 border-t border-[#171717]">
+        <div>
           <button
             type="button"
             onClick={() => setIsTrendingOpen((prev) => !prev)}
@@ -966,7 +971,7 @@ export default function UserSidebar({
                 </div>
               ) : anticipatedMovies && anticipatedMovies.length > 0 ? (
                 anticipatedMovies.map((movie, index) => (
-                  <SidebarMovieItem key={index} movie={movie} currentUserId={currentUserId} allUsers={users} />
+                  <SidebarMovieItem key={index} movie={movie} currentUserId={currentUserId} allUsers={users} interestLabel />
                 ))
               ) : (
                 <div className="text-[10px] text-brand-text-muted font-light text-center py-4">
@@ -1063,7 +1068,7 @@ export default function UserSidebar({
             </div>
           )}
         </div>
-
+        </>}
       </aside>
     </>
   );

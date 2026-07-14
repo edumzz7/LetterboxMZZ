@@ -1,104 +1,50 @@
 import clsx from 'clsx';
-import { Menu } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { cloneElement, isValidElement, useState } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 
 interface HeaderProps {
-  activeTab: 'dashboard' | 'oscars' | 'personal';
-  onTabChange: (tab: 'dashboard' | 'oscars' | 'personal') => void;
-  title: ReactNode;
+  activeTab: 'dashboard' | 'oscars' | 'movies' | 'series' | 'personal';
+  onTabChange: (tab: 'dashboard' | 'oscars' | 'movies' | 'series' | 'personal') => void;
   canAccessOscars: boolean;
-  onToggleSidebar: () => void;
+  onGoHome: () => void;
+  searchSlot?: ReactNode;
   rightSlot?: ReactNode;
-  subSlot?: ReactNode;
   hideTabs?: boolean;
   onBack?: () => void;
+  title?: ReactNode;
+  onToggleSidebar?: () => void;
+  subSlot?: ReactNode;
 }
 
-const Header = ({
-  activeTab,
-  onTabChange,
-  title,
-  canAccessOscars,
-  onToggleSidebar,
-  rightSlot,
-  subSlot,
-  hideTabs,
-  onBack,
-}: HeaderProps) => {
-  return (
-    <header className="flex flex-col gap-6">
-      <div className="w-24 h-[1px] bg-brand-gold opacity-50" />
+const Header = ({ activeTab, onTabChange, canAccessOscars, onGoHome, searchSlot, rightSlot, hideTabs, onBack }: HeaderProps) => {
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const tabs: Array<{ id: HeaderProps['activeTab']; label: string; show?: boolean }> = [
+    { id: 'movies', label: 'Filmes' },
+    { id: 'series', label: 'Séries' },
+    { id: 'oscars', label: 'Oscar 2027', show: canAccessOscars },
+    { id: 'dashboard', label: 'Painel pessoal' },
+  ];
 
-      <div className="space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <h1 className="text-3xl md:text-4xl font-light tracking-widest text-brand-text uppercase break-words flex items-center gap-3">
-            {onBack && (
-              <button onClick={onBack} className="p-2 -ml-2 hover:bg-white/10 rounded-full transition-colors text-brand-gold shrink-0">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-              </button>
-            )}
-            {title}
-          </h1>
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
-            {rightSlot}
-            <button
-              onClick={onToggleSidebar}
-              className="xl:hidden inline-flex items-center shrink-0 gap-2 px-3 py-2 border border-[#222] rounded-lg text-xs uppercase tracking-[0.14em] text-brand-text-muted hover:text-brand-gold"
-            >
-              <Menu size={14} /> Ranking
-            </button>
-          </div>
+  return (
+    <header className="relative z-30 overflow-visible rounded-2xl border border-[#151b28] bg-[#06080d] shadow-[0_12px_36px_rgba(0,0,0,0.2)]">
+      <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 border-b border-white/5 px-3 py-3 sm:gap-5 sm:px-5">
+        <button type="button" onClick={onGoHome} aria-label="Ir para a página inicial" className={clsx('shrink-0 text-xl sm:text-2xl font-semibold tracking-[0.12em] uppercase text-brand-text transition hover:opacity-80', mobileSearchOpen && 'max-md:hidden')}>
+          <span className="text-brand-gold">C</span>ine<span className="text-brand-gold">R</span>ats
+        </button>
+        <div className={clsx('min-w-0 flex justify-center', mobileSearchOpen && 'max-md:col-span-3')}>
+          {isValidElement(searchSlot) ? cloneElement(searchSlot as ReactElement<{ mobileOpen?: boolean; onMobileOpenChange?: (open: boolean) => void }>, { mobileOpen: mobileSearchOpen, onMobileOpenChange: setMobileSearchOpen }) : searchSlot}
         </div>
-        {subSlot}
+        <div className={clsx('flex items-center justify-end gap-1.5 sm:gap-2', mobileSearchOpen && 'max-md:hidden')}>{rightSlot}</div>
       </div>
 
-      <div className="w-24 h-[1px] bg-brand-gold opacity-50" />
-
       {!hideTabs && (
-        <nav className="flex flex-col md:flex-row items-center justify-center w-full gap-8 md:gap-16 mt-4 text-sm md:text-base text-brand-text-muted font-light tracking-wider border-b border-[#111] pb-4">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => onTabChange('dashboard')}
-              className={clsx(
-                'uppercase transition-colors pb-1',
-                activeTab === 'dashboard'
-                  ? 'text-brand-gold border-b-2 border-brand-gold'
-                  : 'hover:text-brand-text',
-              )}
-            >
-              PAINEL PESSOAL
+        <nav className="flex min-h-14 items-center justify-center gap-0 overflow-x-auto px-2 sm:px-5">
+          {onBack && <button onClick={onBack} className="p-2 text-brand-gold hover:bg-white/5 rounded-lg transition" aria-label="Voltar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>}
+          {tabs.filter((tab) => tab.show !== false).map((tab) => (
+            <button key={tab.id} type="button" onClick={() => onTabChange(tab.id)} className={clsx('whitespace-nowrap border-r border-white/10 px-3 py-1.5 text-[10px] uppercase tracking-[0.12em] transition last:border-r-0 sm:px-5 sm:text-xs', activeTab === tab.id ? 'text-brand-gold font-semibold border-b-2 border-b-brand-gold' : 'text-brand-text-muted hover:text-brand-text')}>
+              {tab.label}
             </button>
-          </div>
-
-          {canAccessOscars && (
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => onTabChange('oscars')}
-                className={clsx(
-                  'uppercase transition-colors pb-1',
-                  activeTab === 'oscars'
-                    ? 'text-brand-gold border-b-2 border-brand-gold'
-                    : 'hover:text-brand-text',
-                )}
-              >
-                OSCAR 2027
-              </button>
-            </div>
-          )}
-
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => onTabChange('personal')}
-              className={clsx(
-                'uppercase transition-colors pb-1',
-                activeTab === 'personal'
-                  ? 'text-brand-gold border-b-2 border-brand-gold'
-                  : 'hover:text-brand-text',
-              )}
-            >
-              FILMES E SERIES
-            </button>
-          </div>
+          ))}
         </nav>
       )}
     </header>

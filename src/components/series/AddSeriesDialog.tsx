@@ -153,7 +153,7 @@ export default function AddSeriesDialog({
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger asChild>
-        <button className="flex min-w-0 w-full flex-col items-center justify-center gap-2 border border-[#222] text-brand-gold-alt text-xs tracking-widest uppercase rounded-md hover:border-brand-gold hover:text-brand-gold transition-all bg-brand-bg group min-h-[140px] snap-center border-dashed aspect-[2/3]">
+        <button className="flex h-32 min-w-0 w-full flex-row items-center justify-center gap-2 rounded-md border border-[#222] border-dashed bg-brand-bg text-xs uppercase tracking-widest text-brand-gold-alt transition-all hover:border-brand-gold hover:text-brand-gold md:h-auto md:min-h-[140px] md:flex-col md:aspect-[2/3] group snap-center">
           <Plus size={24} className="group-hover:scale-110 transition-transform" />
           <span>Add Serie</span>
         </button>

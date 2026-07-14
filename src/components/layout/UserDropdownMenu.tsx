@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useLocation } from 'wouter';
-import { KeyRound, LogOut, Plus, Shield, Shuffle, UserRound, Image as ImageIcon } from 'lucide-react';
+import { KeyRound, LogOut, Plus, Shield, UserRound, Image as ImageIcon, Settings } from 'lucide-react';
 import type { SessionUser, RankedUser } from '../../types/app';
-import AvatarDisplay from './AvatarDisplay';
 import EditProfileModal from './EditProfileModal';
 import ProfileAvatarModal from './ProfileAvatarModal';
 import SuggestMovieModal from './SuggestMovieModal';
@@ -55,23 +54,27 @@ export default function UserDropdownMenu({
 
   useEffect(() => {
     const handleOpenEditProfile = () => setActiveModal('editProfile');
+    const handleOpenCineMatch = () => setActiveModal('cineMatch');
     window.addEventListener('open-edit-profile', handleOpenEditProfile);
-    return () => window.removeEventListener('open-edit-profile', handleOpenEditProfile);
+    window.addEventListener('open-cinematch', handleOpenCineMatch);
+    return () => {
+      window.removeEventListener('open-edit-profile', handleOpenEditProfile);
+      window.removeEventListener('open-cinematch', handleOpenCineMatch);
+    };
   }, []);
 
-  const displayAvatar = currentRankedUser?.avatar_id || 'U1F464';
   const isAdmin = adminUsername && session.username === adminUsername;
 
   return (
     <>
       <DropdownMenu.Root>
-        <DropdownMenu.Trigger className="flex items-center gap-2 outline-none rounded-full transition hover:ring-2 hover:ring-brand-gold/40 focus:ring-2 focus:ring-brand-gold">
-          <AvatarDisplay avatarId={displayAvatar} className="w-10 h-10 border-2 border-brand-gold" />
+        <DropdownMenu.Trigger aria-label="Abrir opções do perfil" className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-brand-gold bg-black text-white outline-none transition hover:bg-brand-gold/10 focus:ring-2 focus:ring-brand-gold/40">
+          <Settings size={18} />
         </DropdownMenu.Trigger>
 
         <DropdownMenu.Portal>
           <DropdownMenu.Content
-            className="z-50 min-w-[200px] bg-[#151515] border border-[#222] rounded-md shadow-xl p-1 text-sm text-brand-text"
+            className="z-50 min-w-[200px] bg-[#06080d] border border-[#151b28] rounded-md shadow-xl p-1 text-sm text-brand-text"
             sideOffset={8}
             align="end"
           >
@@ -79,7 +82,7 @@ export default function UserDropdownMenu({
               onClick={() => {
                 setLocation(`/${session.username}`);
               }}
-              className="px-2 py-2 mb-1 border-b border-[#222] cursor-pointer hover:bg-brand-gold/10 hover:text-brand-gold transition rounded"
+              className="px-2 py-2 mb-1 border-b border-[#151b28] cursor-pointer hover:bg-brand-gold/10 hover:text-brand-gold transition rounded"
               title="Ir para minha dashboard"
             >
               <p className="font-semibold">{currentRankedUser?.display_name || session.username}</p>
@@ -123,16 +126,9 @@ export default function UserDropdownMenu({
               <Plus size={16} /> Indicar Filme
             </DropdownMenu.Item>
 
-            <DropdownMenu.Item
-              onSelect={() => setTimeout(() => setActiveModal('cineMatch'), 50)}
-              className="flex items-center gap-2 px-2 py-2 outline-none cursor-pointer rounded hover:bg-brand-gold/10 hover:text-brand-gold transition"
-            >
-              <Shuffle size={16} /> Cine-Match
-            </DropdownMenu.Item>
-
             {isAdmin && (
               <>
-                <DropdownMenu.Separator className="h-[1px] bg-[#222] my-1" />
+                <DropdownMenu.Separator className="h-[1px] bg-[#151b28] my-1" />
                 <DropdownMenu.Item
                   onSelect={() => setTimeout(() => setActiveModal('adminPanel'), 50)}
                   className="flex items-center gap-2 px-2 py-2 outline-none cursor-pointer rounded hover:bg-brand-gold/10 hover:text-brand-gold transition"
@@ -142,7 +138,7 @@ export default function UserDropdownMenu({
               </>
             )}
 
-            <DropdownMenu.Separator className="h-[1px] bg-[#222] my-1" />
+            <DropdownMenu.Separator className="h-[1px] bg-[#151b28] my-1" />
 
             <DropdownMenu.Item
               onSelect={onLogout}

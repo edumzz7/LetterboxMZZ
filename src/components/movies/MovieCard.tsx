@@ -200,14 +200,13 @@ export default function MovieCard({
   return (
     <div
       className={clsx(
-        'flex flex-col gap-3 group/card',
-        layout === 'carousel' ? 'min-w-[160px] md:min-w-[200px] snap-center' : 'w-full',
+        layout === 'grid' ? 'group/card relative flex flex-row gap-3 rounded-2xl border border-[#151b28] bg-[#06080d] p-2 md:flex-col md:gap-3 md:rounded-none md:border-0 md:bg-transparent md:p-0' : 'flex flex-col gap-3 group/card min-w-[160px] md:min-w-[200px] snap-center',
         isPending && 'opacity-90',
       )}
     >
       <div
         onClick={handleCardClick}
-        className="relative aspect-[2/3] w-full rounded-md overflow-hidden bg-brand-card border border-[#222] transition-all hover:border-brand-gold-alt hover:shadow-[0_0_15px_rgba(212,175,55,0.15)] group cursor-pointer"
+        className="static h-32 w-20 shrink-0 overflow-hidden rounded-md border border-[#222] bg-brand-card transition-all hover:border-brand-gold-alt hover:shadow-[0_0_15px_rgba(212,175,55,0.15)] group cursor-pointer md:relative md:h-auto md:w-full md:aspect-[2/3]"
       >
         <img
           src={imageSrc}
@@ -311,17 +310,17 @@ export default function MovieCard({
         ) : null}
       </div>
 
-      <div className="flex flex-col gap-2">
+      <div className="flex min-w-0 flex-1 flex-col gap-2 pr-6 md:px-0 md:pr-0">
         <h3
           onClick={handleCardClick}
-          className="text-sm font-medium text-brand-text line-clamp-1 hover:text-brand-gold cursor-pointer transition-colors"
+          className="max-md:order-1 text-sm font-medium text-brand-text line-clamp-1 hover:text-brand-gold cursor-pointer transition-colors"
           title={movie.titulo}
         >
           {movie.titulo}
         </h3>
 
         {showPlatformSelector ? (
-          <div className="relative" ref={providersRef}>
+          <div className="relative max-md:order-4" ref={providersRef}>
             <button
               type="button"
               onClick={() => {
@@ -365,7 +364,7 @@ export default function MovieCard({
         ) : null}
 
         {showReadOnlyRating ? (
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1 max-md:order-2">
             <div className="flex items-center gap-2 group/stars">
               <StarRatingInput
                 value={localRating}

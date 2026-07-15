@@ -21,6 +21,7 @@ import AllAchievements from './components/ui/AllAchievements';
 import RankingScreen from './components/layout/RankingScreen';
 import GlobalSearch from './components/layout/GlobalSearch';
 import ProfileSummary from './components/layout/ProfileSummary';
+import ProfilePageSkeleton from './components/layout/ProfilePageSkeleton';
 import {
   changePassword,
   adminResetPassword,
@@ -378,7 +379,7 @@ function App() {
           </>}
         />
 
-        {usersQuery.isLoading ? <div className="flex justify-center py-24 text-brand-gold"><Loader2 className="animate-spin" size={32} /></div> : (
+        {usersQuery.isLoading ? <ProfilePageSkeleton /> : (
           <div className={isProfileRoute ? 'grid grid-cols-1 gap-6 xl:grid-cols-[260px_minmax(0,1fr)_260px]' : 'min-w-0'}>
             {isProfileRoute && viewedUser && <aside className="contents xl:flex xl:flex-col xl:gap-5"><div className="order-1 xl:order-none"><ProfileSummary user={viewedUser} users={users} currentUserId={authenticatedSession.id} movies={personalMovies} series={userSeries} isLoading={achievementsLoading} onSelectUser={selectUser} /></div><div className="order-3 xl:order-none"><UserSidebar users={users} currentUserId={authenticatedSession.id} selectedUserId={selectedUserId || authenticatedSession.id} onSelectUser={selectUser} isOpen={false} onClose={() => undefined} section="discover" /></div></aside>}
 

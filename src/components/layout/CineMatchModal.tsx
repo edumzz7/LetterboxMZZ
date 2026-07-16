@@ -8,11 +8,12 @@ import type { AppUser, CineMatchMode, CineMatchSuggestion } from '../../types/ap
 interface CineMatchModalProps {
   currentUserId: string;
   users: AppUser[];
+  favoriteUserIds: string[];
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }
 
-export default function CineMatchModal({ currentUserId, users, open: controlledOpen, onOpenChange: controlledOnOpenChange }: CineMatchModalProps) {
+export default function CineMatchModal({ currentUserId, users, favoriteUserIds, open: controlledOpen, onOpenChange: controlledOnOpenChange }: CineMatchModalProps) {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const isControlled = controlledOpen !== undefined;
   const open = isControlled ? controlledOpen : uncontrolledOpen;
@@ -26,7 +27,7 @@ export default function CineMatchModal({ currentUserId, users, open: controlledO
   const [result, setResult] = useState<CineMatchSuggestion | null>(null);
   const cineMatchMutation = useCineMatch();
 
-  const options = users.filter((user) => user.id !== currentUserId);
+  const options = users.filter((user) => user.id !== currentUserId && favoriteUserIds.includes(user.id));
 
   const handleFind = async () => {
     if (!friendId) return;

@@ -3,14 +3,13 @@ import * as Dialog from '@radix-ui/react-dialog';
 import clsx from 'clsx';
 import { Star, Flame, ChevronDown, ChevronUp, Loader2, Film, Plus, Award } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { useLocation } from 'wouter';
 import type { RankedUser, TrendingMovie, AnticipatedMovie } from '../../types/app';
 import AvatarDisplay from './AvatarDisplay';
 import { useFavorites } from '../../hooks/useFavorites';
 import { usePersonalMovieMutations, usePersonalMoviesQuery } from '../../hooks/usePersonalMovies';
 import { useSeriesMutations, useSeriesQuery } from '../../hooks/useSeries';
 import { getTrendingMovies, getAnticipatedMovies } from '../../lib/appData';
-import { getMovieDetails, searchMulti, type TMDBMultiResult } from '../../lib/tmdb';
+import { getMovieDetails } from '../../lib/tmdb';
 import { generateImagePath } from '../../lib/imageUtils';
 
 const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY;
@@ -358,33 +357,8 @@ export default function UserSidebar({
   const [rankingMode, setRankingMode] = useState<'geral' | 'amigos'>('geral');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [tmdbResults, setTmdbResults] = useState<TMDBMultiResult[]>([]);
-  const [isSearchingTmdb, setIsSearchingTmdb] = useState(false);
-  const [, setLocation] = useLocation();
 
   const { isUserFavorited, toggleFavorite } = useFavorites(currentUserId);
-
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setTmdbResults([]);
-      setIsSearchingTmdb(false);
-      return;
-    }
-
-    setIsSearchingTmdb(true);
-    const delayDebounce = setTimeout(async () => {
-      try {
-        const results = await searchMulti(searchQuery);
-        setTmdbResults(results.slice(0, 5));
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setIsSearchingTmdb(false);
-      }
-    }, 400);
-
-    return () => clearTimeout(delayDebounce);
-  }, [searchQuery]);
   const [isTrendingOpen, setIsTrendingOpen] = useState(false);
   const [isAnticipatedOpen, setIsAnticipatedOpen] = useState(false);
   const [isRecomendadosOpen, setIsRecomendadosOpen] = useState(false);
@@ -670,19 +644,14 @@ export default function UserSidebar({
           <div className="relative flex-1 max-w-[120px]">
             <input
               type="text"
-              placeholder="Buscar..."
+              placeholder="Buscar usuário..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => setIsSearchFocused(true)}
               onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
               className="w-full bg-black/40 border border-[#222] rounded-lg px-2.5 py-1.5 pr-6 text-xs text-brand-text placeholder-brand-text-muted focus:outline-none focus:border-brand-gold transition-colors"
             />
-            {isSearchFocused && isSearchingTmdb && (
-              <div className="absolute right-2 top-2.5">
-                <Loader2 size={10} className="animate-spin text-brand-gold" />
-              </div>
-            )}
-            {isSearchFocused && (searchResults.length > 0 || tmdbResults.length > 0) && (
+            {isSearchFocused && searchResults.length > 0 && (
               <div className="absolute top-full left-[-40px] right-[-10px] sm:left-auto sm:right-0 mt-1 bg-[#0a0a0a] border border-[#222] rounded-lg shadow-xl z-50 overflow-hidden min-w-[200px] max-h-[300px] overflow-y-auto">
                 {searchResults.map((u) => (
                   <button
@@ -698,53 +667,12 @@ export default function UserSidebar({
                     onMouseDown={(e) => e.preventDefault()}
                   >
                     <AvatarDisplay avatarId={u.avatar_id} className="w-5 h-5 shrink-0" />
-                    <span className="text-xs truncate">{u.display_name || u.username} (User)</span>
+                    <span className="text-xs truncate">{u.display_name || u.username} <span className="text-brand-text-muted">(@{u.username})</span></span>
                   </button>
                 ))}
-                {tmdbResults.map((item) => {
-                  const isMovie = item.media_type === 'movie';
-                  const title = isMovie ? item.title : item.name;
-                  const year = isMovie
-                    ? item.release_date?.split('-')[0]
-                    : item.first_air_date?.split('-')[0];
-                  const label = isMovie ? 'filme' : 'série';
-
-                  return (
-                    <button
-                      key={`${item.media_type}-${item.id}`}
-                      className="w-full text-left px-2.5 py-2 hover:bg-[#151515] text-brand-text transition-colors flex items-center gap-2 border-t border-[#151515]/30"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setLocation(isMovie ? `/filme/${item.id}` : `/serie/${item.id}`);
-                        setSearchQuery('');
-                        setIsSearchFocused(false);
-                        onClose();
-                      }}
-                      onMouseDown={(e) => e.preventDefault()}
-                    >
-                      {item.poster_path ? (
-                        <img
-                          src={`https://image.tmdb.org/t/p/w92${item.poster_path}`}
-                          alt={title}
-                          className="w-4 h-6 object-cover rounded shrink-0"
-                        />
-                      ) : (
-                        <div className="w-4 h-6 bg-brand-card flex items-center justify-center rounded shrink-0">
-                          <Film size={10} className="text-[#333]" />
-                        </div>
-                      )}
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-xs truncate font-medium">{title}</span>
-                        <span className="text-[10px] text-brand-text-muted truncate">
-                          {year ? `${year} • ` : ''}{label}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
               </div>
             )}
-            {isSearchFocused && searchQuery.trim() && searchResults.length === 0 && tmdbResults.length === 0 && !isSearchingTmdb && (
+            {isSearchFocused && searchQuery.trim() && searchResults.length === 0 && (
               <div className="absolute top-full left-[-40px] right-[-10px] sm:left-auto sm:right-0 mt-1 bg-[#0a0a0a] border border-[#222] rounded-lg shadow-xl z-50 p-2 text-xs text-center text-brand-text-muted min-w-[200px]">
                 Nenhum resultado
               </div>

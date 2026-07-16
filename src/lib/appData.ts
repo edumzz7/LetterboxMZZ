@@ -1059,11 +1059,21 @@ export async function listMediaReviews(providerExternalId: string, type: 'movie'
       }>('/reviews', {
         params: { providerExternalId, type },
       });
-      return data.reviews;
+      return {
+        watchersCount: Number.isFinite(Number(data.watchersCount))
+          ? Math.max(0, Math.floor(Number(data.watchersCount)))
+          : data.reviews.length,
+        averageRating: Number(data.averageRating) || 0,
+        reviews: data.reviews,
+      };
     },
     async () => {
-      // Local mode: return empty array since we don't have review data locally
-      return [];
+      // Local mode: return empty stats since we don't have review data locally
+      return {
+        watchersCount: 0,
+        averageRating: 0,
+        reviews: [],
+      };
     },
   );
 }
@@ -1110,13 +1120,11 @@ export async function getMovieCineratsStats(sourceMovieId: string | null, title:
         return localData.getMovieCineratsStats(sourceMovieId, title);
       }
 
-      // Get reviews from new API
-      const reviews = await listMediaReviews(sourceMovieId, 'movie');
-
-      // Get watch count from watch-entries
-      const watchEntriesRes = await apiClient.get<{ id: string; providerExternalId: string; type: string }[]>('/watch-entries/trending');
-      const trendingEntry = watchEntriesRes.data.find((e) => e.providerExternalId === sourceMovieId);
-      const watchersCount = trendingEntry ? 1 : reviews.length; // Approximate, API doesn't return count directly
+      // The dynamic media page needs the all-time watcher count.
+      // Trending is a separate 30-day popularity metric and must not be used here.
+      const mediaStats = await listMediaReviews(sourceMovieId, 'movie');
+      const reviews = mediaStats.reviews;
+      const watchersCount = mediaStats.watchersCount;
 
       // Calculate average rating
       const ratings = reviews.map((r) => Number(r.rating)).filter((r) => r > 0);
@@ -1148,8 +1156,10 @@ export async function getSeriesCineratsStats(sourceMovieId: string | null, title
         return localData.getSeriesCineratsStats(title);
       }
 
-      // Get reviews from new API
-      const reviews = await listMediaReviews(sourceMovieId, 'series');
+      // Use the all-time watcher count returned by the media stats endpoint.
+      // The trending metric is intentionally not used on the dynamic page.
+      const mediaStats = await listMediaReviews(sourceMovieId, 'series');
+      const reviews = mediaStats.reviews;
 
       // Calculate stats
       const ratings = reviews.map((r) => Number(r.rating)).filter((r) => r > 0);
@@ -1158,7 +1168,7 @@ export async function getSeriesCineratsStats(sourceMovieId: string | null, title
         : 0;
 
       return {
-        watchersCount: reviews.length, // Approximate
+        watchersCount: mediaStats.watchersCount,
         averageRating,
         reviews: reviews.map((r) => ({
           userId: r.userId,

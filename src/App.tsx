@@ -361,7 +361,10 @@ function App() {
 
   const selectUser = (id: string) => {
     const user = users.find((candidate) => candidate.id === id);
-    if (user) setLocation(`/${user.username}`);
+    if (user) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      setLocation(`/${user.username}`);
+    }
   };
   const isProfileRoute = Boolean(viewedUser && !matchMovie && !matchSerie && urlUsername !== 'ranking');
 
@@ -375,13 +378,13 @@ function App() {
           onGoHome={() => setLocation(`/${authenticatedSession.username}`)}
           searchSlot={<GlobalSearch users={users} onSelectUser={selectUser} />}
           hideTabs={urlUsername === 'ranking' || Boolean(matchMovie) || Boolean(matchSerie)}
-          onBack={(matchMovie || matchSerie || (!isOwnDashboard && viewedUser && urlUsername !== 'ranking')) ? () => setLocation(`/${authenticatedSession.username}`) : undefined}
+          onBack={(matchMovie || matchSerie) ? () => setLocation(`/${authenticatedSession.username}`) : undefined}
           rightSlot={<>
             <details ref={infoMenuRef} open={infoMenuOpen} onToggle={(event) => { const open = event.currentTarget.open; setInfoMenuOpen(open); if (open) notifyHeaderMenuOpen('info'); }} className="relative">
               <summary className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-xl border border-brand-gold bg-black text-white transition hover:bg-brand-gold/10"><Menu size={18} /></summary>
               <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-48 rounded-xl border border-[#151b28] bg-[#06080d] p-3 text-xs shadow-2xl"><p className="text-brand-text">Blog CineRats <span className="text-brand-gold-alt">(em breve)</span></p><p className="mt-2 text-brand-text">Grupos <span className="text-brand-gold-alt">(em breve)</span></p></div>
             </details>
-            <UserDropdownMenu session={authenticatedSession} currentRankedUser={currentRankedUser} users={users} onLogout={handleLogout} avatarMutationPending={avatarMutation.isPending} adminUsername={ADMIN_USERNAME} onChangePassword={handleChangePassword} onAdminReset={handleAdminReset} onSaveAvatar={async (avatarId, displayName) => { await avatarMutation.mutateAsync({ userId: authenticatedSession.id, avatarId }); if (displayName !== currentRankedUser?.display_name) { await updateUserProfile(authenticatedSession.id, { display_name: displayName }); await refetchUsers(); } }} onSaveProfile={async (data) => { await updateUserProfile(authenticatedSession.id, data); await refetchUsers(); }} onDeleteProfile={handleDeleteProfile} deleteProfilePending={deleteProfilePending} />
+            <UserDropdownMenu session={authenticatedSession} currentRankedUser={currentRankedUser} users={users} favoriteUserIds={favorites?.map((favorite) => favorite.favoriteUserId) || []} onLogout={handleLogout} avatarMutationPending={avatarMutation.isPending} adminUsername={ADMIN_USERNAME} onChangePassword={handleChangePassword} onAdminReset={handleAdminReset} onSaveAvatar={async (avatarId, displayName) => { await avatarMutation.mutateAsync({ userId: authenticatedSession.id, avatarId }); if (displayName !== currentRankedUser?.display_name) { await updateUserProfile(authenticatedSession.id, { display_name: displayName }); await refetchUsers(); } }} onSaveProfile={async (data) => { await updateUserProfile(authenticatedSession.id, data); await refetchUsers(); }} onDeleteProfile={handleDeleteProfile} deleteProfilePending={deleteProfilePending} />
             <UserEventBell currentUserId={authenticatedSession.id} viewedUserId={viewedUser?.id ?? authenticatedSession.id} isOwnDashboard={isOwnDashboard} friendIds={favorites?.map((favorite) => favorite.favoriteUserId) || []} />
             <button type="button" aria-label="Abrir CineMatch" title="CineMatch" onClick={() => { notifyHeaderMenuOpen('cineMatch'); window.dispatchEvent(new Event('open-cinematch')); }} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-brand-gold bg-black text-white transition hover:bg-brand-gold/10"><Shuffle size={16} /></button>
           </>}

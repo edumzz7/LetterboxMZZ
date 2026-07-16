@@ -16,6 +16,7 @@ interface UserDropdownMenuProps {
   session: SessionUser;
   currentRankedUser: RankedUser | undefined;
   users: RankedUser[];
+  favoriteUserIds: string[];
   onLogout: () => void;
   avatarMutationPending: boolean;
   onSaveAvatar: (avatarId: string, displayName: string) => Promise<unknown>;
@@ -38,6 +39,7 @@ export default function UserDropdownMenu({
   session,
   currentRankedUser,
   users,
+  favoriteUserIds,
   onLogout,
   avatarMutationPending,
   onSaveAvatar,
@@ -214,6 +216,7 @@ export default function UserDropdownMenu({
       <CineMatchModal
         currentUserId={session.id}
         users={users}
+        favoriteUserIds={favoriteUserIds}
         open={activeModal === 'cineMatch'}
         onOpenChange={(open) => setActiveModal(open ? 'cineMatch' : null)}
       />

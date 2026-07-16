@@ -187,6 +187,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
 
   const imageSrc = generateImagePath(series.name, series.poster_path ? `https://image.tmdb.org/t/p/w500${series.poster_path}` : null);
   const backdropUrl = series.backdrop_path ? `https://image.tmdb.org/t/p/original${series.backdrop_path}` : '';
+  const tmdbRating = Number(series.vote_average ?? 0) / 2;
   const progressPercent = userSeriesDoc && userSeriesDoc.total_episodios > 0
     ? Math.min(100, Math.round((userSeriesDoc.episodios_vistos / userSeriesDoc.total_episodios) * 100))
     : 0;
@@ -314,7 +315,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
 
           {/* CineRats Stats Block */}
           {cineratsStats && (
-            <div className="grid grid-cols-2 gap-4 bg-black/20 border border-[#151515] rounded-2xl p-4 w-full sm:max-w-sm mt-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 bg-black/20 border border-[#151515] rounded-2xl p-4 w-full sm:max-w-lg mt-2">
               <div className="text-center border-r border-[#151515] pr-4">
                 <span className="text-[10px] uppercase tracking-widest text-brand-text-muted block">Média CineRats</span>
                 <span className="text-2xl font-bold text-brand-gold flex items-center justify-center gap-1.5 mt-1">
@@ -323,6 +324,13 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
                 </span>
               </div>
               <div className="text-center pl-4 flex flex-col justify-center">
+                <span className="text-[10px] uppercase tracking-widest text-brand-text-muted block">Média TMDB</span>
+                <span className="text-2xl font-bold text-brand-gold flex items-center justify-center gap-1.5 mt-1">
+                  <Star size={18} className="fill-brand-gold text-brand-gold shrink-0" />
+                  {tmdbRating > 0 ? tmdbRating.toFixed(1) : '-'}
+                </span>
+              </div>
+              <div className="col-span-2 border-t border-[#151515] pt-3 text-center sm:col-span-1 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0 flex flex-col justify-center">
                 <span className="text-[10px] uppercase tracking-widest text-brand-text-muted block">Acompanham/Viram</span>
                 <span className="text-xl font-light text-brand-text mt-1">
                   {cineratsStats.watchersCount} {cineratsStats.watchersCount === 1 ? 'membro' : 'membros'}

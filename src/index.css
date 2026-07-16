@@ -59,4 +59,28 @@
   .scrollbar-custom::-webkit-scrollbar-thumb:hover {
     background: var(--color-brand-gold-alt);
   }
+@keyframes achievement-icon-shake {
+  0%, 100% { transform: rotate(0deg) translateY(0); }
+  20% { transform: rotate(-8deg) translateY(-1px); }
+  40% { transform: rotate(7deg) translateY(0); }
+  60% { transform: rotate(-5deg) translateY(-1px); }
+  80% { transform: rotate(3deg) translateY(0); }
+}
+
+.achievement-card-rare:hover {
+  box-shadow: 0 0 24px rgba(56, 189, 248, 0.2), inset 0 0 18px rgba(56, 189, 248, 0.04);
+}
+
+.achievement-card-epic:hover {
+  box-shadow: 0 0 28px rgba(212, 175, 55, 0.24), inset 0 0 20px rgba(212, 175, 55, 0.05);
+}
+
+.achievement-card-secret:hover {
+  box-shadow: 0 0 30px rgba(168, 85, 247, 0.3), inset 0 0 22px rgba(168, 85, 247, 0.06);
+}
+
+.achievement-card-rare:hover .achievement-badge-icon,
+.achievement-card-epic:hover .achievement-badge-icon,
+.achievement-card-secret:hover .achievement-badge-icon {
+  animation: achievement-icon-shake 0.58s ease-in-out;
 }

@@ -1,20 +1,12 @@
 import { useMemo } from 'react';
 import { Star, Tv, Clapperboard, Heart, Film } from 'lucide-react';
 import { useUserReviews } from '../../hooks/useReviews';
+import { getReviewReaction } from '../../lib/reviewReactions';
 import type { RankedUser } from '../../types/app';
 
 interface DashboardTabProps {
   user: RankedUser;
   isOwnDashboard?: boolean;
-}
-
-function getEmojiForRating(rating: number) {
-  const rounded = Math.round(rating);
-  if (rounded <= 1) return '😡';
-  if (rounded === 2) return '😢';
-  if (rounded === 3) return '😐';
-  if (rounded === 4) return '😊';
-  return '🥳';
 }
 
 function formatDate(dateStr?: string) {
@@ -150,13 +142,15 @@ export default function DashboardTab({ user, isOwnDashboard }: DashboardTabProps
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {latestReviews.map((item) => {
-              const emoji = getEmojiForRating(item.rating);
+              const reaction = getReviewReaction(item.rating);
               return (
                 <div key={item.id} className="flex items-start gap-4">
-                  {/* Emoji expressivo baseado na nota */}
-                  <span className="text-4xl sm:text-5xl select-none leading-none pt-2 shrink-0 hover:scale-110 transition-transform duration-200">
-                    {emoji}
-                  </span>
+                  {/* Reação visual baseada na nota */}
+                  <img
+                    src={reaction}
+                    alt={`Reação para nota ${item.rating.toFixed(1)} de 5`}
+                    className="w-12 h-12 sm:w-14 sm:h-14 object-contain select-none pt-1 shrink-0 hover:scale-110 transition-transform duration-200"
+                  />
 
                   {/* Balão de fala */}
                   <div className="flex-1 bg-[#111] border border-[#222] rounded-2xl p-5 relative min-w-0 before:content-[''] before:absolute before:top-6 before:-left-[9px] before:w-4 before:h-4 before:rotate-45 before:bg-[#111] before:border-l before:border-b before:border-[#222] transition-colors hover:border-brand-gold/20 duration-300">

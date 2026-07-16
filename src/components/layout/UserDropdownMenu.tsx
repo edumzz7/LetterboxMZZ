@@ -10,6 +10,7 @@ import CineMatchModal from './CineMatchModal';
 import ChangePasswordModal from './ChangePasswordModal';
 import AdminPanel from './AdminPanel';
 import ShareReviewModal from './ShareReviewModal';
+import { HEADER_MENU_OPEN_EVENT, notifyHeaderMenuOpen } from '../../lib/headerMenu';
 
 interface UserDropdownMenuProps {
   session: SessionUser;
@@ -51,6 +52,7 @@ export default function UserDropdownMenu({
   const [activeModal, setActiveModal] = useState<
     'editProfile' | 'avatar' | 'suggest' | 'cineMatch' | 'changePassword' | 'adminPanel' | 'shareReview' | null
   >(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     const handleOpenEditProfile = () => setActiveModal('editProfile');
@@ -63,11 +65,19 @@ export default function UserDropdownMenu({
     };
   }, []);
 
+  useEffect(() => {
+    const handleOtherHeaderMenu = (event: Event) => {
+      if ((event as CustomEvent<string>).detail !== 'profile') setMenuOpen(false);
+    };
+    window.addEventListener(HEADER_MENU_OPEN_EVENT, handleOtherHeaderMenu);
+    return () => window.removeEventListener(HEADER_MENU_OPEN_EVENT, handleOtherHeaderMenu);
+  }, []);
+
   const isAdmin = adminUsername && session.username === adminUsername;
 
   return (
     <>
-      <DropdownMenu.Root>
+      <DropdownMenu.Root open={menuOpen} onOpenChange={(open) => { if (open) notifyHeaderMenuOpen('profile'); setMenuOpen(open); }}>
         <DropdownMenu.Trigger aria-label="Abrir opções do perfil" className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-brand-gold bg-black text-white outline-none transition hover:bg-brand-gold/10 focus:ring-2 focus:ring-brand-gold/40">
           <Settings size={18} />
         </DropdownMenu.Trigger>

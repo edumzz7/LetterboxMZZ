@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import type { TouchEvent } from 'react';
 import { ChevronRight, Users } from 'lucide-react';
 import type { PersonalMovie, RankedUser, SeriesEntry } from '../../types/app';
 import AvatarDisplay from './AvatarDisplay';
@@ -18,12 +19,30 @@ interface ProfileSummaryProps {
 export default function ProfileSummary({ user, users, currentUserId, movies, series, isLoading, onSelectUser }: ProfileSummaryProps) {
   const [slide, setSlide] = useState<'profile' | 'friends'>('profile');
   const [showAllFriends, setShowAllFriends] = useState(false);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const { favorites } = useFavorites(user.id);
   const friends = users.filter((candidate) => favorites?.some((favorite) => favorite.favoriteUserId === candidate.id));
   const visibleFriends = showAllFriends ? friends : friends.slice(0, 5);
 
+  const handleTouchStart = (event: TouchEvent<HTMLElement>) => {
+    const touch = event.touches[0];
+    touchStartRef.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
+  };
+
+  const handleTouchEnd = (event: TouchEvent<HTMLElement>) => {
+    const start = touchStartRef.current;
+    const touch = event.changedTouches[0];
+    touchStartRef.current = null;
+    if (!start || !touch) return;
+
+    const deltaX = touch.clientX - start.x;
+    const deltaY = touch.clientY - start.y;
+    if (Math.abs(deltaX) < 45 || Math.abs(deltaX) <= Math.abs(deltaY)) return;
+    setSlide(deltaX < 0 ? 'friends' : 'profile');
+  };
+
   return (
-    <section className="rounded-3xl border border-[#151b28] bg-[#06080d] p-5 shadow-[0_16px_40px_rgba(0,0,0,0.24)]">
+    <section className="rounded-3xl border border-[#151b28] bg-[#06080d] p-5 shadow-[0_16px_40px_rgba(0,0,0,0.24)]" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} onTouchCancel={() => { touchStartRef.current = null; }} style={{ touchAction: 'pan-y' }}>
       {slide === 'profile' ? <div className="flex flex-col items-center text-center animate-in fade-in duration-200">
         <AvatarDisplay avatarId={user.avatar_id} className="h-24 w-24 rounded-full border-[3px] border-brand-gold shadow-[0_0_28px_rgba(212,175,55,0.16)]" emojiClassName="text-5xl" />
         <h2 className="mt-3 max-w-full truncate text-base font-semibold uppercase tracking-[0.12em] text-brand-text">{user.display_name || user.username}</h2>

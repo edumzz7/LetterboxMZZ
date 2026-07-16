@@ -905,3 +905,146 @@ export function getUnlockedAchievements(
 
   return unlocked.filter((ach) => !idsToExclude.has(ach.id));
 }
+
+export interface AchievementProgressContext {
+  movies: PersonalMovie[];
+  series: SeriesEntry[];
+  users: RankedUser[];
+  userId: string;
+  predictions: UserOscarPrediction[];
+  favoritesCount: number;
+  favoritedByCount: number;
+  activities: ActivityEntry[];
+}
+
+function progressRatio(current: number, target: number) {
+  if (target <= 0) return 0;
+  return Math.min(100, Math.round((current / target) * 100));
+}
+
+function watchedMovies(movies: PersonalMovie[]) {
+  return movies.filter((movie) => movie.status === 'watched');
+}
+
+function watchedMovieCountForDirector(movies: PersonalMovie[], director: string) {
+  return watchedMovies(movies).filter(
+    (movie) => MOVIE_DIRECTORS[movie.titulo.toLowerCase().trim()] === director,
+  ).length;
+}
+
+function maxSevenDayMovieCount(movies: PersonalMovie[]) {
+  const times = watchedMovies(movies)
+    .map((movie) => new Date(movie.created_at).getTime())
+    .filter(Number.isFinite)
+    .sort((a, b) => a - b);
+  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+  let max = 0;
+  times.forEach((time, index) => {
+    let end = index;
+    while (end < times.length && times[end] - time <= sevenDaysMs) end += 1;
+    max = Math.max(max, end - index);
+  });
+  return max;
+}
+
+function uniqueNonEnglishLanguages(movies: PersonalMovie[]) {
+  return new Set(
+    watchedMovies(movies)
+      .map((movie) => MOVIE_LANGUAGES[movie.titulo.toLowerCase().trim()])
+      .filter((language): language is string => Boolean(language && language !== 'en')),
+  ).size;
+}
+
+export function getFavoriteDirector(movies: PersonalMovie[]) {
+  const counts = new Map<string, number>();
+  watchedMovies(movies).forEach((movie) => {
+    const director = MOVIE_DIRECTORS[movie.titulo.toLowerCase().trim()];
+    if (director) counts.set(director, (counts.get(director) ?? 0) + 1);
+  });
+  return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? null;
+}
+
+export function getAchievementProgress(
+  achievement: Achievement,
+  context: AchievementProgressContext,
+) {
+  const { movies, series, users, userId, predictions, favoritesCount, favoritedByCount, activities } = context;
+  const watched = watchedMovies(movies).length;
+  const watchlist = movies.filter((movie) => movie.status === 'watchlist').length;
+  const rated = movies.filter((movie) => (movie.rating ?? movie.avaliacao ?? 0) > 0).length
+    + series.filter((item) => (item.rating ?? item.avaliacao ?? 0) > 0).length;
+  const reviews = movies.filter((movie) => Boolean(movie.review?.trim())).length
+    + series.filter((item) => Boolean(item.review?.trim())).length;
+  const allTitles = movies.filter((movie) => FAMILY_MOVIES.has(movie.titulo.toLowerCase().trim())).length;
+  const comedyTitles = movies.filter((movie) => COMEDY_MOVIES.has(movie.titulo.toLowerCase().trim())).length;
+  const days = new Set([...movies, ...series].map((item) => item.created_at?.slice(0, 10)).filter(Boolean)).size;
+  const directorFanCount = Math.max(
+    0,
+    ...Object.values(
+      watchedMovies(movies).reduce<Record<string, number>>((counts, movie) => {
+        const director = MOVIE_DIRECTORS[movie.titulo.toLowerCase().trim()];
+        if (director) counts[director] = (counts[director] ?? 0) + 1;
+        return counts;
+      }, {}),
+    ),
+  );
+  const unlocked = achievement.check(
+    movies,
+    series,
+    users,
+    userId,
+    predictions,
+    favoritesCount,
+    favoritedByCount,
+    activities,
+  );
+
+  switch (achievement.id) {
+    case 'first_movie': return progressRatio(watched, 1);
+    case 'cinephile': return progressRatio(watched, 30);
+    case 'marathon': return progressRatio(maxSevenDayMovieCount(movies), 10);
+    case 'director': return progressRatio(watched, 50);
+    case 'curious': return progressRatio(watchlist, 15);
+    case 'haja_tempo': return progressRatio(watchlist, 30);
+    case 'tarantino_1': return progressRatio(watchedMovieCountForDirector(movies, 'Quentin Tarantino'), 3);
+    case 'del_toro_1': return progressRatio(watchedMovieCountForDirector(movies, 'Guillermo del Toro'), 3);
+    case 'del_toro_2': return progressRatio(watchedMovieCountForDirector(movies, 'Guillermo del Toro'), 5);
+    case 'nolan_1': return progressRatio(watchedMovieCountForDirector(movies, 'Christopher Nolan'), 3);
+    case 'nolan_2': return progressRatio(watchedMovieCountForDirector(movies, 'Christopher Nolan'), 5);
+    case 'spielberg_1': return progressRatio(watchedMovieCountForDirector(movies, 'Steven Spielberg'), 3);
+    case 'spielberg_2': return progressRatio(watchedMovieCountForDirector(movies, 'Steven Spielberg'), 5);
+    case 'scorsese_1': return progressRatio(watchedMovieCountForDirector(movies, 'Martin Scorsese'), 3);
+    case 'scorsese_2': return progressRatio(watchedMovieCountForDirector(movies, 'Martin Scorsese'), 5);
+    case 'infantil_1': return progressRatio(allTitles, 5);
+    case 'infantil_2': return progressRatio(allTitles, 10);
+    case 'comedy_1': return progressRatio(comedyTitles, 10);
+    case 'amargo': return progressRatio(movies.filter((movie) => COMEDY_MOVIES.has(movie.titulo.toLowerCase().trim()) && (movie.rating ?? movie.avaliacao ?? 0) > 0 && (movie.rating ?? movie.avaliacao ?? 0) <= 2).length, 3);
+    case 'watchlist_25': return progressRatio(watchlist + series.filter((item) => item.status === 'watchlist').length, 25);
+    case 'first_series': return progressRatio(series.length, 1);
+    case 'dedicated_series': return progressRatio(series.length, 5);
+    case 'no_social_life': return progressRatio(series.filter((item) => item.status === 'watched').length, 20);
+    case 'critic_15': return progressRatio(rated, 15);
+    case 'critic_30': return progressRatio(rated, 30);
+    case 'critic_50': return progressRatio(rated, 50);
+    case 'review_abc': return progressRatio(reviews, 1);
+    case 'review_5': return progressRatio(reviews, 5);
+    case 'review_10': return progressRatio(reviews, 10);
+    case 'review_20': return progressRatio(reviews, 20);
+    case 'oscar_bet': return progressRatio(predictions.length, 1);
+    case 'oscar_tigrinho': return progressRatio(predictions.length, 5);
+    case 'hater': return progressRatio(movies.filter((movie) => movie.rating === 1 || movie.avaliacao === 1).length + series.filter((item) => item.rating === 1 || item.avaliacao === 1).length, 10);
+    case 'coracao_mole': return progressRatio(movies.filter((movie) => movie.rating === 5 || movie.avaliacao === 5).length + series.filter((item) => item.rating === 5 || item.avaliacao === 5).length, 20);
+    case 'director_fan': return progressRatio(directorFanCount, 5);
+    case 'founder': return unlocked ? 100 : 0;
+    case 'je_parlo_mucho': return progressRatio(uniqueNonEnglishLanguages(movies), 3);
+    case 'poliglota': return progressRatio(uniqueNonEnglishLanguages(movies), 5);
+    case 'universal': return progressRatio(uniqueNonEnglishLanguages(movies), 7);
+    case 'serial_killer': return progressRatio(series.filter((item) => item.status === 'watched' && HORROR_SERIES.has(item.titulo.toLowerCase().trim())).length, 5);
+    case 'vereador': return progressRatio(favoritesCount, 10);
+    case 'eleito': return progressRatio(favoritedByCount, 10);
+    case 'ecletico': return progressRatio(new Set(watchedMovies(movies).map((movie) => MOVIE_GENRES[movie.titulo.toLowerCase().trim()]).filter(Boolean)).size, 12);
+    case 'influente': return progressRatio(activities.filter((activity) => activity.message.includes('foi assistido') && activity.mcoins_delta > 0).length, 5);
+    case 'fiel_escudeiro': return progressRatio(days, 15);
+    default: return unlocked ? 100 : 0;
+  }
+}

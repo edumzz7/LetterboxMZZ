@@ -10,18 +10,17 @@ import PersonalMoviesSection from './components/movies/PersonalMoviesSection';
 import SeriesSection from './components/series/SeriesSection';
 import MovieDetailScreen from './components/movies/MovieDetailScreen';
 import SeriesDetailScreen from './components/series/SeriesDetailScreen';
-import ImportTvTimePage from './components/layout/ImportTvTimePage';
 import UserDropdownMenu from './components/layout/UserDropdownMenu';
 import UserEventBell from './components/layout/UserEventBell';
 import { useAvatarMutation, useUsers } from './hooks/useUsers';
 import { useFavorites } from './hooks/useFavorites';
 import { usePersonalMovies } from './hooks/usePersonalMovies';
 import { useSeries } from './hooks/useSeries';
-import AllAchievements from './components/ui/AllAchievements';
 import RankingScreen from './components/layout/RankingScreen';
 import GlobalSearch from './components/layout/GlobalSearch';
 import ProfileSummary from './components/layout/ProfileSummary';
 import ProfilePageSkeleton from './components/layout/ProfilePageSkeleton';
+import { HEADER_MENU_OPEN_EVENT, notifyHeaderMenuOpen } from './lib/headerMenu';
 import {
   changePassword,
   adminResetPassword,
@@ -56,7 +55,6 @@ function App() {
   const [match, params] = useRoute('/:username');
   const [matchMovie, movieParams] = useRoute('/filme/:id');
   const [matchSerie, serieParams] = useRoute('/serie/:id');
-  const [matchImport] = useRoute('/import-tvtime');
   const [authError, setAuthError] = useState<string | null>(null);
   const [authPending, setAuthPending] = useState(false);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
@@ -66,7 +64,7 @@ function App() {
   // If we have a stored session, skip the loading screen entirely
   const [isBootstrapping, setIsBootstrapping] = useState(!storedSession);
 
-  const { favorites, toggleFavorite } = useFavorites(session?.id || '');
+  const { favorites } = useFavorites(session?.id || '');
 
   const usersQuery = useUsers(Boolean(session?.id));
   const avatarMutation = useAvatarMutation();
@@ -120,6 +118,17 @@ function App() {
   }, []);
 
   useEffect(() => {
+    const handleOtherHeaderMenu = (event: Event) => {
+      if ((event as CustomEvent<string>).detail !== 'info') {
+        setInfoMenuOpen(false);
+        if (infoMenuRef.current) infoMenuRef.current.open = false;
+      }
+    };
+    window.addEventListener(HEADER_MENU_OPEN_EVENT, handleOtherHeaderMenu);
+    return () => window.removeEventListener(HEADER_MENU_OPEN_EVENT, handleOtherHeaderMenu);
+  }, []);
+
+  useEffect(() => {
     if (!session?.id) return;
     if (location === '/') setLocation(`/${session.username}`);
   }, [session, location, setLocation]);
@@ -152,17 +161,15 @@ function App() {
     ? (users.find((user) => user.username === urlUsername) || null)
     : (users.find((user) => user.id === session?.id) || null);
 
-  const selectedUserId = viewedUser?.id || null;
-  const isProfileRoute = Boolean(viewedUser && !matchMovie && !matchSerie && !matchImport && urlUsername !== 'ranking');
-
-  // Só buscar filmes/séries quando estiver em rota de perfil (evita requisições desnecessárias)
-  const { moviesQuery: personalMoviesQuery } = usePersonalMovies(isProfileRoute ? selectedUserId : null);
-  const { seriesQuery: userSeriesQuery } = useSeries(isProfileRoute ? selectedUserId : null);
+  const currentRankedUser = users.find((user) => user.id === session?.id);
+  const contentUser = urlUsername === 'ranking' ? currentRankedUser : viewedUser;
+  const selectedUserId = contentUser?.id || null;
+  const { moviesQuery: personalMoviesQuery } = usePersonalMovies(selectedUserId);
+  const { seriesQuery: userSeriesQuery } = useSeries(selectedUserId);
   const personalMovies = personalMoviesQuery.data || [];
   const userSeries = userSeriesQuery.data || [];
   const achievementsLoading = personalMoviesQuery.isLoading || userSeriesQuery.isLoading || usersQuery.isLoading;
   const currentUser = users.find((user) => user.id === session?.id) || session || null;
-  const currentRankedUser = users.find((user) => user.id === session?.id);
   const isOwnDashboard = Boolean(session?.id && viewedUser?.id === session.id);
   const canAccessOscars = Boolean(viewedUser);
 
@@ -356,6 +363,7 @@ function App() {
     const user = users.find((candidate) => candidate.id === id);
     if (user) setLocation(`/${user.username}`);
   };
+  const isProfileRoute = Boolean(viewedUser && !matchMovie && !matchSerie && urlUsername !== 'ranking');
 
   return (
     <div className="min-h-screen bg-brand-bg text-brand-text">
@@ -366,16 +374,16 @@ function App() {
           canAccessOscars={canAccessOscars}
           onGoHome={() => setLocation(`/${authenticatedSession.username}`)}
           searchSlot={<GlobalSearch users={users} onSelectUser={selectUser} />}
-          hideTabs={urlUsername === 'ranking' || Boolean(matchMovie) || Boolean(matchSerie) || Boolean(matchImport)}
-          onBack={(matchMovie || matchSerie || matchImport || (!isOwnDashboard && viewedUser && urlUsername !== 'ranking')) ? () => setLocation(`/${authenticatedSession.username}`) : undefined}
+          hideTabs={urlUsername === 'ranking' || Boolean(matchMovie) || Boolean(matchSerie)}
+          onBack={(matchMovie || matchSerie || (!isOwnDashboard && viewedUser && urlUsername !== 'ranking')) ? () => setLocation(`/${authenticatedSession.username}`) : undefined}
           rightSlot={<>
-            <details ref={infoMenuRef} open={infoMenuOpen} onToggle={(event) => setInfoMenuOpen(event.currentTarget.open)} className="relative">
+            <details ref={infoMenuRef} open={infoMenuOpen} onToggle={(event) => { const open = event.currentTarget.open; setInfoMenuOpen(open); if (open) notifyHeaderMenuOpen('info'); }} className="relative">
               <summary className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-xl border border-brand-gold bg-black text-white transition hover:bg-brand-gold/10"><Menu size={18} /></summary>
               <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-48 rounded-xl border border-[#151b28] bg-[#06080d] p-3 text-xs shadow-2xl"><p className="text-brand-text">Blog CineRats <span className="text-brand-gold-alt">(em breve)</span></p><p className="mt-2 text-brand-text">Grupos <span className="text-brand-gold-alt">(em breve)</span></p></div>
             </details>
             <UserDropdownMenu session={authenticatedSession} currentRankedUser={currentRankedUser} users={users} onLogout={handleLogout} avatarMutationPending={avatarMutation.isPending} adminUsername={ADMIN_USERNAME} onChangePassword={handleChangePassword} onAdminReset={handleAdminReset} onSaveAvatar={async (avatarId, displayName) => { await avatarMutation.mutateAsync({ userId: authenticatedSession.id, avatarId }); if (displayName !== currentRankedUser?.display_name) { await updateUserProfile(authenticatedSession.id, { display_name: displayName }); await refetchUsers(); } }} onSaveProfile={async (data) => { await updateUserProfile(authenticatedSession.id, data); await refetchUsers(); }} onDeleteProfile={handleDeleteProfile} deleteProfilePending={deleteProfilePending} />
             <UserEventBell currentUserId={authenticatedSession.id} viewedUserId={viewedUser?.id ?? authenticatedSession.id} isOwnDashboard={isOwnDashboard} friendIds={favorites?.map((favorite) => favorite.favoriteUserId) || []} />
-            <button type="button" aria-label="Abrir CineMatch" title="CineMatch" onClick={() => window.dispatchEvent(new Event('open-cinematch'))} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-brand-gold bg-black text-white transition hover:bg-brand-gold/10"><Shuffle size={16} /></button>
+            <button type="button" aria-label="Abrir CineMatch" title="CineMatch" onClick={() => { notifyHeaderMenuOpen('cineMatch'); window.dispatchEvent(new Event('open-cinematch')); }} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-brand-gold bg-black text-white transition hover:bg-brand-gold/10"><Shuffle size={16} /></button>
           </>}
         />
 
@@ -384,7 +392,7 @@ function App() {
             {isProfileRoute && viewedUser && <aside className="contents xl:flex xl:flex-col xl:gap-5"><div className="order-1 xl:order-none"><ProfileSummary user={viewedUser} users={users} currentUserId={authenticatedSession.id} movies={personalMovies} series={userSeries} isLoading={achievementsLoading} onSelectUser={selectUser} /></div><div className="order-3 xl:order-none"><UserSidebar users={users} currentUserId={authenticatedSession.id} selectedUserId={selectedUserId || authenticatedSession.id} onSelectUser={selectUser} isOpen={false} onClose={() => undefined} section="discover" /></div></aside>}
 
             <main className="order-2 min-w-0 rounded-3xl border border-[#151b28] bg-[#06080d] p-4 xl:order-none sm:p-7 lg:p-9">
-              {matchMovie ? <MovieDetailScreen id={movieParams.id} currentUserId={session.id} /> : matchSerie ? <SeriesDetailScreen id={serieParams.id} currentUserId={session.id} /> : matchImport ? <ImportTvTimePage currentUserId={session.id} onBack={() => setLocation(`/${session.username}`)} /> : urlUsername === 'ranking' ? <><AllAchievements /><RankingScreen users={users} currentUserId={session.id} favorites={favorites?.map((favorite) => favorite.favoriteUserId) || []} onToggleFavorite={toggleFavorite} onSelectUser={selectUser} onBack={() => setLocation(`/${session.username}`)} /></> : urlUsername && !viewedUser ? <div className="py-20 text-center text-brand-text-muted">Usuário não encontrado.</div> : viewedUser && <div className="animate-in fade-in duration-500">{activeTab === 'dashboard' ? <DashboardTab user={viewedUser} isOwnDashboard={isOwnDashboard} /> : activeTab === 'oscars' ? <OscarPredictionsSection userId={viewedUser.id} canEdit={isOwnDashboard} /> : activeTab === 'movies' ? <PersonalMoviesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /> : activeTab === 'series' ? <SeriesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /> : <><PersonalMoviesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /><SeriesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /></>}</div>}
+              {matchMovie ? <MovieDetailScreen id={movieParams.id} currentUserId={session.id} /> : matchSerie ? <SeriesDetailScreen id={serieParams.id} currentUserId={session.id} /> : urlUsername === 'ranking' && currentRankedUser ? <RankingScreen user={currentRankedUser} users={users} movies={personalMovies} series={userSeries} currentUserId={session.id} isLoading={personalMoviesQuery.isLoading || userSeriesQuery.isLoading} /> : urlUsername && !viewedUser ? <div className="py-20 text-center text-brand-text-muted">Usuário não encontrado.</div> : viewedUser && <div className="animate-in fade-in duration-500">{activeTab === 'dashboard' ? <DashboardTab user={viewedUser} isOwnDashboard={isOwnDashboard} /> : activeTab === 'oscars' ? <OscarPredictionsSection userId={viewedUser.id} canEdit={isOwnDashboard} /> : activeTab === 'movies' ? <PersonalMoviesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /> : activeTab === 'series' ? <SeriesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /> : <><PersonalMoviesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /><SeriesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /></>}</div>}
             </main>
 
             {isProfileRoute && <aside className="order-4 flex flex-col gap-5 xl:order-none"><section className="rounded-3xl border border-[#151b28] bg-[#06080d] p-5"><h2 className="text-center text-xs font-semibold uppercase tracking-[0.18em] text-brand-gold">Blog CineRats</h2><p className="mt-4 text-sm leading-relaxed text-brand-text-muted">13/07 - O Blog CineRats está em construção, assim como o sistema de grupos, em breve teremos novidades!</p></section><UserSidebar users={users} currentUserId={session.id} selectedUserId={selectedUserId || session.id} onSelectUser={selectUser} onViewAll={() => setLocation('/ranking')} isOpen={false} onClose={() => undefined} section="ranking" /></aside>}

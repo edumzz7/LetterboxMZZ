@@ -3,6 +3,7 @@ import { Bell, Loader2 } from 'lucide-react';
 import { useLocation } from 'wouter';
 import clsx from 'clsx';
 import { useUserActivity } from '../../hooks/useUserActivity';
+import { HEADER_MENU_OPEN_EVENT, notifyHeaderMenuOpen } from '../../lib/headerMenu';
 
 interface UserEventBellProps {
   currentUserId: string;
@@ -76,6 +77,14 @@ export default function UserEventBell({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    const handleOtherHeaderMenu = (event: Event) => {
+      if ((event as CustomEvent<string>).detail !== 'activity') setOpen(false);
+    };
+    window.addEventListener(HEADER_MENU_OPEN_EVENT, handleOtherHeaderMenu);
+    return () => window.removeEventListener(HEADER_MENU_OPEN_EVENT, handleOtherHeaderMenu);
+  }, []);
+
   const items = useMemo(() => {
     const rawItems = activityQuery.data ?? [];
     const seenBroadcasts = new Set<string>();
@@ -114,7 +123,8 @@ export default function UserEventBell({
     <div ref={containerRef} className={clsx('relative', open && 'z-[100]')}>
       <button
         type="button"
-        onClick={() =>
+        onClick={() => {
+          if (!open) notifyHeaderMenuOpen('activity');
           setOpen((current) => {
             const next = !current;
             if (next && isOwnDashboard && items.length > 0) {
@@ -125,8 +135,8 @@ export default function UserEventBell({
               }
             }
             return next;
-          })
-        }
+          });
+        }}
         aria-label={buttonLabel}
         title={buttonLabel}
         className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-brand-gold bg-black text-white transition hover:bg-brand-gold/10"

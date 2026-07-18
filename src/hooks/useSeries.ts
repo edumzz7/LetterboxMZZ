@@ -124,7 +124,8 @@ export function useSeriesQuery(userId: string | null) {
     queryKey: ['series', userId],
     queryFn: () => listSeries(userId as string),
     enabled: Boolean(userId),
-    staleTime: 1000 * 30,
+    staleTime: 1000 * 60 * 2, // 2 minutos - reduz requisições mantendo dados frescos
+    refetchOnWindowFocus: true, // Atualiza ao voltar para a aba
   });
 }
 

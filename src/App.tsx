@@ -152,8 +152,11 @@ function App() {
     : (users.find((user) => user.id === session?.id) || null);
 
   const selectedUserId = viewedUser?.id || null;
-  const { moviesQuery: personalMoviesQuery } = usePersonalMovies(selectedUserId);
-  const { seriesQuery: userSeriesQuery } = useSeries(selectedUserId);
+  const isProfileRoute = Boolean(viewedUser && !matchMovie && !matchSerie && !matchImport && urlUsername !== 'ranking');
+
+  // Só buscar filmes/séries quando estiver em rota de perfil (evita requisições desnecessárias)
+  const { moviesQuery: personalMoviesQuery } = usePersonalMovies(isProfileRoute ? selectedUserId : null);
+  const { seriesQuery: userSeriesQuery } = useSeries(isProfileRoute ? selectedUserId : null);
   const personalMovies = personalMoviesQuery.data || [];
   const userSeries = userSeriesQuery.data || [];
   const achievementsLoading = personalMoviesQuery.isLoading || userSeriesQuery.isLoading || usersQuery.isLoading;
@@ -352,7 +355,6 @@ function App() {
     const user = users.find((candidate) => candidate.id === id);
     if (user) setLocation(`/${user.username}`);
   };
-  const isProfileRoute = Boolean(viewedUser && !matchMovie && !matchSerie && !matchImport && urlUsername !== 'ranking');
 
   return (
     <div className="min-h-screen bg-brand-bg text-brand-text">

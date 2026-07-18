@@ -78,7 +78,8 @@ export function usePersonalMoviesQuery(userId: string | null) {
     queryKey: ['personal-movies', userId],
     queryFn: () => listPersonalMovies(userId as string),
     enabled: Boolean(userId),
-    staleTime: 1000 * 30,
+    staleTime: 1000 * 60 * 2, // 2 minutos - reduz requisições mantendo dados frescos
+    refetchOnWindowFocus: true, // Atualiza ao voltar para a aba
   });
 }
 

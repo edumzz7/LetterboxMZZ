@@ -1,6 +1,6 @@
 import * as localData from './localData';
 import apiClient from './apiClient';
-import { getTvDetails } from './tmdb';
+import { getTvDetailsWithCache } from './tmdbCache';
 import type {
   ActivityEntry,
   CineMatchMode,
@@ -701,11 +701,11 @@ export async function listSeries(userId: string) {
       for (const e of seriesEntries) if (e.providerExternalId) tmdbIds.add(e.providerExternalId);
       for (const e of seriesWatchlist) if (e.providerExternalId) tmdbIds.add(e.providerExternalId);
 
-      // Fetch TMDB details in parallel (deduplicated)
+      // Fetch TMDB details in parallel (deduplicated) with localStorage cache
       const tmdbDetailsMap = new Map<string, { season_number: number; episode_count: number }[]>();
       await Promise.all(
         [...tmdbIds].map(async (tmdbId) => {
-          const details = await getTvDetails(Number(tmdbId));
+          const details = await getTvDetailsWithCache(Number(tmdbId));
           if (details) tmdbDetailsMap.set(tmdbId, details.seasons);
         }),
       );

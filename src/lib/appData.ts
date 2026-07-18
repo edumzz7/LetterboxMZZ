@@ -244,6 +244,7 @@ type ApiActivity = {
   referenceId: string | null;
   metadata: Record<string, unknown> | null;
   createdAt: string;
+  message?: string;
 };
 
 function activityMessage(a: ApiActivity): string {
@@ -301,24 +302,30 @@ function activityMessage(a: ApiActivity): string {
 }
 
 function mapApiActivity(a: ApiActivity, usersMap?: Map<string, string>): ActivityEntry {
-  // Enrich metadata with username from users map if available
-  const enrichedActivity = { ...a };
-  if (usersMap && !enrichedActivity.metadata?.username) {
-    const username = usersMap.get(a.userId);
-    if (username) {
-      enrichedActivity.metadata = {
-        ...enrichedActivity.metadata,
-        username,
-      };
+  // Use message from API if available, otherwise build it (fallback for local mode)
+  let message = a.message;
+
+  if (!message) {
+    // Fallback: Enrich metadata with username from users map if available
+    const enrichedActivity = { ...a };
+    if (usersMap && !enrichedActivity.metadata?.username) {
+      const username = usersMap.get(a.userId);
+      if (username) {
+        enrichedActivity.metadata = {
+          ...enrichedActivity.metadata,
+          username,
+        };
+      }
     }
+    message = activityMessage(enrichedActivity);
   }
 
   return {
-    id: enrichedActivity.id,
-    user_id: enrichedActivity.userId,
-    message: activityMessage(enrichedActivity),
+    id: a.id,
+    user_id: a.userId,
+    message,
     mcoins_delta: 0,
-    created_at: enrichedActivity.createdAt,
+    created_at: a.createdAt,
   };
 }
 
@@ -326,20 +333,8 @@ export async function listActivities(limit = 30) {
   return withFallback(
     async () => {
       const res = await apiClient.get<ApiActivity[]>(`/activities?limit=${limit}`);
-
-      // Fetch users to enrich activities with usernames
-      const usersMap = new Map<string, string>();
-
-      try {
-        const rankedUsers = await listRankedUsers();
-        rankedUsers.forEach((user) => {
-          usersMap.set(user.id, user.display_name || user.username);
-        });
-      } catch (err) {
-        console.error('Failed to fetch users for activities:', err);
-      }
-
-      return res.data.map((activity) => mapApiActivity(activity, usersMap));
+      // API now returns messages, no need to enrich with usernames
+      return res.data.map((activity) => mapApiActivity(activity));
     },
     () => localData.listActivities(limit),
   );
@@ -373,19 +368,8 @@ export async function listUserActivity(userIds: string[], limit = 20) {
         activities = activities.slice(0, limit);
       }
 
-      // Fetch users to enrich activities with usernames
-      const usersMap = new Map<string, string>();
-
-      try {
-        const rankedUsers = await listRankedUsers();
-        rankedUsers.forEach((user) => {
-          usersMap.set(user.id, user.display_name || user.username);
-        });
-      } catch (err) {
-        console.error('Failed to fetch users for activities:', err);
-      }
-
-      return activities.map((activity) => mapApiActivity(activity, usersMap));
+      // API now returns messages, no need to enrich with usernames
+      return activities.map((activity) => mapApiActivity(activity));
     },
     () => localData.listUserActivity(userIds[0], limit),
   );

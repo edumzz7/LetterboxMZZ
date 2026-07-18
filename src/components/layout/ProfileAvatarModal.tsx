@@ -66,15 +66,15 @@ export default function ProfileAvatarModal({
 
     try {
       // Validate file type
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
       if (!allowedTypes.includes(file.type)) {
-        throw new Error('Formato inválido. Use JPEG, PNG ou WebP.');
+        throw new Error(`Formato inválido (${file.type}). Use JPEG, PNG, WebP ou HEIC.`);
       }
 
-      // Validate file size (2MB max)
-      const maxSize = 2 * 1024 * 1024;
+      // Validate file size (10MB max)
+      const maxSize = 10 * 1024 * 1024; // 10MB
       if (file.size > maxSize) {
-        throw new Error('Arquivo muito grande. Tamanho máximo: 2MB.');
+        throw new Error('Arquivo muito grande. Tamanho máximo: 10MB.');
       }
 
       // Upload to API
@@ -162,14 +162,14 @@ export default function ProfileAvatarModal({
               ) : null}
               <input
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
+                accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
                 className="sr-only"
                 onChange={(event) => void handleUpload(event)}
                 disabled={isProcessingUpload}
               />
             </label>
             <p className="text-xs text-brand-text-muted/60 mt-1">
-              Formatos: JPEG, PNG, WebP • Tamanho máximo: 2MB
+              Formatos: JPEG, PNG, WebP, HEIC • Tamanho máximo: 10MB
             </p>
             </div>
 

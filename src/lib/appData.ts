@@ -1327,12 +1327,79 @@ export async function getAnticipatedMovies(): Promise<AnticipatedMovie[]> {
   );
 }
 
+// Data Import (Tv Time) API
+// API returns data in camelCase format
+export interface DataImport {
+  id: string;
+  userId?: string;
+  platform: string;
+  status: 'pending' | 'importing_movies' | 'importing_series' | 'done' | 'failed';
+  lastStatus?: string | null;
+  errorMessage?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  finishedAt?: string | null;
+}
 
+export interface ImportError {
+  id: string;
+  importId?: string;
+  rowData?: Record<string, unknown> | null;
+  errorMessage: string;
+  createdAt: string;
+  mediaTitle?: string;
+  mediaType?: string;
+  seasonNumber?: number;
+  episodeNumber?: number;
+}
 
+export async function uploadTvTimeImport(file: File): Promise<DataImport> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('platform', 'tv_time');
 
+  const response = await apiClient.post<DataImport>('/users/data-imports', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
 
+  // API returns data in camelCase
+  return response.data;
+}
 
+export async function listUserImports(): Promise<DataImport[]> {
+  const response = await apiClient.get<DataImport[]>('/users/data-imports');
+  // API returns data in camelCase
+  return response.data;
+}
 
+export async function getImportStatusById(importId: string): Promise<DataImport> {
+  const response = await apiClient.get<DataImport>(`/users/data-imports/${importId}`);
+  // API returns data in camelCase
+  return response.data;
+}
 
+export async function getImportErrors(importId: string): Promise<ImportError[]> {
+  const response = await apiClient.get<ImportError[]>(`/users/data-imports/${importId}/errors`);
+  // API returns data in camelCase
+  return response.data;
+}
 
+export async function downloadImportErrorsCSV(importId: string): Promise<void> {
+  const response = await apiClient.get(`/users/data-imports/${importId}/errors/export`, {
+    responseType: 'blob',
+  });
+
+  // Create download link
+  const blob = new Blob([response.data], { type: 'text/csv; charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `erros-importacao-${importId}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
 

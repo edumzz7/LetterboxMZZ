@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useLocation } from 'wouter';
-import { KeyRound, LogOut, Plus, Shield, UserRound, Image as ImageIcon, Settings } from 'lucide-react';
+import { KeyRound, LogOut, Plus, Shield, UserRound, Image as ImageIcon, Settings, Upload } from 'lucide-react';
 import type { SessionUser, RankedUser } from '../../types/app';
 import EditProfileModal from './EditProfileModal';
 import ProfileAvatarModal from './ProfileAvatarModal';
@@ -124,6 +124,13 @@ export default function UserDropdownMenu({
               className="flex items-center gap-2 px-2 py-2 outline-none cursor-pointer rounded hover:bg-brand-gold/10 hover:text-brand-gold transition"
             >
               <Plus size={16} /> Indicar Filme
+            </DropdownMenu.Item>
+
+            <DropdownMenu.Item
+              onSelect={() => setTimeout(() => setLocation('/import-tvtime'), 50)}
+              className="flex items-center gap-2 px-2 py-2 outline-none cursor-pointer rounded hover:bg-brand-gold/10 hover:text-brand-gold transition"
+            >
+              <Upload size={16} /> Importar Tv Time
             </DropdownMenu.Item>
 
             {isAdmin && (

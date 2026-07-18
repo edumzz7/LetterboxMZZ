@@ -32,3 +32,31 @@
     transition: background-color 9999s ease-in-out 0s;
   }
 }
+
+@layer utilities {
+  /* Custom scrollbar styles */
+  .scrollbar-custom {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-brand-gold) rgba(20, 20, 20, 0.3);
+  }
+
+  .scrollbar-custom::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scrollbar-custom::-webkit-scrollbar-track {
+    background: rgba(20, 20, 20, 0.3);
+    border-radius: 4px;
+  }
+
+  .scrollbar-custom::-webkit-scrollbar-thumb {
+    background: var(--color-brand-gold);
+    border-radius: 4px;
+    transition: background 0.2s;
+  }
+
+  .scrollbar-custom::-webkit-scrollbar-thumb:hover {
+    background: var(--color-brand-gold-alt);
+  }
+}

@@ -10,6 +10,7 @@ import PersonalMoviesSection from './components/movies/PersonalMoviesSection';
 import SeriesSection from './components/series/SeriesSection';
 import MovieDetailScreen from './components/movies/MovieDetailScreen';
 import SeriesDetailScreen from './components/series/SeriesDetailScreen';
+import ImportTvTimePage from './components/layout/ImportTvTimePage';
 import UserDropdownMenu from './components/layout/UserDropdownMenu';
 import UserEventBell from './components/layout/UserEventBell';
 import { useAvatarMutation, useUsers } from './hooks/useUsers';
@@ -54,6 +55,7 @@ function App() {
   const [match, params] = useRoute('/:username');
   const [matchMovie, movieParams] = useRoute('/filme/:id');
   const [matchSerie, serieParams] = useRoute('/serie/:id');
+  const [matchImport] = useRoute('/import-tvtime');
   const [authError, setAuthError] = useState<string | null>(null);
   const [authPending, setAuthPending] = useState(false);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
@@ -350,7 +352,7 @@ function App() {
     const user = users.find((candidate) => candidate.id === id);
     if (user) setLocation(`/${user.username}`);
   };
-  const isProfileRoute = Boolean(viewedUser && !matchMovie && !matchSerie && urlUsername !== 'ranking');
+  const isProfileRoute = Boolean(viewedUser && !matchMovie && !matchSerie && !matchImport && urlUsername !== 'ranking');
 
   return (
     <div className="min-h-screen bg-brand-bg text-brand-text">
@@ -361,8 +363,8 @@ function App() {
           canAccessOscars={canAccessOscars}
           onGoHome={() => setLocation(`/${authenticatedSession.username}`)}
           searchSlot={<GlobalSearch users={users} onSelectUser={selectUser} />}
-          hideTabs={urlUsername === 'ranking' || Boolean(matchMovie) || Boolean(matchSerie)}
-          onBack={(matchMovie || matchSerie || (!isOwnDashboard && viewedUser && urlUsername !== 'ranking')) ? () => setLocation(`/${authenticatedSession.username}`) : undefined}
+          hideTabs={urlUsername === 'ranking' || Boolean(matchMovie) || Boolean(matchSerie) || Boolean(matchImport)}
+          onBack={(matchMovie || matchSerie || matchImport || (!isOwnDashboard && viewedUser && urlUsername !== 'ranking')) ? () => setLocation(`/${authenticatedSession.username}`) : undefined}
           rightSlot={<>
             <details ref={infoMenuRef} open={infoMenuOpen} onToggle={(event) => setInfoMenuOpen(event.currentTarget.open)} className="relative">
               <summary className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-xl border border-brand-gold bg-black text-white transition hover:bg-brand-gold/10"><Menu size={18} /></summary>
@@ -379,7 +381,7 @@ function App() {
             {isProfileRoute && viewedUser && <aside className="contents xl:flex xl:flex-col xl:gap-5"><div className="order-1 xl:order-none"><ProfileSummary user={viewedUser} users={users} currentUserId={authenticatedSession.id} movies={personalMovies} series={userSeries} isLoading={achievementsLoading} onSelectUser={selectUser} /></div><div className="order-3 xl:order-none"><UserSidebar users={users} currentUserId={authenticatedSession.id} selectedUserId={selectedUserId || authenticatedSession.id} onSelectUser={selectUser} isOpen={false} onClose={() => undefined} section="discover" /></div></aside>}
 
             <main className="order-2 min-w-0 rounded-3xl border border-[#151b28] bg-[#06080d] p-4 xl:order-none sm:p-7 lg:p-9">
-              {matchMovie ? <MovieDetailScreen id={movieParams.id} currentUserId={session.id} /> : matchSerie ? <SeriesDetailScreen id={serieParams.id} currentUserId={session.id} /> : urlUsername === 'ranking' ? <><AllAchievements /><RankingScreen users={users} currentUserId={session.id} favorites={favorites?.map((favorite) => favorite.favoriteUserId) || []} onToggleFavorite={toggleFavorite} onSelectUser={selectUser} onBack={() => setLocation(`/${session.username}`)} /></> : urlUsername && !viewedUser ? <div className="py-20 text-center text-brand-text-muted">Usuário não encontrado.</div> : viewedUser && <div className="animate-in fade-in duration-500">{activeTab === 'dashboard' ? <DashboardTab user={viewedUser} isOwnDashboard={isOwnDashboard} /> : activeTab === 'oscars' ? <OscarPredictionsSection userId={viewedUser.id} canEdit={isOwnDashboard} /> : activeTab === 'movies' ? <PersonalMoviesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /> : activeTab === 'series' ? <SeriesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /> : <><PersonalMoviesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /><SeriesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /></>}</div>}
+              {matchMovie ? <MovieDetailScreen id={movieParams.id} currentUserId={session.id} /> : matchSerie ? <SeriesDetailScreen id={serieParams.id} currentUserId={session.id} /> : matchImport ? <ImportTvTimePage currentUserId={session.id} onBack={() => setLocation(`/${session.username}`)} /> : urlUsername === 'ranking' ? <><AllAchievements /><RankingScreen users={users} currentUserId={session.id} favorites={favorites?.map((favorite) => favorite.favoriteUserId) || []} onToggleFavorite={toggleFavorite} onSelectUser={selectUser} onBack={() => setLocation(`/${session.username}`)} /></> : urlUsername && !viewedUser ? <div className="py-20 text-center text-brand-text-muted">Usuário não encontrado.</div> : viewedUser && <div className="animate-in fade-in duration-500">{activeTab === 'dashboard' ? <DashboardTab user={viewedUser} isOwnDashboard={isOwnDashboard} /> : activeTab === 'oscars' ? <OscarPredictionsSection userId={viewedUser.id} canEdit={isOwnDashboard} /> : activeTab === 'movies' ? <PersonalMoviesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /> : activeTab === 'series' ? <SeriesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /> : <><PersonalMoviesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /><SeriesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /></>}</div>}
             </main>
 
             {isProfileRoute && <aside className="order-4 flex flex-col gap-5 xl:order-none"><section className="rounded-3xl border border-[#151b28] bg-[#06080d] p-5"><h2 className="text-center text-xs font-semibold uppercase tracking-[0.18em] text-brand-gold">Blog CineRats</h2><p className="mt-4 text-sm leading-relaxed text-brand-text-muted">13/07 - O Blog CineRats está em construção, assim como o sistema de grupos, em breve teremos novidades!</p></section><UserSidebar users={users} currentUserId={session.id} selectedUserId={selectedUserId || session.id} onSelectUser={selectUser} onViewAll={() => setLocation('/ranking')} isOpen={false} onClose={() => undefined} section="ranking" /></aside>}

@@ -22,7 +22,7 @@ import {
 import type { TMDBRecommendationItem } from '../../lib/tmdb';
 import { generateImagePath } from '../../lib/imageUtils';
 
-export const RECOMMENDATIONS_STORAGE_KEY_PREFIX = 'cinerats_recommendations_v3_';
+export const RECOMMENDATIONS_STORAGE_KEY_PREFIX = 'cinerats_recommendations_v4_';
 
 type RecommendationType = 'movie' | 'tv';
 type RecommendationItem = { tmdbId: number; title: string; coverUrl: string | null; type: RecommendationType };
@@ -31,6 +31,12 @@ type RecommendationSeed = { id: number; weight: number };
 
 function normalizeTitle(value: string | null | undefined) {
   return (value || '').toLocaleLowerCase('pt-BR').replace(/[^a-z0-9à-ÿ]+/gi, ' ').trim();
+}
+
+function createSessionVariant() {
+  const value = new Uint32Array(1);
+  globalThis.crypto?.getRandomValues?.(value);
+  return value[0] || Date.now();
 }
 
 function entryWeight(entry: PersonalMovie | SeriesEntry) {
@@ -62,6 +68,7 @@ async function getRecommendationSeeds(entries: Array<PersonalMovie | SeriesEntry
 async function buildRecommendations(
   entries: Array<PersonalMovie | SeriesEntry>,
   type: RecommendationType,
+  sessionVariant: number,
 ): Promise<RecommendationItem[]> {
   const seeds = await getRecommendationSeeds(entries, type);
   if (!seeds.length) return [];
@@ -101,10 +108,18 @@ async function buildRecommendations(
     similarLists.forEach(({ seed, items }) => items.forEach((item) => add(item, seed, 'similar')));
   }
 
-  return Array.from(scored.values())
+  const ranked = Array.from(scored.values())
     .map((candidate) => ({ ...candidate, score: candidate.score + Math.max(0, candidate.seedIds.size - 1) * 3 }))
-    .sort((a, b) => b.directHits - a.directHits || b.score - a.score || b.item.id - a.item.id)
-    .slice(0, 3)
+    .sort((a, b) => b.directHits - a.directHits || b.score - a.score || b.item.id - a.item.id);
+  const best = ranked[0];
+  const rotationPool = best
+    ? ranked.filter((candidate) => candidate.directHits === best.directHits && candidate.score >= best.score * 0.72).slice(0, 8)
+    : [];
+  const selected = rotationPool.length > 3
+    ? Array.from({ length: 3 }, (_, index) => rotationPool[(sessionVariant + index) % rotationPool.length])
+    : ranked.slice(0, 3);
+
+  return selected
     .map(({ item }) => ({
       tmdbId: item.id,
       title: (item.title || item.name) as string,
@@ -518,9 +533,10 @@ export default function UserSidebar({
       setRecLoading(true);
       generatedForUserRef.current = currentUserId;
       try {
+        const sessionVariant = createSessionVariant();
         const [movies, series] = await Promise.all([
-          buildRecommendations(moviesQuery.data || [], 'movie'),
-          buildRecommendations(seriesQuery.data || [], 'tv'),
+          buildRecommendations(moviesQuery.data || [], 'movie', sessionVariant),
+          buildRecommendations(seriesQuery.data || [], 'tv', sessionVariant + 1),
         ]);
         const next: RecommendationLists = {
           movies: movies.map((item) => ({ ...item, type: 'movie' })),

@@ -52,6 +52,51 @@ export interface TMDBMultiResult {
     vote_average?: number;
 }
 
+export interface TMDBRecommendationItem {
+    id: number;
+    title?: string;
+    name?: string;
+    poster_path: string | null;
+    vote_average?: number;
+    vote_count?: number;
+    popularity?: number;
+    release_date?: string;
+    first_air_date?: string;
+    adult?: boolean;
+}
+
+async function getRecommendationList(path: string, language = 'pt-BR'): Promise<TMDBRecommendationItem[]> {
+    if (!TMDB_API_KEY) return [];
+
+    try {
+        const response = await fetch(
+            `${TMDB_BASE_URL}/${path}?api_key=${TMDB_API_KEY}&language=${language}&page=1`
+        );
+        if (!response.ok) return [];
+        const data = await response.json();
+        return Array.isArray(data?.results) ? data.results : [];
+    } catch (error) {
+        console.error(`Error fetching TMDB recommendations for ${path}:`, error);
+        return [];
+    }
+}
+
+export function getMovieRecommendations(movieId: number, language = 'pt-BR') {
+    return getRecommendationList(`movie/${movieId}/recommendations`, language);
+}
+
+export function getMovieSimilar(movieId: number, language = 'pt-BR') {
+    return getRecommendationList(`movie/${movieId}/similar`, language);
+}
+
+export function getTvRecommendations(tvId: number, language = 'pt-BR') {
+    return getRecommendationList(`tv/${tvId}/recommendations`, language);
+}
+
+export function getTvSimilar(tvId: number, language = 'pt-BR') {
+    return getRecommendationList(`tv/${tvId}/similar`, language);
+}
+
 export async function searchMovies(query: string): Promise<TMDBMovie[]> {
     if (!query || !query.trim()) return [];
 
@@ -157,6 +202,30 @@ export async function getMovieDetails(movieId: string | number) {
     }
 }
 
+async function getDetailsWithOverviewFallback(path: string) {
+    if (!TMDB_API_KEY || !path) return null;
+
+    for (const language of ['pt-BR', 'en-US']) {
+        try {
+            const response = await fetch(
+                `${TMDB_BASE_URL}/${path}?api_key=${TMDB_API_KEY}&language=${language}`
+            );
+            if (!response.ok) continue;
+
+            const data = await response.json();
+            if (data?.overview || language === 'en-US') return data;
+        } catch (error) {
+            console.error(`Error fetching TMDB details in ${language}:`, error);
+        }
+    }
+
+    return null;
+}
+
+export function getMovieDetailsWithFallback(movieId: string | number) {
+    return getDetailsWithOverviewFallback(`movie/${movieId}`);
+}
+
 export async function getTvWatchProviders(
     tvId: number,
     region = 'BR'
@@ -224,6 +293,39 @@ export async function getTvDetailsRaw(tvId: number) {
         console.error('Error fetching TV details raw:', error);
         return null;
     }
+}
+
+export function getTvDetailsRawWithFallback(tvId: number) {
+    return getDetailsWithOverviewFallback(`tv/${tvId}`);
+}
+
+export async function getMediaDetailsWithFallback(mediaId: string | number) {
+    const movie = await getMovieDetailsWithFallback(mediaId);
+    if (movie) return { ...movie, media_type: 'movie' as const };
+
+    const tv = await getTvDetailsRawWithFallback(Number(mediaId));
+    return tv ? { ...tv, media_type: 'tv' as const } : null;
+}
+
+function normalizeMediaTitle(title: string | null | undefined) {
+    return (title || '').toLowerCase().replace(/[^a-z0-9À-ÿ]+/gi, ' ').trim();
+}
+
+export async function getMediaDetailsMatchingTitle(mediaId: string | number, requestedTitle: string) {
+    const [movie, tv] = await Promise.all([
+        getMovieDetailsWithFallback(mediaId),
+        getTvDetailsRawWithFallback(Number(mediaId)),
+    ]);
+    const normalizedRequestedTitle = normalizeMediaTitle(requestedTitle);
+    const candidates = [
+        movie && { details: movie, type: 'movie' as const, titles: [movie.title, movie.original_title] },
+        tv && { details: tv, type: 'tv' as const, titles: [tv.name, tv.original_name] },
+    ].filter(Boolean) as Array<{ details: Record<string, unknown>; type: 'movie' | 'tv'; titles: Array<string | undefined> }>;
+
+    const match = candidates.find((candidate) =>
+        candidate.titles.some((title) => normalizeMediaTitle(title) === normalizedRequestedTitle),
+    );
+    return match ? { ...match.details, media_type: match.type } : null;
 }
 
 export async function getTvSeasonEpisodes(tvId: number, seasonNumber: number): Promise<TMDBSeasonEpisode[]> {
@@ -320,4 +422,3 @@ export async function getTvCredits(tvId: string | number) {
         return null;
     }
 }
-

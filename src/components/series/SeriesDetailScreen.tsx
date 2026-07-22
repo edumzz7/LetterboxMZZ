@@ -4,7 +4,7 @@ import { Loader2, Tv, Eye, Plus, Trash2, Edit3, Star, ArrowLeft, Play } from 'lu
 import { useLocation } from 'wouter';
 import { useSeries } from '../../hooks/useSeries';
 import { useUsers } from '../../hooks/useUsers';
-import { getTvDetailsRaw, getTvCredits, getTvWatchProviders, getTvSeasonEpisodes } from '../../lib/tmdb';
+import { getTvDetailsRawWithFallback, getTvCredits, getTvWatchProviders, getTvSeasonEpisodes } from '../../lib/tmdb';
 import { getSeriesCineratsStats } from '../../lib/appData';
 import StarRatingInput from '../ui/StarRatingInput';
 import ReviewModal from '../ui/ReviewModal';
@@ -26,7 +26,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
   // 1. Fetch TMDB TV Details (Raw)
   const seriesQuery = useQuery({
     queryKey: ['tmdb-tv-details', id],
-    queryFn: () => getTvDetailsRaw(Number(id)),
+    queryFn: () => getTvDetailsRawWithFallback(Number(id)),
     staleTime: 1000 * 60 * 10, // 10 minutes
   });
 
@@ -389,6 +389,28 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
                 </div>
               )}
             </div>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold tracking-[0.25em] uppercase text-brand-gold">Onde Assistir</h3>
+            {providersQuery.isLoading ? (
+              <p className="text-xs text-brand-text-muted">Consultando plataformas...</p>
+            ) : providers.length ? (
+              <div className="flex items-center gap-3 flex-wrap">
+                {providers.map((provider) => (
+                  <div key={provider.provider_id} className="flex items-center gap-2 bg-black/35 border border-[#151515] px-3 py-1.5 rounded-xl text-xs font-light text-brand-text shrink-0">
+                    {provider.logo_path ? (
+                      <img src={`https://image.tmdb.org/t/p/w92${provider.logo_path}`} alt={provider.provider_name} className="w-5 h-5 rounded object-cover" />
+                    ) : (
+                      <Tv size={12} className="text-brand-gold-alt" />
+                    )}
+                    {provider.provider_name}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-brand-text-muted">Nenhuma plataforma encontrada no Brasil.</p>
+            )}
           </div>
 
           {/* Seasons and Episodes Selector */}

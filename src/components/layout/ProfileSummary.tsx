@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import type { TouchEvent } from 'react';
-import { ChevronRight, Users } from 'lucide-react';
+import { ChevronRight, UserCheck, UserPlus, Users } from 'lucide-react';
 import type { PersonalMovie, RankedUser, SeriesEntry } from '../../types/app';
 import AvatarDisplay from './AvatarDisplay';
 import UserAchievements from '../ui/UserAchievements';
@@ -20,7 +20,7 @@ export default function ProfileSummary({ user, users, currentUserId, movies, ser
   const [slide, setSlide] = useState<'profile' | 'friends'>('profile');
   const [showAllFriends, setShowAllFriends] = useState(false);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
-  const { favorites } = useFavorites(user.id);
+  const { favorites, isUserFavorited, toggleFavorite, isToggling } = useFavorites(currentUserId);
   const friends = users.filter((candidate) => favorites?.some((favorite) => favorite.favoriteUserId === candidate.id));
   const visibleFriends = showAllFriends ? friends : friends.slice(0, 5);
 
@@ -45,7 +45,21 @@ export default function ProfileSummary({ user, users, currentUserId, movies, ser
     <section className="rounded-3xl border border-[#151b28] bg-[#06080d] p-5 shadow-[0_16px_40px_rgba(0,0,0,0.24)]" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} onTouchCancel={() => { touchStartRef.current = null; }} style={{ touchAction: 'pan-y' }}>
       {slide === 'profile' ? <div className="flex flex-col items-center text-center animate-in fade-in duration-200">
         <AvatarDisplay avatarId={user.avatar_id} className="h-24 w-24 rounded-full border-[3px] border-brand-gold shadow-[0_0_28px_rgba(212,175,55,0.16)]" emojiClassName="text-5xl" />
-        <h2 className="mt-3 max-w-full truncate text-base font-semibold uppercase tracking-[0.12em] text-brand-text">{user.display_name || user.username}</h2>
+        <div className="mt-3 flex w-fit max-w-full items-center justify-center gap-1.5 px-1">
+          <h2 className="min-w-0 max-w-full break-words text-base font-semibold uppercase tracking-[0.12em] text-brand-text">{user.display_name || user.username}</h2>
+          {user.id !== currentUserId && (
+            <button
+              type="button"
+              aria-label={isUserFavorited(user.id) ? 'Remover dos amigos' : 'Adicionar aos amigos'}
+              title={isUserFavorited(user.id) ? 'Remover dos amigos' : 'Adicionar aos amigos'}
+              disabled={isToggling}
+              onClick={() => toggleFavorite(user.id)}
+              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-brand-gold/45 text-brand-gold transition hover:bg-brand-gold/10 disabled:cursor-wait disabled:opacity-50"
+            >
+              {isUserFavorited(user.id) ? <UserCheck size={14} /> : <UserPlus size={14} />}
+            </button>
+          )}
+        </div>
         <p className="mt-1 text-xs text-brand-text-muted">@{user.username}</p>
         <span className="mt-2 rounded-full border border-brand-gold/35 bg-brand-gold/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-gold">{user.mcoins} MC</span>
       </div> : <div className="min-h-[236px] animate-in fade-in duration-200">

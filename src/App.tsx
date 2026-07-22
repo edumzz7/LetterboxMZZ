@@ -3,7 +3,7 @@ import { useRoute, useLocation } from 'wouter';
 import { Film, Loader2, Menu, Shuffle } from 'lucide-react';
 import AppHeader from './components/layout/Header';
 import DashboardTab from './components/layout/DashboardTab';
-import UserSidebar from './components/layout/UserSidebar';
+import UserSidebar, { RECOMMENDATIONS_STORAGE_KEY_PREFIX } from './components/layout/UserSidebar';
 import AuthScreen from './components/auth/AuthScreen';
 import OscarPredictionsSection from './components/movies/OscarPredictionsSection';
 import PersonalMoviesSection from './components/movies/PersonalMoviesSection';
@@ -171,7 +171,6 @@ function App() {
   const personalMovies = personalMoviesQuery.data || [];
   const userSeries = userSeriesQuery.data || [];
   const achievementsLoading = personalMoviesQuery.isLoading || userSeriesQuery.isLoading || usersQuery.isLoading;
-  const currentUser = users.find((user) => user.id === session?.id) || session || null;
   const isOwnDashboard = Boolean(session?.id && viewedUser?.id === session.id);
   const canAccessOscars = Boolean(viewedUser);
 
@@ -258,6 +257,9 @@ function App() {
     }
 
     localStorage.removeItem(SESSION_KEY);
+    Object.keys(sessionStorage)
+      .filter((key) => key.startsWith(RECOMMENDATIONS_STORAGE_KEY_PREFIX))
+      .forEach((key) => sessionStorage.removeItem(key));
     setLocation('/');
   };
 
@@ -384,7 +386,21 @@ function App() {
           rightSlot={<>
             <details ref={infoMenuRef} open={infoMenuOpen} onToggle={(event) => { const open = event.currentTarget.open; setInfoMenuOpen(open); if (open) notifyHeaderMenuOpen('info'); }} className="relative">
               <summary className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-xl border border-brand-gold bg-black text-white transition hover:bg-brand-gold/10"><Menu size={18} /></summary>
-              <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-48 rounded-xl border border-[#151b28] bg-[#06080d] p-3 text-xs shadow-2xl"><p className="text-brand-text">Blog CineRats <span className="text-brand-gold-alt">(em breve)</span></p><p className="mt-2 text-brand-text">Grupos <span className="text-brand-gold-alt">(em breve)</span></p></div>
+              <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-52 rounded-xl border border-[#151b28] bg-[#06080d] p-3 text-xs shadow-2xl flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInfoMenuOpen(false);
+                    if (infoMenuRef.current) infoMenuRef.current.open = false;
+                    setLocation('/ranking');
+                  }}
+                  className="w-full text-left text-brand-text hover:text-brand-gold transition-colors font-medium cursor-pointer"
+                >
+                  Desempenho e Conquistas
+                </button>
+                <p className="text-brand-text">Blog CineRats <span className="text-brand-gold-alt">(em breve)</span></p>
+                <p className="text-brand-text">Grupos <span className="text-brand-gold-alt">(em breve)</span></p>
+              </div>
             </details>
             <UserDropdownMenu session={authenticatedSession} currentRankedUser={currentRankedUser} users={users} favoriteUserIds={favorites?.map((favorite) => favorite.favoriteUserId) || []} onLogout={handleLogout} avatarMutationPending={avatarMutation.isPending} adminUsername={ADMIN_USERNAME} onChangePassword={handleChangePassword} onAdminReset={handleAdminReset} onSaveAvatar={async (avatarId, displayName) => { await avatarMutation.mutateAsync({ userId: authenticatedSession.id, avatarId }); if (displayName !== currentRankedUser?.display_name) { await updateUserProfile(authenticatedSession.id, { display_name: displayName }); await refetchUsers(); } }} onSaveProfile={async (data) => { await updateUserProfile(authenticatedSession.id, data); await refetchUsers(); }} onDeleteProfile={handleDeleteProfile} deleteProfilePending={deleteProfilePending} />
             <UserEventBell currentUserId={authenticatedSession.id} viewedUserId={viewedUser?.id ?? authenticatedSession.id} isOwnDashboard={isOwnDashboard} friendIds={favorites?.map((favorite) => favorite.favoriteUserId) || []} />
@@ -400,11 +416,17 @@ function App() {
               {matchMovie ? <MovieDetailScreen id={movieParams.id} currentUserId={session.id} /> : matchSerie ? <SeriesDetailScreen id={serieParams.id} currentUserId={session.id} /> : matchImportTvTime ? <ImportTvTimePage currentUserId={session.id} onBack={() => setLocation(`/${authenticatedSession.username}`)} /> : urlUsername === 'ranking' && currentRankedUser ? <RankingScreen user={currentRankedUser} users={users} movies={personalMovies} series={userSeries} currentUserId={session.id} isLoading={personalMoviesQuery.isLoading || userSeriesQuery.isLoading} /> : urlUsername && !viewedUser ? <div className="py-20 text-center text-brand-text-muted">Usuário não encontrado.</div> : viewedUser && <div className="animate-in fade-in duration-500">{activeTab === 'dashboard' ? <DashboardTab user={viewedUser} isOwnDashboard={isOwnDashboard} /> : activeTab === 'oscars' ? <OscarPredictionsSection userId={viewedUser.id} canEdit={isOwnDashboard} /> : activeTab === 'movies' ? <PersonalMoviesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /> : activeTab === 'series' ? <SeriesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /> : <><PersonalMoviesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /><SeriesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /></>}</div>}
             </main>
 
-            {isProfileRoute && <aside className="order-4 flex flex-col gap-5 xl:order-none"><section className="rounded-3xl border border-[#151b28] bg-[#06080d] p-5"><h2 className="text-center text-xs font-semibold uppercase tracking-[0.18em] text-brand-gold">Blog CineRats</h2><p className="mt-4 text-sm leading-relaxed text-brand-text-muted">13/07 - O Blog CineRats está em construção, assim como o sistema de grupos, em breve teremos novidades!</p></section><UserSidebar users={users} currentUserId={session.id} selectedUserId={selectedUserId || session.id} onSelectUser={selectUser} onViewAll={() => setLocation('/ranking')} isOpen={false} onClose={() => undefined} section="ranking" /></aside>}
+            {isProfileRoute && <aside className="order-4 flex flex-col gap-5 xl:order-none"><section className="rounded-3xl border border-[#151b28] bg-[#06080d] p-5"><h2 className="text-center text-xs font-semibold uppercase tracking-[0.18em] text-brand-gold">Últimas atualizações</h2><div className="mt-4 space-y-4 text-xs leading-relaxed text-brand-text-muted"><div><p className="font-semibold text-brand-text mb-2">22/07</p><ul className="list-disc list-inside space-y-1.5 pl-1 text-brand-text-muted/90"><li>Melhora significativa no algoritmo de recomendação de filmes</li><li>Ícone de adição de amigo presente no hero do usuário</li><li>Agora você pode entrar em contato conosco através do e-mail contato@cinerats.com</li><li>As plataformas onde o filme/série está disponível agora também é renderizada na página dedicada de cada mídia</li><li>Agora a tela de Desempenho e Conquistas está disponível através do acesso pelo menu superior ≡.</li></ul></div><div className="border-t border-[#151b28] pt-3"><p><strong className="text-brand-text">13/07</strong> - As sessões de Blog e Grupos estão em produção no CineRats</p></div></div></section><UserSidebar users={users} currentUserId={session.id} selectedUserId={selectedUserId || session.id} onSelectUser={selectUser} isOpen={false} onClose={() => undefined} section="ranking" /></aside>}
           </div>
         )}
 
-        <footer className="py-5 text-center text-xs text-brand-text-muted"><p className="flex items-center justify-center gap-2"><Film size={14} className="text-brand-gold-alt" />CineRats • {currentUser?.username || 'Sessão ativa'}</p></footer>
+        <footer className="border-t border-[#151b28] py-5 text-center text-xs text-brand-text-muted">
+          <div className="flex flex-col items-center justify-center gap-2 sm:flex-row sm:gap-4">
+            <p className="flex items-center gap-2"><Film size={14} className="text-brand-gold-alt" />CineRats • edumzz</p>
+            <span className="hidden text-brand-text-muted/40 sm:inline">•</span>
+            <a href="mailto:contato@cinerats.com" className="transition hover:text-brand-gold">contato@cinerats.com</a>
+          </div>
+        </footer>
       </div>
     </div>
   );
@@ -422,7 +444,7 @@ function App() {
               const u = users.find((x) => x.id === id);
               if (u) setLocation(`/${u.username}`);
             }}
-            onViewAll={() => setLocation('/ranking')}
+
             isOpen={sidebarOpen}
             onClose={() => setSidebarOpen(false)}
           />

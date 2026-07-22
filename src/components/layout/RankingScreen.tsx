@@ -89,22 +89,36 @@ function AchievementIcon({ achievement, size, className }: { achievement: Achiev
   return createElement(getIcon(achievement), { size, className });
 }
 
-function getLongestStreak(activities: ActivityEntry[]) {
+function getLongestStreak(activities: ActivityEntry[], movies: PersonalMovie[], series: SeriesEntry[]) {
+  const allDates = [
+    ...activities.map((a) => a.created_at),
+    ...movies.filter((m) => m.status === 'watched').map((m) => m.created_at),
+    ...series.filter((s) => s.status === 'watched').map((s) => s.created_at),
+  ];
+
   const days = [...new Set(
-    activities
-      .filter((activity) => activity.mcoins_delta > 0)
-      .map((activity) => activity.created_at.slice(0, 10))
-      .filter(Boolean),
+    allDates
+      .map((dateStr) => (dateStr ? dateStr.slice(0, 10) : ''))
+      .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)),
   )].sort();
+
   let longest = 0;
   let current = 0;
   let previous = '';
 
   days.forEach((day) => {
-    const previousDate = previous ? new Date(`${previous}T12:00:00`) : null;
-    const currentDate = new Date(`${day}T12:00:00`);
-    const difference = previousDate ? (currentDate.getTime() - previousDate.getTime()) / 86_400_000 : 0;
-    current = difference === 1 ? current + 1 : 1;
+    if (!previous) {
+      current = 1;
+    } else {
+      const previousDate = new Date(`${previous}T12:00:00`);
+      const currentDate = new Date(`${day}T12:00:00`);
+      const diffDays = Math.round((currentDate.getTime() - previousDate.getTime()) / 86_400_000);
+      if (diffDays === 1) {
+        current += 1;
+      } else if (diffDays > 1) {
+        current = 1;
+      }
+    }
     longest = Math.max(longest, current);
     previous = day;
   });
@@ -194,7 +208,7 @@ export default function RankingScreen({ user, users, movies, series, currentUser
   const activities = useMemo(() => activitiesQuery.data || [], [activitiesQuery.data]);
   const favoriteDirector = getFavoriteDirector(movies);
   const favoriteGenre = user.favorite_genre ? (GENRE_LABELS[user.favorite_genre] || user.favorite_genre) : null;
-  const longestStreak = getLongestStreak(activities);
+  const longestStreak = getLongestStreak(activities, movies, series);
   const betterThanPercent = users.length <= 1
     ? 100
     : Math.max(0, Math.min(100, Math.round(((users.length - user.rank) / (users.length - 1)) * 100)));

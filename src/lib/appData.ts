@@ -1232,11 +1232,12 @@ export function getSeriesStatus(episodiosVistos: number, totalEpisodios: number)
 export async function getTrendingMovies(): Promise<TrendingMovie[]> {
   return withFallback(
     async () => {
-      const res = await apiClient.get<{ title: string; posterPath: string | null; providerExternalId: string; userCount: number; userIds: string[]; lastWatchedAt: string }[]>('/watch-entries/trending');
+      const res = await apiClient.get<{ title: string; posterPath: string | null; providerExternalId: string; type?: string; mediaType?: string; userCount: number; userIds: string[]; lastWatchedAt: string }[]>('/watch-entries/trending');
       return res.data.map((e) => ({
         title: e.title,
         coverUrl: e.posterPath,
         tmdbId: e.providerExternalId,
+        mediaType: e.mediaType === 'tv' || e.mediaType === 'series' || e.type === 'tv' || e.type === 'series' ? 'tv' as const : e.mediaType === 'movie' || e.type === 'movie' ? 'movie' as const : undefined,
         userCount: e.userCount,
         userIds: e.userIds,
         lastWatchedAt: e.lastWatchedAt,
@@ -1308,13 +1309,14 @@ export async function saveOscarPrediction(
 export async function getAnticipatedMovies(): Promise<AnticipatedMovie[]> {
   return withFallback(
     async () => {
-      const res = await apiClient.get<{ title: string; posterPath: string | null; providerExternalId: string; userCount: number; userIds: string[] }[]>('/watchlist/anticipated');
+      const res = await apiClient.get<{ title: string; posterPath: string | null; providerExternalId: string; type?: string; mediaType?: string; userCount?: number; userIds?: string[] }[]>('/watchlist/anticipated');
       return res.data.map((e) => ({
         title: e.title,
         coverUrl: e.posterPath,
         tmdbId: e.providerExternalId,
-        userCount: e.userCount,
-        userIds: e.userIds,
+        mediaType: e.mediaType === 'tv' || e.mediaType === 'series' || e.type === 'tv' || e.type === 'series' ? 'tv' as const : e.mediaType === 'movie' || e.type === 'movie' ? 'movie' as const : undefined,
+        userCount: e.userCount ?? e.userIds?.length ?? 0,
+        userIds: e.userIds ?? [],
       }));
     },
     () => localData.getAnticipatedMovies(),

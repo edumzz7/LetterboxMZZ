@@ -990,6 +990,7 @@ export async function getTrendingMovies(): Promise<Array<{ title: string; coverU
     title: g.title,
     coverUrl: g.coverUrl,
     tmdbId: g.tmdbId,
+    mediaType: 'movie' as const,
     userCount: g.watchers.size,
     userIds: Array.from(g.watchers),
     lastWatchedAt: g.lastWatchedAt,
@@ -1041,19 +1042,26 @@ export async function saveOscarPrediction(
 }
 
 export async function getAnticipatedMovies(): Promise<AnticipatedMovie[]> {
-  const allMovies = readPersonalMovies();
-  const watchlistMovies = allMovies.filter((m) => m.status === 'watchlist');
+  const watchlistItems = [
+    ...readPersonalMovies()
+      .filter((m) => m.status === 'watchlist')
+      .map((m) => ({ ...m, mediaType: 'movie' as const })),
+    ...readSeries()
+      .filter((s) => s.status === 'watchlist')
+      .map((s) => ({ ...s, mediaType: 'tv' as const })),
+  ];
 
-  const watcherSets = new Map<string, { title: string; coverUrl: string | null; tmdbId?: string | null; watchers: Set<string> }>();
+  const watcherSets = new Map<string, { title: string; coverUrl: string | null; tmdbId?: string | null; mediaType: 'movie' | 'tv'; watchers: Set<string> }>();
 
-  for (const m of watchlistMovies) {
-    const key = m.source_movie_id || m.titulo.toLowerCase().trim();
+  for (const m of watchlistItems) {
+    const key = `${m.mediaType}:${m.source_movie_id || m.titulo.toLowerCase().trim()}`;
     let group = watcherSets.get(key);
     if (!group) {
       group = {
         title: m.titulo,
         coverUrl: m.capa_url,
         tmdbId: m.source_movie_id,
+        mediaType: m.mediaType,
         watchers: new Set<string>(),
       };
       watcherSets.set(key, group);
@@ -1065,6 +1073,7 @@ export async function getAnticipatedMovies(): Promise<AnticipatedMovie[]> {
     title: g.title,
     coverUrl: g.coverUrl,
     tmdbId: g.tmdbId,
+    mediaType: g.mediaType,
     userCount: g.watchers.size,
     userIds: Array.from(g.watchers),
   }));

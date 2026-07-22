@@ -3,17 +3,115 @@ import * as Dialog from '@radix-ui/react-dialog';
 import clsx from 'clsx';
 import { Star, Flame, ChevronDown, ChevronUp, Loader2, Film, Plus, Award } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import type { RankedUser, TrendingMovie, AnticipatedMovie } from '../../types/app';
+import type { PersonalMovie, RankedUser, SeriesEntry, TrendingMovie, AnticipatedMovie } from '../../types/app';
 import AvatarDisplay from './AvatarDisplay';
 import { useFavorites } from '../../hooks/useFavorites';
 import { usePersonalMovieMutations, usePersonalMoviesQuery } from '../../hooks/usePersonalMovies';
 import { useSeriesMutations, useSeriesQuery } from '../../hooks/useSeries';
 import { getTrendingMovies, getAnticipatedMovies } from '../../lib/appData';
-import { getMovieDetails } from '../../lib/tmdb';
+import {
+  getMediaDetailsMatchingTitle,
+  getMovieDetailsWithFallback,
+  getMovieRecommendations,
+  getMovieSimilar,
+  getTvDetailsRawWithFallback,
+  getTvRecommendations,
+  getTvSimilar,
+  searchMulti,
+} from '../../lib/tmdb';
+import type { TMDBRecommendationItem } from '../../lib/tmdb';
 import { generateImagePath } from '../../lib/imageUtils';
 
-const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY;
-const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
+export const RECOMMENDATIONS_STORAGE_KEY_PREFIX = 'cinerats_recommendations_v3_';
+
+type RecommendationType = 'movie' | 'tv';
+type RecommendationItem = { tmdbId: number; title: string; coverUrl: string | null; type: RecommendationType };
+type RecommendationLists = { movies: Array<RecommendationItem & { type: 'movie' }>; series: Array<RecommendationItem & { type: 'tv' }> };
+type RecommendationSeed = { id: number; weight: number };
+
+function normalizeTitle(value: string | null | undefined) {
+  return (value || '').toLocaleLowerCase('pt-BR').replace(/[^a-z0-9à-ÿ]+/gi, ' ').trim();
+}
+
+function entryWeight(entry: PersonalMovie | SeriesEntry) {
+  const rating = Number(entry.rating ?? entry.avaliacao ?? 0);
+  if (rating > 0 && rating < 3) return 0;
+  const statusWeight = entry.status === 'watched' ? 2 : entry.status === 'watching' ? 1.5 : 0.5;
+  if (rating >= 4) return statusWeight + 3;
+  if (rating >= 3) return statusWeight + 1.5;
+  return statusWeight;
+}
+
+async function getRecommendationSeeds(entries: Array<PersonalMovie | SeriesEntry>, type: RecommendationType): Promise<RecommendationSeed[]> {
+  const candidates = entries
+    .map((entry) => ({ entry, weight: entryWeight(entry) }))
+    .filter(({ weight }) => weight > 0)
+    .sort((a, b) => b.weight - a.weight || b.entry.created_at.localeCompare(a.entry.created_at))
+    .slice(0, 6);
+
+  const resolved = await Promise.all(candidates.map(async ({ entry, weight }) => {
+    const storedId = Number(entry.source_movie_id);
+    if (Number.isFinite(storedId) && storedId > 0) return { id: storedId, weight };
+    const result = (await searchMulti(entry.titulo)).find((item) => item.media_type === type);
+    return result ? { id: result.id, weight } : null;
+  }));
+
+  return resolved.filter((seed): seed is RecommendationSeed => Boolean(seed));
+}
+
+async function buildRecommendations(
+  entries: Array<PersonalMovie | SeriesEntry>,
+  type: RecommendationType,
+): Promise<RecommendationItem[]> {
+  const seeds = await getRecommendationSeeds(entries, type);
+  if (!seeds.length) return [];
+
+  const knownIds = new Set(entries.map((entry) => Number(entry.source_movie_id)).filter((id) => Number.isFinite(id) && id > 0));
+  const knownTitles = new Set(entries.map((entry) => normalizeTitle(entry.titulo)));
+  const scored = new Map<number, { item: TMDBRecommendationItem; score: number; seedIds: Set<number>; directHits: number }>();
+  const minimumVotes = type === 'movie' ? 150 : 75;
+
+  const add = (item: TMDBRecommendationItem, seed: RecommendationSeed, relation: 'recommendation' | 'similar') => {
+    const title = item.title || item.name || '';
+    if (!item.id || !title || !item.poster_path || item.adult || knownIds.has(item.id) || knownTitles.has(normalizeTitle(title))) return;
+    const votes = Number(item.vote_count ?? 0);
+    const average = Number(item.vote_average ?? 0);
+    if (votes < minimumVotes || average < 6) return;
+
+    const current = scored.get(item.id) ?? { item, score: 0, seedIds: new Set<number>(), directHits: 0 };
+    current.item = item;
+    current.score += seed.weight * (relation === 'recommendation' ? 1 : 0.25) + Math.min(2, average / 5) + Math.min(1.5, Math.log10(votes + 1) / 3);
+    current.seedIds.add(seed.id);
+    if (relation === 'recommendation') current.directHits += 1;
+    scored.set(item.id, current);
+  };
+
+  const directLists = await Promise.all(seeds.map(async (seed) => ({
+    seed,
+    items: type === 'movie' ? await getMovieRecommendations(seed.id) : await getTvRecommendations(seed.id),
+  })));
+  directLists.forEach(({ seed, items }) => items.forEach((item) => add(item, seed, 'recommendation')));
+
+  // "Similar" só complementa uma lista pobre; recomendações diretas são a fonte principal.
+  if (scored.size < 3) {
+    const similarLists = await Promise.all(seeds.map(async (seed) => ({
+      seed,
+      items: type === 'movie' ? await getMovieSimilar(seed.id) : await getTvSimilar(seed.id),
+    })));
+    similarLists.forEach(({ seed, items }) => items.forEach((item) => add(item, seed, 'similar')));
+  }
+
+  return Array.from(scored.values())
+    .map((candidate) => ({ ...candidate, score: candidate.score + Math.max(0, candidate.seedIds.size - 1) * 3 }))
+    .sort((a, b) => b.directHits - a.directHits || b.score - a.score || b.item.id - a.item.id)
+    .slice(0, 3)
+    .map(({ item }) => ({
+      tmdbId: item.id,
+      title: (item.title || item.name) as string,
+      coverUrl: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : null,
+      type,
+    }));
+}
 
 function SidebarRecommendationItem({ 
   item, 
@@ -29,11 +127,9 @@ function SidebarRecommendationItem({
 
   const { data: details, isLoading } = useQuery({
     queryKey: ['rec-details', item.type, item.tmdbId],
-    queryFn: async () => {
-      const res = await fetch(`${TMDB_BASE_URL}/${item.type}/${item.tmdbId}?api_key=${TMDB_API_KEY}&language=pt-BR`);
-      if (!res.ok) return null;
-      return res.json();
-    },
+    queryFn: () => item.type === 'movie'
+      ? getMovieDetailsWithFallback(item.tmdbId)
+      : getTvDetailsRawWithFallback(item.tmdbId),
     enabled: expanded && !!item.tmdbId,
   });
 
@@ -55,6 +151,7 @@ function SidebarRecommendationItem({
       addSeriesMutation.mutate({
         titulo: item.title,
         capa_url: item.coverUrl,
+        source_movie_id: String(item.tmdbId),
         status: 'watchlist',
         temporada: 1,
         total_episodios: details?.number_of_episodes || 0,
@@ -174,36 +271,59 @@ function SidebarMovieItem({
   interestLabel?: boolean;
 }) {
   const userCountLabel = interestLabel
-    ? 'querem ver'
-    : movie.userCount === 1
-      ? 'visto'
-      : 'vistos';
+    ? movie.userCount === 1 ? 'quer ver' : 'querem ver'
+    : movie.userCount === 1 ? 'visto' : 'vistos';
   const usersDialogTitle = interestLabel
     ? 'Usuários que querem ver'
     : 'Usuários que registraram';
   const [expanded, setExpanded] = useState(false);
   const [showWatchers, setShowWatchers] = useState(false);
   const { addMovieMutation } = usePersonalMovieMutations(currentUserId);
+  const { addSeriesMutation } = useSeriesMutations(currentUserId);
   const [addedToWatchlist, setAddedToWatchlist] = useState(false);
 
   const { data: details, isLoading } = useQuery({
-    queryKey: ['movie-details', movie.tmdbId],
-    queryFn: () => movie.tmdbId ? getMovieDetails(movie.tmdbId) : null,
+    queryKey: ['media-details', movie.mediaType, movie.tmdbId, movie.title],
+    queryFn: async () => {
+      if (!movie.tmdbId) return null;
+      if (movie.mediaType === 'movie') {
+        const details = await getMovieDetailsWithFallback(movie.tmdbId);
+        return details ? { ...details, media_type: 'movie' as const } : null;
+      }
+      if (movie.mediaType === 'tv') {
+        const details = await getTvDetailsRawWithFallback(Number(movie.tmdbId));
+        return details ? { ...details, media_type: 'tv' as const } : null;
+      }
+      return getMediaDetailsMatchingTitle(movie.tmdbId, movie.title);
+    },
     enabled: expanded && !!movie.tmdbId,
   });
 
   const handleAddToWatchlist = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (addedToWatchlist) return;
-    addMovieMutation.mutate({
+    if (details?.media_type === 'tv') {
+      addSeriesMutation.mutate({
+        titulo: movie.title,
+        capa_url: movie.coverUrl || null,
+        source_movie_id: movie.tmdbId || null,
+        status: 'watchlist',
+        temporada: 1,
+        total_episodios: details.number_of_episodes || 0,
+        episodios_vistos: 0,
+        plataforma_slug: null,
+      });
+    } else {
+      addMovieMutation.mutate({
       titulo: movie.title,
       capa_url: movie.coverUrl || null,
       source_movie_id: movie.tmdbId || null,
       status: 'watchlist',
       plataforma_slug: null,
-      ano_lancamento: null,
+      ano_lancamento: details?.release_date ? Number(details.release_date.slice(0, 4)) : null,
       source: 'manual',
-    });
+      });
+    }
     setAddedToWatchlist(true);
   };
 
@@ -240,7 +360,7 @@ function SidebarMovieItem({
                 </span>
                 <button 
                   onClick={handleAddToWatchlist}
-                  disabled={addedToWatchlist || addMovieMutation.isPending}
+                  disabled={addedToWatchlist || addMovieMutation.isPending || addSeriesMutation.isPending}
                   className="text-brand-gold-alt hover:text-brand-gold hover:scale-125 hover:bg-white/10 p-1 rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Adicionar à watchlist"
                 >
@@ -281,7 +401,7 @@ function SidebarMovieItem({
               </button>
               <button
                 onClick={handleAddToWatchlist}
-                disabled={addedToWatchlist || addMovieMutation.isPending}
+                disabled={addedToWatchlist || addMovieMutation.isPending || addSeriesMutation.isPending}
                 className="flex items-center justify-center gap-2 py-2 px-3 bg-brand-gold/10 text-brand-gold hover:bg-brand-gold hover:text-black transition-colors rounded-lg text-xs font-semibold uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Plus size={14} /> 
@@ -338,7 +458,6 @@ interface UserSidebarProps {
   currentUserId: string;
   selectedUserId: string;
   onSelectUser: (userId: string) => void;
-  onViewAll?: () => void;
   isOpen: boolean;
   onClose: () => void;
   section?: 'ranking' | 'discover';
@@ -349,7 +468,6 @@ export default function UserSidebar({
   currentUserId,
   selectedUserId,
   onSelectUser,
-  onViewAll,
   isOpen: _isOpen,
   onClose,
   section = 'discover',
@@ -384,9 +502,42 @@ export default function UserSidebar({
     if (moviesQuery.isLoading || seriesQuery.isLoading) return;
     if (generatedForUserRef.current === currentUserId) return;
 
+    const cacheKey = `${RECOMMENDATIONS_STORAGE_KEY_PREFIX}${currentUserId}`;
+    try {
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) {
+        setRecommendations(JSON.parse(cached) as RecommendationLists);
+        generatedForUserRef.current = currentUserId;
+        return;
+      }
+    } catch {
+      sessionStorage.removeItem(cacheKey);
+    }
+
     const generate = async () => {
       setRecLoading(true);
       generatedForUserRef.current = currentUserId;
+      try {
+        const [movies, series] = await Promise.all([
+          buildRecommendations(moviesQuery.data || [], 'movie'),
+          buildRecommendations(seriesQuery.data || [], 'tv'),
+        ]);
+        const next: RecommendationLists = {
+          movies: movies.map((item) => ({ ...item, type: 'movie' })),
+          series: series.map((item) => ({ ...item, type: 'tv' })),
+        };
+        setRecommendations(next);
+        sessionStorage.setItem(cacheKey, JSON.stringify(next));
+        return;
+      } catch (error) {
+        console.error('Error generating recommendations:', error);
+        return;
+      } finally {
+        setRecLoading(false);
+      }
+
+      /* Legacy genre/discover implementation intentionally disabled.
+         Recommendations now use the deterministic TMDB relation ranking above.
       try {
         const userMovies = moviesQuery.data || [];
         const userSeries = seriesQuery.data || [];
@@ -515,7 +666,7 @@ export default function UserSidebar({
             const candidateTitle = (c.title || '').toLowerCase().trim();
             return !userMovies.some((m) => (m.titulo || '').toLowerCase().trim() === candidateTitle);
           });
-          candidates.sort(() => 0.5 - Math.random());
+          candidates.sort((a: any, b: any) => (b.popularity || 0) - (a.popularity || 0) || b.id - a.id);
           recommendedMovies = candidates.slice(0, 2);
         }
 
@@ -529,7 +680,7 @@ export default function UserSidebar({
               const candidateTitle = (c.title || '').toLowerCase().trim();
               return !userMovies.some((m) => (m.titulo || '').toLowerCase().trim() === candidateTitle);
             });
-            candidates.sort(() => 0.5 - Math.random());
+            candidates.sort((a: any, b: any) => (b.popularity || 0) - (a.popularity || 0) || b.id - a.id);
             if (candidates.length > 0) {
               recommendedMovies.push(candidates[0]);
               directorMoviePicked = true;
@@ -549,7 +700,7 @@ export default function UserSidebar({
                 !recommendedMovies.some((rm) => rm.id === c.id)
               );
             });
-            candidates.sort(() => 0.5 - Math.random());
+            candidates.sort((a: any, b: any) => (b.popularity || 0) - (a.popularity || 0) || b.id - a.id);
             if (candidates.length > 0) {
               recommendedMovies.push(candidates[0]);
             }
@@ -565,7 +716,7 @@ export default function UserSidebar({
             const candidateName = (c.name || '').toLowerCase().trim();
             return !userSeries.some((s) => (s.titulo || '').toLowerCase().trim() === candidateName);
           });
-          candidates.sort(() => 0.5 - Math.random());
+          candidates.sort((a: any, b: any) => (b.popularity || 0) - (a.popularity || 0) || b.id - a.id);
           recommendedSeries = candidates.slice(0, 3);
         }
 
@@ -592,6 +743,7 @@ export default function UserSidebar({
       } finally {
         setRecLoading(false);
       }
+      */
     };
 
     void generate();
@@ -676,18 +828,6 @@ export default function UserSidebar({
               <div className="absolute top-full left-[-40px] right-[-10px] sm:left-auto sm:right-0 mt-1 bg-[#0a0a0a] border border-[#222] rounded-lg shadow-xl z-50 p-2 text-xs text-center text-brand-text-muted min-w-[200px]">
                 Nenhum resultado
               </div>
-            )}
-            {onViewAll && (
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  onViewAll();
-                  onClose();
-                }}
-                className="text-[9px] text-brand-gold hover:text-brand-gold-alt uppercase tracking-widest block w-full text-right mt-1.5 transition-colors"
-              >
-                Ver todos
-              </button>
             )}
           </div>
         </div>

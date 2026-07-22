@@ -49,6 +49,7 @@ export interface PersonalMovie {
   source: 'manual' | 'oscar';
   source_movie_id: string | null;
   indicado_por_user_id?: string | null;
+  diretor?: string | null;
   avaliacao?: number | null;
   rating?: number | null;
   review?: string | null;
@@ -111,6 +112,7 @@ export interface TrendingMovie {
   userCount: number;
   lastWatchedAt: string;
   tmdbId?: string | null;
+  mediaType?: 'movie' | 'tv';
   userIds: string[];
 }
 
@@ -119,6 +121,7 @@ export interface AnticipatedMovie {
   coverUrl: string | null;
   userCount: number;
   tmdbId?: string | null;
+  mediaType?: 'movie' | 'tv';
   userIds: string[];
 }
 export interface UserOscarPrediction {
@@ -130,4 +133,3 @@ export interface AnticipatedMovie {
   poster_path: string;
   created_at: string;
 }
-

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X, Loader2 } from 'lucide-react';
-import { getMovieDetails, getTvDetailsRaw } from '../../lib/tmdb';
+import { getMovieDetailsWithFallback, getTvDetailsRawWithFallback } from '../../lib/tmdb';
 
 interface SynopsisModalProps {
   isOpen: boolean;
@@ -27,9 +27,9 @@ export default function SynopsisModal({
       setIsLoading(true);
       setError(null);
       
-      const fetchPromise = mediaType === 'tv' 
-        ? getTvDetailsRaw(movieId) 
-        : getMovieDetails(movieId);
+      const fetchPromise = mediaType === 'tv'
+        ? getTvDetailsRawWithFallback(movieId)
+        : getMovieDetailsWithFallback(movieId);
 
       fetchPromise
         .then((data) => {

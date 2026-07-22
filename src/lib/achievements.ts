@@ -139,6 +139,115 @@ const MOVIE_DIRECTORS: Record<string, string> = {
   'a espinha do diabo': 'Guillermo del Toro',
   'el espinazo del diablo': 'Guillermo del Toro',
   'cronos': 'Guillermo del Toro',
+
+  // Denis Villeneuve
+  'dune': 'Denis Villeneuve',
+  'duna': 'Denis Villeneuve',
+  'dune: part two': 'Denis Villeneuve',
+  'duna: parte 2': 'Denis Villeneuve',
+  'blade runner 2049': 'Denis Villeneuve',
+  'arrival': 'Denis Villeneuve',
+  'a chegada': 'Denis Villeneuve',
+  'sicario': 'Denis Villeneuve',
+  'os suspeitos': 'Denis Villeneuve',
+  'prisoners': 'Denis Villeneuve',
+
+  // Greta Gerwig
+  'barbie': 'Greta Gerwig',
+  'lady bird': 'Greta Gerwig',
+  'little women': 'Greta Gerwig',
+  'adoráveis mulheres': 'Greta Gerwig',
+
+  // James Cameron
+  'avatar': 'James Cameron',
+  'avatar: o caminho da água': 'James Cameron',
+  'avatar: the way of water': 'James Cameron',
+  'titanic': 'James Cameron',
+  'the terminator': 'James Cameron',
+  'o exterminador do futuro': 'James Cameron',
+  'terminator 2': 'James Cameron',
+  'aliens': 'James Cameron',
+
+  // Bong Joon-ho
+  'parasite': 'Bong Joon-ho',
+  'parasita': 'Bong Joon-ho',
+  'memórias de um assassino': 'Bong Joon-ho',
+  'memories of murder': 'Bong Joon-ho',
+  'snowpiercer': 'Bong Joon-ho',
+
+  // Hayao Miyazaki
+  'a viagem de chihiro': 'Hayao Miyazaki',
+  'spirited away': 'Hayao Miyazaki',
+  'meu vizinho totoro': 'Hayao Miyazaki',
+  'my neighbor totoro': 'Hayao Miyazaki',
+  'o castelo animado': 'Hayao Miyazaki',
+  'princesa mononoke': 'Hayao Miyazaki',
+  'o menino e a garça': 'Hayao Miyazaki',
+  'the boy and the heron': 'Hayao Miyazaki',
+
+  // David Fincher
+  'fight club': 'David Fincher',
+  'clube da luta': 'David Fincher',
+  'se7en': 'David Fincher',
+  'seven': 'David Fincher',
+  'garota exemplar': 'David Fincher',
+  'gone girl': 'David Fincher',
+  'zodíaco': 'David Fincher',
+  'a rede social': 'David Fincher',
+  'the social network': 'David Fincher',
+
+  // Ridley Scott
+  'gladiador': 'Ridley Scott',
+  'gladiator': 'Ridley Scott',
+  'blade runner': 'Ridley Scott',
+  'alien': 'Ridley Scott',
+  'perdido em marte': 'Ridley Scott',
+  'the martian': 'Ridley Scott',
+
+  // Stanley Kubrick
+  '2001: uma odisséia no espaço': 'Stanley Kubrick',
+  '2001: a space odyssey': 'Stanley Kubrick',
+  'o iluminado': 'Stanley Kubrick',
+  'the shining': 'Stanley Kubrick',
+  'laranja mecânica': 'Stanley Kubrick',
+  'a clockwork orange': 'Stanley Kubrick',
+
+  // Damien Chazelle
+  'la la land': 'Damien Chazelle',
+  'whiplash': 'Damien Chazelle',
+  'babylon': 'Damien Chazelle',
+
+  // Jordan Peele
+  'corra!': 'Jordan Peele',
+  'get out': 'Jordan Peele',
+  'nós': 'Jordan Peele',
+  'us': 'Jordan Peele',
+  'não! não olhe!': 'Jordan Peele',
+  'nope': 'Jordan Peele',
+
+  // Yorgos Lanthimos
+  'pobres criaturas': 'Yorgos Lanthimos',
+  'poor things': 'Yorgos Lanthimos',
+  'a favorita': 'Yorgos Lanthimos',
+
+  // Peter Jackson
+  'o senhor dos anéis: a sociedade do anel': 'Peter Jackson',
+  'o senhor dos anéis: as duas torres': 'Peter Jackson',
+  'o senhor dos anéis: o retorno do rei': 'Peter Jackson',
+  'the lord of the rings: the fellowship of the ring': 'Peter Jackson',
+  'the lord of the rings: the two towers': 'Peter Jackson',
+  'the lord of the rings: the return of the king': 'Peter Jackson',
+
+  // Todd Phillips
+  'joker': 'Todd Phillips',
+  'coringa': 'Todd Phillips',
+
+  // Tim Burton
+  'beetlejuice': 'Tim Burton',
+  'os fantasmas se divertem': 'Tim Burton',
+  'edward mãos de tesoura': 'Tim Burton',
+  'edward scissorhands': 'Tim Burton',
+  'batman': 'Tim Burton',
 };
 
 const FAMILY_MOVIES = new Set<string>([
@@ -958,7 +1067,7 @@ function uniqueNonEnglishLanguages(movies: PersonalMovie[]) {
 export function getFavoriteDirector(movies: PersonalMovie[]) {
   const counts = new Map<string, number>();
   watchedMovies(movies).forEach((movie) => {
-    const director = MOVIE_DIRECTORS[movie.titulo.toLowerCase().trim()];
+    const director = movie.diretor || MOVIE_DIRECTORS[movie.titulo.toLowerCase().trim()];
     if (director) counts.set(director, (counts.get(director) ?? 0) + 1);
   });
   return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? null;

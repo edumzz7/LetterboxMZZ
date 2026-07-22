@@ -5,7 +5,7 @@ import { useLocation } from 'wouter';
 import { usePersonalMovies } from '../../hooks/usePersonalMovies';
 import { useSocialActions } from '../../hooks/useSocialActions';
 import { useUsers } from '../../hooks/useUsers';
-import { getMovieDetails, getMovieCredits, getMovieWatchProviders } from '../../lib/tmdb';
+import { getMovieDetailsWithFallback, getMovieCredits, getMovieWatchProviders } from '../../lib/tmdb';
 import { getMovieCineratsStats } from '../../lib/appData';
 import StarRatingInput from '../ui/StarRatingInput';
 import ReviewModal from '../ui/ReviewModal';
@@ -25,7 +25,7 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
   // 1. Fetch TMDB Movie Details
   const movieQuery = useQuery({
     queryKey: ['tmdb-movie-details', id],
-    queryFn: () => getMovieDetails(id),
+    queryFn: () => getMovieDetailsWithFallback(id),
     staleTime: 1000 * 60 * 10, // 10 minutes
   });
 
@@ -358,9 +358,11 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
           </div>
 
           {/* Streaming / Watch Providers */}
-          {providers.length > 0 && (
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold tracking-[0.25em] uppercase text-brand-gold">Onde Assistir</h3>
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold tracking-[0.25em] uppercase text-brand-gold">Onde Assistir</h3>
+            {providersQuery.isLoading ? (
+              <p className="text-xs text-brand-text-muted">Consultando plataformas...</p>
+            ) : providers.length ? (
               <div className="flex items-center gap-3 flex-wrap">
                 {providers.map((p) => (
                   <div
@@ -380,8 +382,10 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <p className="text-xs text-brand-text-muted">Nenhuma plataforma encontrada no Brasil.</p>
+            )}
+          </div>
         </div>
 
         {/* Reviews Section */}

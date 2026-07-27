@@ -370,6 +370,31 @@ export interface TMDBPerson {
     id: number;
     name: string;
     profile_path: string | null;
+    known_for_department?: string;
+}
+
+export interface TMDBCombinedCredit {
+    id: number;
+    media_type: 'movie' | 'tv';
+    title?: string;
+    name?: string;
+    poster_path: string | null;
+    release_date?: string;
+    first_air_date?: string;
+    character?: string;
+    job?: string;
+    department?: string;
+}
+
+export interface TMDBPersonDetails extends TMDBPerson {
+    birthday: string | null;
+    deathday: string | null;
+    place_of_birth: string | null;
+    biography: string | null;
+    combined_credits?: {
+        cast?: TMDBCombinedCredit[];
+        crew?: TMDBCombinedCredit[];
+    };
 }
 
 export async function searchPeople(query: string): Promise<TMDBPerson[]> {
@@ -392,6 +417,33 @@ export async function searchPeople(query: string): Promise<TMDBPerson[]> {
     } catch (error) {
         console.error("Error searching TMDB people:", error);
         return [];
+    }
+}
+
+export async function getPersonDetailsWithCredits(personId: string | number): Promise<TMDBPersonDetails | null> {
+    if (!TMDB_API_KEY || !personId) return null;
+
+    try {
+        const primaryResponse = await fetch(
+            `${TMDB_BASE_URL}/person/${personId}?api_key=${TMDB_API_KEY}&language=pt-BR&append_to_response=combined_credits`
+        );
+        if (!primaryResponse.ok) return null;
+
+        const primaryDetails = await primaryResponse.json() as TMDBPersonDetails;
+        if (primaryDetails.biography?.trim()) return primaryDetails;
+
+        const fallbackResponse = await fetch(
+            `${TMDB_BASE_URL}/person/${personId}?api_key=${TMDB_API_KEY}&language=en-US`
+        );
+        if (!fallbackResponse.ok) return primaryDetails;
+
+        const fallbackDetails = await fallbackResponse.json() as TMDBPersonDetails;
+        return fallbackDetails.biography?.trim()
+            ? { ...primaryDetails, biography: fallbackDetails.biography }
+            : primaryDetails;
+    } catch (error) {
+        console.error('Error fetching person details:', error);
+        return null;
     }
 }
 

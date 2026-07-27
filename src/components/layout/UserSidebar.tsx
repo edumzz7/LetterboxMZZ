@@ -3,6 +3,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import clsx from 'clsx';
 import { Star, Flame, ChevronDown, ChevronUp, Loader2, Film, Plus, Award } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { useLocation } from 'wouter';
 import type { PersonalMovie, RankedUser, SeriesEntry, TrendingMovie, AnticipatedMovie } from '../../types/app';
 import AvatarDisplay from './AvatarDisplay';
 import { useFavorites } from '../../hooks/useFavorites';
@@ -136,6 +137,7 @@ function SidebarRecommendationItem({
   currentUserId: string;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [, setLocation] = useLocation();
   const { addMovieMutation } = usePersonalMovieMutations(currentUserId);
   const { addSeriesMutation } = useSeriesMutations(currentUserId);
   const [addedToWatchlist, setAddedToWatchlist] = useState(false);
@@ -175,6 +177,11 @@ function SidebarRecommendationItem({
       });
     }
     setAddedToWatchlist(true);
+  };
+
+  const handleOpenDetails = () => {
+    setExpanded(false);
+    setLocation(item.type === 'movie' ? `/filme/${item.tmdbId}` : `/serie/${item.tmdbId}`);
   };
 
   return (
@@ -226,7 +233,12 @@ function SidebarRecommendationItem({
         <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60]" />
         <Dialog.Content className="fixed left-[50%] top-[50%] z-[70] w-[90vw] max-w-sm translate-x-[-50%] translate-y-[-50%] border border-[#222] bg-[#111] p-5 shadow-2xl rounded-xl">
           <div className="flex gap-4">
-            <div className="w-24 aspect-[2/3] shrink-0 rounded overflow-hidden border border-[#222] bg-black">
+            <button
+              type="button"
+              onClick={handleOpenDetails}
+              className="w-24 aspect-[2/3] shrink-0 rounded overflow-hidden border border-[#222] bg-black cursor-pointer transition-colors hover:border-brand-gold focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold"
+              aria-label={`Abrir página de ${item.title}`}
+            >
               {item.coverUrl ? (
                 <img
                   src={item.coverUrl}
@@ -238,10 +250,16 @@ function SidebarRecommendationItem({
                   <Film size={24} className="text-[#333]" />
                 </div>
               )}
-            </div>
+            </button>
             <div className="flex flex-col flex-1">
               <Dialog.Title className="text-lg font-medium text-brand-text mb-1 leading-tight">
-                {item.title}
+                <button
+                  type="button"
+                  onClick={handleOpenDetails}
+                  className="text-left cursor-pointer transition-colors hover:text-brand-gold focus:outline-none focus-visible:text-brand-gold"
+                >
+                  {item.title}
+                </button>
               </Dialog.Title>
               <span className="text-[10px] uppercase tracking-wider text-brand-gold-alt mb-3 block">
                 {item.type === 'movie' ? 'Filme Recomendado' : 'Série Recomendada'}
@@ -293,6 +311,7 @@ function SidebarMovieItem({
     : 'Usuários que registraram';
   const [expanded, setExpanded] = useState(false);
   const [showWatchers, setShowWatchers] = useState(false);
+  const [, setLocation] = useLocation();
   const { addMovieMutation } = usePersonalMovieMutations(currentUserId);
   const { addSeriesMutation } = useSeriesMutations(currentUserId);
   const [addedToWatchlist, setAddedToWatchlist] = useState(false);
@@ -340,6 +359,14 @@ function SidebarMovieItem({
       });
     }
     setAddedToWatchlist(true);
+  };
+
+  const handleOpenDetails = () => {
+    if (!movie.tmdbId) return;
+    setExpanded(false);
+    setShowWatchers(false);
+    const isSeries = movie.mediaType === 'tv' || details?.media_type === 'tv';
+    setLocation(isSeries ? `/serie/${movie.tmdbId}` : `/filme/${movie.tmdbId}`);
   };
 
   return (
@@ -391,7 +418,13 @@ function SidebarMovieItem({
         <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60]" />
         <Dialog.Content className="fixed left-[50%] top-[50%] z-[70] w-[90vw] max-w-sm translate-x-[-50%] translate-y-[-50%] border border-[#222] bg-[#111] p-5 shadow-2xl rounded-xl">
           <div className="flex gap-4">
-            <div className="w-24 aspect-[2/3] shrink-0 rounded overflow-hidden border border-[#222] bg-black">
+            <button
+              type="button"
+              onClick={handleOpenDetails}
+              disabled={!movie.tmdbId}
+              className="w-24 aspect-[2/3] shrink-0 rounded overflow-hidden border border-[#222] bg-black cursor-pointer transition-colors hover:border-brand-gold focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold disabled:cursor-default disabled:hover:border-[#222]"
+              aria-label={`Abrir página de ${movie.title}`}
+            >
               {movie.coverUrl ? (
                 <img
                   src={generateImagePath(movie.title, movie.coverUrl)}
@@ -403,10 +436,17 @@ function SidebarMovieItem({
                   <Film size={24} className="text-[#333]" />
                 </div>
               )}
-            </div>
+            </button>
             <div className="flex flex-col flex-1">
               <Dialog.Title className="text-lg font-medium text-brand-text mb-1 leading-tight">
-                {movie.title}
+                <button
+                  type="button"
+                  onClick={handleOpenDetails}
+                  disabled={!movie.tmdbId}
+                  className="text-left cursor-pointer transition-colors hover:text-brand-gold focus:outline-none focus-visible:text-brand-gold disabled:cursor-default disabled:hover:text-brand-text"
+                >
+                  {movie.title}
+                </button>
               </Dialog.Title>
               <button 
                 onClick={() => setShowWatchers(true)}

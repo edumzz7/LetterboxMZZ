@@ -20,6 +20,13 @@ interface MovieDetailScreenProps {
 
 export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScreenProps) {
   const [, setLocation] = useLocation();
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+    setLocation('/');
+  };
   const [isReviewOpen, setIsReviewOpen] = useState(false);
 
   // 1. Fetch TMDB Movie Details
@@ -75,7 +82,7 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
   }, [userMovies, movie]);
 
   const releaseYear = movie?.release_date ? movie.release_date.split('-')[0] : null;
-  const director = credits?.crew?.find((c: any) => c.job === 'Director')?.name || 'Desconhecido';
+  const director = credits?.crew?.find((c: any) => c.job === 'Director');
   const cast = credits?.cast?.slice(0, 6) || [];
   const genres = movie?.genres?.map((g: any) => g.name).join(', ') || '';
 
@@ -170,7 +177,7 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
         <span className="text-4xl">🍿</span>
         <h2 className="text-lg uppercase tracking-widest text-red-400">Filme não encontrado</h2>
         <button
-          onClick={() => setLocation('/')}
+          onClick={handleBack}
           className="text-xs uppercase tracking-widest text-brand-gold hover:underline flex items-center gap-2 mt-2"
         >
           <ArrowLeft size={14} /> Voltar para o painel
@@ -198,7 +205,7 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
           </>
         )}
         <button
-          onClick={() => setLocation('/')}
+          onClick={handleBack}
           className="absolute top-6 left-6 px-4 py-2 border border-white/10 rounded-xl text-xs uppercase tracking-widest bg-black/60 backdrop-blur-md text-brand-text hover:text-brand-gold hover:border-brand-gold/30 transition-all flex items-center gap-2 z-10"
         >
           <ArrowLeft size={14} /> Painel
@@ -325,7 +332,7 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
             <div className="bg-black/10 border border-[#151515] rounded-2xl p-5 space-y-4">
               <div className="text-sm">
                 <span className="font-semibold text-brand-text-muted uppercase text-xs tracking-wider">Diretor:</span>{' '}
-                <span className="font-light text-brand-text">{director}</span>
+                {director ? <button type="button" onClick={() => setLocation(`/director/${director.id}`)} className="cursor-pointer font-light text-brand-text transition hover:text-brand-gold hover:underline">{director.name}</button> : <span className="font-light text-brand-text">Desconhecido</span>}
               </div>
 
               {cast.length > 0 && (
@@ -333,7 +340,7 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
                   <span className="font-semibold text-brand-text-muted uppercase text-xs tracking-wider block mb-3">Elenco principal:</span>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                     {cast.map((actor: any) => (
-                      <div key={actor.id} className="flex items-center gap-2 min-w-0">
+                      <button key={actor.id} type="button" onClick={() => setLocation(`/actor/${actor.id}`)} className="flex min-w-0 cursor-pointer items-center gap-2 text-left transition hover:text-brand-gold">
                         {actor.profile_path ? (
                           <img
                             src={`https://image.tmdb.org/t/p/w185${actor.profile_path}`}
@@ -349,7 +356,7 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
                           <span className="text-xs truncate font-medium text-brand-text">{actor.name}</span>
                           <span className="text-[10px] text-brand-text-muted truncate font-light">{actor.character}</span>
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 </div>

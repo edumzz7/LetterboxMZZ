@@ -339,7 +339,7 @@ export default function SeriesCard({
                 <span className="text-xs text-brand-text-muted">{series.titulo}</span>
               </div>
 
-              <div className="absolute top-2 right-2 z-30">
+              <div className="absolute top-2 right-2 z-10">
                 <DropdownMenu.Root>
                   <DropdownMenu.Trigger asChild>
                     <button
@@ -356,7 +356,7 @@ export default function SeriesCard({
                       align="end"
                       onClick={(e) => e.stopPropagation()}
                       onPointerDown={(e) => e.stopPropagation()}
-                      className="min-w-[180px] bg-[#0a0f1e]/95 backdrop-blur-md border border-[#222] rounded-xl p-1.5 shadow-xl shadow-black/50 z-50 animate-in fade-in zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:zoom-out-95"
+                      className="min-w-[180px] bg-[#0a0f1e]/95 backdrop-blur-md border border-[#222] rounded-xl p-1.5 shadow-xl shadow-black/50 z-20 animate-in fade-in zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:zoom-out-95"
                     >
                       {isFriendCard && (
                         <>

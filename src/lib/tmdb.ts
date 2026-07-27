@@ -41,6 +41,20 @@ export interface TMDBWatchProvider {
     logo_path: string | null;
 }
 
+export interface TMDBTrailer {
+    name: string;
+    url: string;
+}
+
+interface TMDBVideoResult {
+    key?: string;
+    name?: string;
+    site?: string;
+    type?: string;
+    official?: boolean;
+    iso_639_1?: string;
+}
+
 export interface TMDBMultiResult {
     id: number;
     media_type: 'movie' | 'tv';
@@ -63,7 +77,23 @@ export interface TMDBRecommendationItem {
     release_date?: string;
     first_air_date?: string;
     adult?: boolean;
+    genre_ids?: number[];
 }
+
+export interface TMDBHomeMedia extends TMDBRecommendationItem {
+    media_type: 'movie' | 'tv';
+}
+
+export const HOME_RELATED_MIN_RATING = 7;
+export const HOME_RELATED_MIN_VOTES = {
+    movie: 150,
+    tv: 75,
+} as const;
+
+export const HOME_TOP_RATED_REQUIREMENTS = {
+    movie: { minimumRating: 7.5, minimumVotes: 1000 },
+    tv: { minimumRating: 7.5, minimumVotes: 500 },
+} as const;
 
 async function getRecommendationList(path: string, language = 'pt-BR'): Promise<TMDBRecommendationItem[]> {
     if (!TMDB_API_KEY) return [];
@@ -95,6 +125,55 @@ export function getTvRecommendations(tvId: number, language = 'pt-BR') {
 
 export function getTvSimilar(tvId: number, language = 'pt-BR') {
     return getRecommendationList(`tv/${tvId}/similar`, language);
+}
+
+async function getHomeCatalog(path: string, forcedMediaType?: 'movie' | 'tv'): Promise<TMDBHomeMedia[]> {
+    if (!TMDB_API_KEY) return [];
+
+    try {
+        const response = await fetch(`${TMDB_BASE_URL}/${path}&api_key=${TMDB_API_KEY}`);
+        if (!response.ok) return [];
+        const results = ((await response.json())?.results || []) as Array<TMDBRecommendationItem & { media_type?: 'movie' | 'tv' }>;
+        return results
+            .map((item: TMDBRecommendationItem & { media_type?: 'movie' | 'tv' }) => ({
+                ...item,
+                media_type: forcedMediaType || item.media_type,
+            }))
+            .filter((item): item is TMDBHomeMedia =>
+                (item.media_type === 'movie' || item.media_type === 'tv') && !item.adult && Boolean(item.poster_path),
+            );
+    } catch (error) {
+        console.error(`Error fetching TMDB catalog for ${path}:`, error);
+        return [];
+    }
+}
+
+export function getWeeklyTrendingMedia() {
+    return getHomeCatalog('trending/all/week?language=pt-BR');
+}
+
+function sortTopRatedCatalog(items: TMDBHomeMedia[]) {
+    return items.sort((a, b) =>
+        Number(b.vote_average || 0) - Number(a.vote_average || 0) ||
+        Number(b.vote_count || 0) - Number(a.vote_count || 0) ||
+        a.id - b.id,
+    );
+}
+
+export function getTopRatedMovies() {
+    const { minimumRating, minimumVotes } = HOME_TOP_RATED_REQUIREMENTS.movie;
+    return getHomeCatalog(
+        `discover/movie?language=pt-BR&sort_by=vote_average.desc&vote_average.gte=${minimumRating}&vote_count.gte=${minimumVotes}&include_adult=false&include_video=false&page=1`,
+        'movie',
+    ).then(sortTopRatedCatalog);
+}
+
+export function getTopRatedSeries() {
+    const { minimumRating, minimumVotes } = HOME_TOP_RATED_REQUIREMENTS.tv;
+    return getHomeCatalog(
+        `discover/tv?language=pt-BR&sort_by=vote_average.desc&vote_average.gte=${minimumRating}&vote_count.gte=${minimumVotes}&include_adult=false&page=1`,
+        'tv',
+    ).then(sortTopRatedCatalog);
 }
 
 export async function searchMovies(query: string): Promise<TMDBMovie[]> {
@@ -226,6 +305,50 @@ export function getMovieDetailsWithFallback(movieId: string | number) {
     return getDetailsWithOverviewFallback(`movie/${movieId}`);
 }
 
+function selectYouTubeTrailer(videos: TMDBVideoResult[]): TMDBTrailer | null {
+    const selected = videos
+        .filter((video) => video.site?.toLowerCase() === 'youtube' && Boolean(video.key))
+        .sort((a, b) => {
+            const score = (video: TMDBVideoResult) =>
+                (video.official ? 20 : 0) +
+                (video.type === 'Trailer' ? 10 : video.type === 'Teaser' ? 5 : 0);
+            return score(b) - score(a);
+        })[0];
+
+    return selected?.key
+        ? { name: selected.name || 'Trailer oficial', url: `https://www.youtube.com/watch?v=${selected.key}` }
+        : null;
+}
+
+async function getYouTubeTrailer(path: string): Promise<TMDBTrailer | null> {
+    if (!TMDB_API_KEY || !path) return null;
+
+    let fallback: TMDBTrailer | null = null;
+    for (const language of ['pt-BR', 'en-US']) {
+        try {
+            const response = await fetch(
+                `${TMDB_BASE_URL}/${path}/videos?api_key=${TMDB_API_KEY}&language=${language}`
+            );
+            if (!response.ok) continue;
+
+            const videos = ((await response.json())?.results || []) as TMDBVideoResult[];
+            fallback ||= selectYouTubeTrailer(videos);
+            const localizedTrailer = selectYouTubeTrailer(
+                videos.filter((video) => video.iso_639_1 === language.slice(0, 2)),
+            );
+            if (localizedTrailer) return localizedTrailer;
+        } catch (error) {
+            console.error(`Error fetching TMDB trailer for ${path}:`, error);
+        }
+    }
+
+    return fallback;
+}
+
+export function getMovieYouTubeTrailer(movieId: string | number) {
+    return getYouTubeTrailer(`movie/${movieId}`);
+}
+
 export async function getTvWatchProviders(
     tvId: number,
     region = 'BR'
@@ -297,6 +420,10 @@ export async function getTvDetailsRaw(tvId: number) {
 
 export function getTvDetailsRawWithFallback(tvId: number) {
     return getDetailsWithOverviewFallback(`tv/${tvId}`);
+}
+
+export function getTvYouTubeTrailer(tvId: string | number) {
+    return getYouTubeTrailer(`tv/${tvId}`);
 }
 
 export async function getMediaDetailsWithFallback(mediaId: string | number) {

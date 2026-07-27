@@ -1028,7 +1028,7 @@ export default function UserSidebar({
             <div className="flex items-center gap-2">
               <Flame size={14} className="text-brand-gold animate-pulse" />
               <span className="text-xs uppercase tracking-[0.2em] font-medium text-brand-text-muted group-hover:text-brand-text transition-colors">
-                Em Alta (30d)
+                Em alta no CineRats
               </span>
             </div>
             {isTrendingOpen ? (

@@ -1,11 +1,11 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Loader2, Film, Eye, EyeOff, Plus, Trash2, Edit3, Star, ArrowLeft } from 'lucide-react';
+import { Loader2, Film, Eye, EyeOff, Plus, Trash2, Edit3, Star, ArrowLeft, Video } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { usePersonalMovies } from '../../hooks/usePersonalMovies';
 import { useSocialActions } from '../../hooks/useSocialActions';
 import { useUsers } from '../../hooks/useUsers';
-import { getMovieDetailsWithFallback, getMovieCredits, getMovieWatchProviders } from '../../lib/tmdb';
+import { getMovieDetailsWithFallback, getMovieCredits, getMovieWatchProviders, getMovieYouTubeTrailer } from '../../lib/tmdb';
 import { getMovieCineratsStats } from '../../lib/appData';
 import StarRatingInput from '../ui/StarRatingInput';
 import ReviewModal from '../ui/ReviewModal';
@@ -49,6 +49,13 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
     queryKey: ['tmdb-movie-providers', id],
     queryFn: () => getMovieWatchProviders(Number(id)),
     staleTime: 1000 * 60 * 10,
+    enabled: !!movieQuery.data,
+  });
+
+  const trailerQuery = useQuery({
+    queryKey: ['tmdb-movie-trailer', id],
+    queryFn: () => getMovieYouTubeTrailer(id),
+    staleTime: 1000 * 60 * 60 * 24,
     enabled: !!movieQuery.data,
   });
 
@@ -325,6 +332,18 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
               {movie.overview || <span className="italic text-brand-text-muted">Sinopse não disponível no momento.</span>}
             </p>
           </div>
+
+          {trailerQuery.data && (
+            <a
+              href={trailerQuery.data.url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex w-fit items-center gap-2 rounded-xl border border-[#222] bg-black/35 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-brand-gold-alt transition-colors hover:border-brand-gold hover:bg-brand-gold/10 hover:text-brand-gold"
+              aria-label={`Abrir trailer de ${movie.title} no YouTube`}
+            >
+              <Video size={15} /> Link do Trailer no YouTube
+            </a>
+          )}
 
           {/* Director & Cast */}
           <div className="space-y-4">

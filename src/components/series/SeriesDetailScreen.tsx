@@ -1,10 +1,10 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Loader2, Tv, Eye, Plus, Trash2, Edit3, Star, ArrowLeft, Play } from 'lucide-react';
+import { Loader2, Tv, Eye, Plus, Trash2, Edit3, Star, ArrowLeft, Play, Video } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useSeries } from '../../hooks/useSeries';
 import { useUsers } from '../../hooks/useUsers';
-import { getTvDetailsRawWithFallback, getTvCredits, getTvWatchProviders, getTvSeasonEpisodes } from '../../lib/tmdb';
+import { getTvDetailsRawWithFallback, getTvCredits, getTvWatchProviders, getTvSeasonEpisodes, getTvYouTubeTrailer } from '../../lib/tmdb';
 import { getSeriesCineratsStats } from '../../lib/appData';
 import StarRatingInput from '../ui/StarRatingInput';
 import ReviewModal from '../ui/ReviewModal';
@@ -50,6 +50,13 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
     queryKey: ['tmdb-tv-providers', id],
     queryFn: () => getTvWatchProviders(Number(id)),
     staleTime: 1000 * 60 * 10,
+    enabled: !!seriesQuery.data,
+  });
+
+  const trailerQuery = useQuery({
+    queryKey: ['tmdb-tv-trailer', id],
+    queryFn: () => getTvYouTubeTrailer(id),
+    staleTime: 1000 * 60 * 60 * 24,
     enabled: !!seriesQuery.data,
   });
 
@@ -359,6 +366,18 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
               {series.overview || <span className="italic text-brand-text-muted">Sinopse não disponível no momento.</span>}
             </p>
           </div>
+
+          {trailerQuery.data && (
+            <a
+              href={trailerQuery.data.url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex w-fit items-center gap-2 rounded-xl border border-[#222] bg-black/35 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-brand-gold-alt transition-colors hover:border-brand-gold hover:bg-brand-gold/10 hover:text-brand-gold"
+              aria-label={`Abrir trailer de ${series.name} no YouTube`}
+            >
+              <Video size={15} /> Link do Trailer no YouTube
+            </a>
+          )}
 
           {/* Technical Info */}
           <div className="space-y-4">

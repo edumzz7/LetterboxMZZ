@@ -3,9 +3,10 @@ import { cloneElement, isValidElement, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 
 interface HeaderProps {
-  activeTab: 'dashboard' | 'oscars' | 'movies' | 'series' | 'personal';
-  onTabChange: (tab: 'dashboard' | 'oscars' | 'movies' | 'series' | 'personal') => void;
+  activeTab: 'home' | 'dashboard' | 'oscars' | 'movies' | 'series' | 'personal';
+  onTabChange: (tab: 'home' | 'dashboard' | 'oscars' | 'movies' | 'series' | 'personal') => void;
   canAccessOscars: boolean;
+  canAccessHome: boolean;
   onGoHome: () => void;
   searchSlot?: ReactNode;
   rightSlot?: ReactNode;
@@ -16,9 +17,10 @@ interface HeaderProps {
   subSlot?: ReactNode;
 }
 
-const Header = ({ activeTab, onTabChange, canAccessOscars, onGoHome, searchSlot, rightSlot, hideTabs, onBack }: HeaderProps) => {
+const Header = ({ activeTab, onTabChange, canAccessOscars, canAccessHome, onGoHome, searchSlot, rightSlot, hideTabs, onBack }: HeaderProps) => {
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const tabs: Array<{ id: HeaderProps['activeTab']; label: string; show?: boolean }> = [
+    { id: 'home', label: 'Home', show: canAccessHome },
     { id: 'movies', label: 'Filmes' },
     { id: 'series', label: 'Séries' },
     { id: 'oscars', label: 'Oscar 2027', show: canAccessOscars },

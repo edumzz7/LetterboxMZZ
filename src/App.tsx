@@ -11,6 +11,7 @@ import SeriesSection from './components/series/SeriesSection';
 import MovieDetailScreen from './components/movies/MovieDetailScreen';
 import SeriesDetailScreen from './components/series/SeriesDetailScreen';
 import PersonDetailScreen from './components/people/PersonDetailScreen';
+import HomeScreen from './components/home/HomeScreen';
 import UserDropdownMenu from './components/layout/UserDropdownMenu';
 import UserEventBell from './components/layout/UserEventBell';
 import ImportTvTimePage from './components/layout/ImportTvTimePage';
@@ -50,7 +51,7 @@ function readStoredSession(): SessionUser | null {
 }
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'oscars' | 'movies' | 'series' | 'personal'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'home' | 'dashboard' | 'oscars' | 'movies' | 'series' | 'personal'>('home');
   const storedSession = readStoredSession();
   const [session, setSession] = useState<SessionUser | null>(storedSession);
   const [location, setLocation] = useLocation();
@@ -182,6 +183,12 @@ function App() {
       setActiveTab('dashboard');
     }
   }, [activeTab, canAccessOscars]);
+
+  useEffect(() => {
+    if (viewedUser && !isOwnDashboard && activeTab === 'home') {
+      setActiveTab('dashboard');
+    }
+  }, [activeTab, isOwnDashboard, viewedUser]);
 
   /* Previous title block is no longer part of the persistent header.
   const headerCopy = useMemo(() => {
@@ -383,7 +390,11 @@ function App() {
           activeTab={activeTab}
           onTabChange={setActiveTab}
           canAccessOscars={canAccessOscars}
-          onGoHome={() => setLocation(`/${authenticatedSession.username}`)}
+          canAccessHome={isOwnDashboard}
+          onGoHome={() => {
+            setActiveTab('home');
+            setLocation(`/${authenticatedSession.username}`);
+          }}
           searchSlot={<GlobalSearch users={users} onSelectUser={selectUser} />}
           hideTabs={urlUsername === 'ranking' || Boolean(matchMovie) || Boolean(matchSerie) || isPersonRoute || Boolean(matchImportTvTime)}
           onBack={(matchMovie || matchSerie || isPersonRoute || matchImportTvTime) ? () => setLocation(`/${authenticatedSession.username}`) : undefined}
@@ -417,10 +428,10 @@ function App() {
             {isProfileRoute && viewedUser && <aside className="contents xl:flex xl:flex-col xl:gap-5"><div className="order-1 xl:order-none"><ProfileSummary user={viewedUser} users={users} currentUserId={authenticatedSession.id} movies={personalMovies} series={userSeries} isLoading={achievementsLoading} onSelectUser={selectUser} /></div><div className="order-3 xl:order-none"><UserSidebar users={users} currentUserId={authenticatedSession.id} selectedUserId={selectedUserId || authenticatedSession.id} onSelectUser={selectUser} isOpen={false} onClose={() => undefined} section="discover" /></div></aside>}
 
             <main className="order-2 min-w-0 rounded-3xl border border-[#151b28] bg-[#06080d] p-4 xl:order-none sm:p-7 lg:p-9">
-              {matchMovie ? <MovieDetailScreen id={movieParams.id} currentUserId={session.id} /> : matchSerie ? <SeriesDetailScreen id={serieParams.id} currentUserId={session.id} /> : matchActor ? <PersonDetailScreen id={actorParams.id} mode="actor" /> : matchDirector ? <PersonDetailScreen id={directorParams.id} mode="director" /> : matchImportTvTime ? <ImportTvTimePage currentUserId={session.id} onBack={() => setLocation(`/${authenticatedSession.username}`)} /> : urlUsername === 'ranking' && currentRankedUser ? <RankingScreen user={currentRankedUser} users={users} movies={personalMovies} series={userSeries} currentUserId={session.id} isLoading={personalMoviesQuery.isLoading || userSeriesQuery.isLoading} /> : urlUsername && !viewedUser ? <div className="py-20 text-center text-brand-text-muted">Usuário não encontrado.</div> : viewedUser && <div className="animate-in fade-in duration-500">{activeTab === 'dashboard' ? <DashboardTab user={viewedUser} isOwnDashboard={isOwnDashboard} /> : activeTab === 'oscars' ? <OscarPredictionsSection userId={viewedUser.id} canEdit={isOwnDashboard} /> : activeTab === 'movies' ? <PersonalMoviesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /> : activeTab === 'series' ? <SeriesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /> : <><PersonalMoviesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /><SeriesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /></>}</div>}
+              {matchMovie ? <MovieDetailScreen id={movieParams.id} currentUserId={session.id} /> : matchSerie ? <SeriesDetailScreen id={serieParams.id} currentUserId={session.id} /> : matchActor ? <PersonDetailScreen id={actorParams.id} mode="actor" /> : matchDirector ? <PersonDetailScreen id={directorParams.id} mode="director" /> : matchImportTvTime ? <ImportTvTimePage currentUserId={session.id} onBack={() => setLocation(`/${authenticatedSession.username}`)} /> : urlUsername === 'ranking' && currentRankedUser ? <RankingScreen user={currentRankedUser} users={users} movies={personalMovies} series={userSeries} currentUserId={session.id} isLoading={personalMoviesQuery.isLoading || userSeriesQuery.isLoading} /> : urlUsername && !viewedUser ? <div className="py-20 text-center text-brand-text-muted">Usuário não encontrado.</div> : viewedUser && <div className="animate-in fade-in duration-500">{activeTab === 'home' && isOwnDashboard ? <HomeScreen userId={session.id} movies={personalMovies} series={userSeries} /> : activeTab === 'dashboard' || !isOwnDashboard ? <DashboardTab user={viewedUser} isOwnDashboard={isOwnDashboard} /> : activeTab === 'oscars' ? <OscarPredictionsSection userId={viewedUser.id} canEdit={isOwnDashboard} /> : activeTab === 'movies' ? <PersonalMoviesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /> : activeTab === 'series' ? <SeriesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /> : <><PersonalMoviesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /><SeriesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /></>}</div>}
             </main>
 
-            {isProfileRoute && <aside className="order-4 flex flex-col gap-5 xl:order-none"><section className="rounded-3xl border border-[#151b28] bg-[#06080d] p-5"><h2 className="text-center text-xs font-semibold uppercase tracking-[0.18em] text-brand-gold">Últimas atualizações</h2><div className="mt-4 space-y-4 text-xs leading-relaxed text-brand-text-muted"><div><p className="font-semibold text-brand-text mb-2">22/07</p><ul className="list-disc list-inside space-y-1.5 pl-1 text-brand-text-muted/90"><li>Melhora significativa no algoritmo de recomendação de filmes</li><li>Ícone de adição de amigo presente no hero do usuário</li><li>Agora você pode entrar em contato conosco através do e-mail contato@cinerats.com</li><li>As plataformas onde o filme/série está disponível agora também é renderizada na página dedicada de cada mídia</li><li>Agora a tela de Desempenho e Conquistas está disponível através do acesso pelo menu superior ≡.</li></ul></div><div className="border-t border-[#151b28] pt-3"><p><strong className="text-brand-text">13/07</strong> - As sessões de Blog e Grupos estão em produção no CineRats</p></div></div></section><UserSidebar users={users} currentUserId={session.id} selectedUserId={selectedUserId || session.id} onSelectUser={selectUser} isOpen={false} onClose={() => undefined} section="ranking" /></aside>}
+            {isProfileRoute && <aside className="order-4 flex flex-col gap-5 xl:order-none"><section className="rounded-3xl border border-[#151b28] bg-[#06080d] p-5"><h2 className="text-center text-xs font-semibold uppercase tracking-[0.18em] text-brand-gold">Últimas atualizações</h2><div className="mt-4 space-y-4 text-xs leading-relaxed text-brand-text-muted"><div><p className="font-semibold text-brand-text mb-2">27/07 - NEW</p><ul className="list-disc list-inside space-y-1.5 pl-1 text-brand-text-muted/90"><li>Adição da tela Home com as Tendências da Semana, sugestões baseadas no seu último título assistido e as séries e filmes mais bem avaliados</li><li>Telas dedicadas para atores, atrizes e diretores com a filmografia de cada um</li><li>Melhora significativa no algoritmo de recomendação de filmes</li><li>Ícone de adição de amigo presente no hero do usuário</li><li>Agora a tela de <button type="button" onClick={() => setLocation('/ranking')} className="cursor-pointer text-brand-text underline decoration-brand-gold/60 underline-offset-2 transition hover:text-brand-gold">Desempenho e Conquistas</button> está disponível através do acesso pelo menu superior <button type="button" aria-label="Abrir Desempenho e Conquistas" onClick={() => setLocation('/ranking')} className="cursor-pointer font-semibold text-brand-text transition hover:text-brand-gold">≡</button>.</li></ul></div><div className="border-t border-[#151b28] pt-3"><p><strong className="text-brand-text">13/07</strong> - As sessões de Blog e Grupos estão em produção no CineRats</p></div></div></section><UserSidebar users={users} currentUserId={session.id} selectedUserId={selectedUserId || session.id} onSelectUser={selectUser} isOpen={false} onClose={() => undefined} section="ranking" /></aside>}
           </div>
         )}
 

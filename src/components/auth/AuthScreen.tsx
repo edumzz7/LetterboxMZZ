@@ -8,6 +8,7 @@ interface AuthScreenProps {
   onRegister: (username: string, email: string, password: string) => Promise<void>;
   error: string | null;
   isPending: boolean;
+  onForgotPassword?: () => void;
 }
 
 export default function AuthScreen({
@@ -15,6 +16,7 @@ export default function AuthScreen({
   onRegister,
   error,
   isPending,
+  onForgotPassword,
 }: AuthScreenProps) {
   const [mode, setMode] = useState<Mode>('login');
   const [username, setUsername] = useState('');
@@ -170,6 +172,15 @@ export default function AuthScreen({
               )}
             </button>
 
+            {mode === 'login' && onForgotPassword && (
+              <button
+                type="button"
+                onClick={onForgotPassword}
+                className="w-full text-center text-xs uppercase tracking-[0.25em] text-brand-text-muted hover:text-brand-gold transition-colors"
+              >
+                Esqueci minha senha
+              </button>
+            )}
           </form>
         </section>
       </div>

@@ -156,6 +156,43 @@ export async function changePassword(
   );
 }
 
+export async function requestPasswordReset(email: string) {
+  return withFallback(
+    async () => {
+      await apiClient.post('/auth/password-reset', { email });
+    },
+    async () => {
+      // Local mode fallback - just log the request
+      console.log('Password reset requested for:', email);
+    },
+  );
+}
+
+export async function confirmPasswordReset(
+  email: string,
+  code: string,
+  password: string,
+  confirmPassword: string,
+) {
+  clearAppDataCache();
+  return withFallback(
+    async () => {
+      await apiClient.patch('/auth/password-reset', {
+        email,
+        code,
+        password,
+        confirmPassword,
+      });
+      const { data } = await apiClient.get<{ id: string; username: string }>('/auth/me');
+      cachedSessionUser = { id: data.id, username: data.username };
+      return cachedSessionUser;
+    },
+    async () => {
+      throw new Error('Reset de senha não disponível no modo local.');
+    },
+  );
+}
+
 export async function adminResetPassword(
   targetUsername: string,
   newPassword: string,

@@ -5,6 +5,8 @@ import AppHeader from './components/layout/Header';
 import DashboardTab from './components/layout/DashboardTab';
 import UserSidebar, { RECOMMENDATIONS_STORAGE_KEY_PREFIX } from './components/layout/UserSidebar';
 import AuthScreen from './components/auth/AuthScreen';
+import RequestPasswordResetScreen from './components/auth/RequestPasswordResetScreen';
+import EnterCodeScreen from './components/auth/EnterCodeScreen';
 import OscarPredictionsSection from './components/movies/OscarPredictionsSection';
 import PersonalMoviesSection from './components/movies/PersonalMoviesSection';
 import SeriesSection from './components/series/SeriesSection';
@@ -33,6 +35,8 @@ import {
   logoutUser,
   registerUser,
   updateUserProfile,
+  requestPasswordReset,
+  confirmPasswordReset,
 } from './lib/appData';
 import type { RankedUser, SessionUser } from './types/app';
 
@@ -61,8 +65,13 @@ function App() {
   const [matchActor, actorParams] = useRoute('/actor/:id');
   const [matchDirector, directorParams] = useRoute('/director/:id');
   const [matchImportTvTime] = useRoute('/import-tvtime');
+  const [matchRequestPasswordReset] = useRoute('/conta/esqueci-senha');
+  const [matchConfirmPasswordReset] = useRoute('/conta/resetar-senha');
   const [authError, setAuthError] = useState<string | null>(null);
   const [authPending, setAuthPending] = useState(false);
+  const [passwordResetError, setPasswordResetError] = useState<string | null>(null);
+  const [passwordResetPending, setPasswordResetPending] = useState(false);
+  const [passwordResetSuccess, setPasswordResetSuccess] = useState(false);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const [deleteProfilePending, setDeleteProfilePending] = useState(false);
   const [infoMenuOpen, setInfoMenuOpen] = useState(false);
@@ -335,6 +344,46 @@ function App() {
     }
   };
 
+  const handleRequestPasswordReset = async (email: string) => {
+    setPasswordResetPending(true);
+    setPasswordResetError(null);
+    setPasswordResetSuccess(false);
+
+    try {
+      await requestPasswordReset(email);
+      setPasswordResetSuccess(true);
+      // Redireciona para a tela de código
+      setTimeout(() => {
+        setLocation(`/conta/resetar-senha?email=${encodeURIComponent(email)}`);
+      }, 1500);
+    } catch (error) {
+      setPasswordResetError(error instanceof Error ? error.message : 'Falha ao solicitar reset de senha.');
+    } finally {
+      setPasswordResetPending(false);
+    }
+  };
+
+  const handleConfirmPasswordReset = async (
+    email: string,
+    code: string,
+    password: string,
+    confirmPassword: string,
+  ) => {
+    setPasswordResetPending(true);
+    setPasswordResetError(null);
+
+    try {
+      const nextSession = await confirmPasswordReset(email, code, password, confirmPassword);
+      persistSession(nextSession);
+      await refetchUsers();
+      setLocation(`/${nextSession.username}`);
+    } catch (error) {
+      setPasswordResetError(error instanceof Error ? error.message : 'Falha ao redefinir senha.');
+    } finally {
+      setPasswordResetPending(false);
+    }
+  };
+
   if (isBootstrapping) {
     return (
       <div className="min-h-screen bg-brand-bg text-brand-text flex items-center justify-center">
@@ -361,12 +410,48 @@ function App() {
   }
 
   if (!session) {
+    if (matchRequestPasswordReset) {
+      return (
+        <RequestPasswordResetScreen
+          onSubmit={handleRequestPasswordReset}
+          onBackToLogin={() => setLocation('/')}
+          error={passwordResetError}
+          isPending={passwordResetPending}
+          success={passwordResetSuccess}
+        />
+      );
+    }
+
+    if (matchConfirmPasswordReset) {
+      const searchParams = new URLSearchParams(window.location.search);
+      const emailFromUrl = searchParams.get('email') || '';
+      const codeFromUrl = searchParams.get('code') || '';
+
+      // Se não tem email na URL, volta para tela de solicitar reset
+      if (!emailFromUrl) {
+        setLocation('/conta/esqueci-senha');
+        return null;
+      }
+
+      return (
+        <EnterCodeScreen
+          onSubmit={handleConfirmPasswordReset}
+          onBackToLogin={() => setLocation('/')}
+          error={passwordResetError}
+          isPending={passwordResetPending}
+          initialEmail={emailFromUrl}
+          initialCode={codeFromUrl}
+        />
+      );
+    }
+
     return (
       <AuthScreen
         onLogin={handleLogin}
         onRegister={handleRegister}
         error={authError}
         isPending={authPending}
+        onForgotPassword={() => setLocation('/conta/esqueci-senha')}
       />
     );
   }

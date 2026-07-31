@@ -95,6 +95,14 @@ export const HOME_TOP_RATED_REQUIREMENTS = {
     tv: { minimumRating: 7.5, minimumVotes: 500 },
 } as const;
 
+const HOME_TOP_RATED_CACHE_DURATION = 1000 * 60 * 60 * 24;
+const HOME_TOP_RATED_CACHE_PREFIX = 'cinerats:home-top-rated:v1';
+
+interface CachedHomeCatalog {
+    timestamp: number;
+    items: TMDBHomeMedia[];
+}
+
 async function getRecommendationList(path: string, language = 'pt-BR'): Promise<TMDBRecommendationItem[]> {
     if (!TMDB_API_KEY) return [];
 
@@ -152,28 +160,70 @@ export function getWeeklyTrendingMedia() {
     return getHomeCatalog('trending/all/week?language=pt-BR');
 }
 
-function sortTopRatedCatalog(items: TMDBHomeMedia[]) {
-    return items.sort((a, b) =>
-        Number(b.vote_average || 0) - Number(a.vote_average || 0) ||
-        Number(b.vote_count || 0) - Number(a.vote_count || 0) ||
-        a.id - b.id,
-    );
+function readCachedHomeCatalog(cacheKey: string): TMDBHomeMedia[] | null {
+    try {
+        const raw = localStorage.getItem(cacheKey);
+        if (!raw) return null;
+        const cached = JSON.parse(raw) as CachedHomeCatalog;
+        if (
+            !Array.isArray(cached.items)
+            || typeof cached.timestamp !== 'number'
+            || Date.now() - cached.timestamp >= HOME_TOP_RATED_CACHE_DURATION
+        ) {
+            localStorage.removeItem(cacheKey);
+            return null;
+        }
+        return cached.items;
+    } catch {
+        return null;
+    }
+}
+
+function writeCachedHomeCatalog(cacheKey: string, items: TMDBHomeMedia[]) {
+    try {
+        localStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), items } satisfies CachedHomeCatalog));
+    } catch {
+        // A lista continua funcional mesmo se o navegador bloquear o armazenamento local.
+    }
+}
+
+function pickRandomHomeItems(items: TMDBHomeMedia[], limit = 10) {
+    const shuffled = [...items];
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+        const randomIndex = Math.floor(Math.random() * (index + 1));
+        [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
+    }
+    return shuffled.slice(0, limit);
+}
+
+async function getRandomTopRatedCatalog(
+    type: 'movie' | 'tv',
+    path: string,
+): Promise<TMDBHomeMedia[]> {
+    const cacheKey = `${HOME_TOP_RATED_CACHE_PREFIX}:${type}`;
+    const cached = readCachedHomeCatalog(cacheKey);
+    if (cached) return cached;
+
+    const items = await getHomeCatalog(path, type);
+    const selected = pickRandomHomeItems(items);
+    if (selected.length) writeCachedHomeCatalog(cacheKey, selected);
+    return selected;
 }
 
 export function getTopRatedMovies() {
     const { minimumRating, minimumVotes } = HOME_TOP_RATED_REQUIREMENTS.movie;
-    return getHomeCatalog(
-        `discover/movie?language=pt-BR&sort_by=vote_average.desc&vote_average.gte=${minimumRating}&vote_count.gte=${minimumVotes}&include_adult=false&include_video=false&page=1`,
+    return getRandomTopRatedCatalog(
         'movie',
-    ).then(sortTopRatedCatalog);
+        `discover/movie?language=pt-BR&sort_by=vote_average.desc&vote_average.gte=${minimumRating}&vote_count.gte=${minimumVotes}&include_adult=false&include_video=false&page=1`,
+    );
 }
 
 export function getTopRatedSeries() {
     const { minimumRating, minimumVotes } = HOME_TOP_RATED_REQUIREMENTS.tv;
-    return getHomeCatalog(
-        `discover/tv?language=pt-BR&sort_by=vote_average.desc&vote_average.gte=${minimumRating}&vote_count.gte=${minimumVotes}&include_adult=false&page=1`,
+    return getRandomTopRatedCatalog(
         'tv',
-    ).then(sortTopRatedCatalog);
+        `discover/tv?language=pt-BR&sort_by=vote_average.desc&vote_average.gte=${minimumRating}&vote_count.gte=${minimumVotes}&include_adult=false&page=1`,
+    );
 }
 
 export async function searchMovies(query: string): Promise<TMDBMovie[]> {

@@ -653,6 +653,50 @@ export async function updatePersonalMovie(
 ) {
   return withFallback(
     async () => {
+      // Move a watched item back to the watchlist.
+      if (updates.status === 'watchlist') {
+        const watchEntriesRes = await apiClient.get<{
+          id: string;
+          providerExternalId: string;
+          type: string;
+          title: string;
+          posterPath: string | null;
+        }[]>('/watch-entries');
+        const item = watchEntriesRes.data.find((entry) => entry.id === movieId);
+
+        if (item) {
+          await apiClient.delete(`/watch-entries/${movieId}`);
+          const res = await apiClient.post<{
+            id: string;
+            providerExternalId: string;
+            type: string;
+            title: string;
+            posterPath: string | null;
+            createdAt: string;
+          }>('/watchlist', {
+            type: item.type,
+            providerExternalId: item.providerExternalId,
+          });
+
+          return {
+            id: res.data.id,
+            user_id: '',
+            titulo: res.data.title ?? item.title,
+            ano_lancamento: null,
+            capa_url: res.data.posterPath ?? item.posterPath,
+            plataforma_slug: updates.plataforma_slug ?? null,
+            status: 'watchlist' as MovieStatus,
+            source: 'manual' as const,
+            source_movie_id: res.data.providerExternalId ?? item.providerExternalId,
+            avaliacao: updates.avaliacao ?? null,
+            rating: null,
+            review: null,
+            streaming_data: null,
+            created_at: res.data.createdAt,
+          } as PersonalMovie;
+        }
+      }
+
       // If status changed to 'watched', move from watchlist to watch-entries
       if (updates.status === 'watched') {
         // We need to get the current item to find its providerExternalId.
@@ -754,6 +798,26 @@ export async function listSeries(userId: string) {
         const s = seasons.find((item) => item.season_number === season);
         return s?.episode_count ?? 0;
       };
+      const getSeriesProgressStatus = (
+        tmdbId: string | null,
+        season: number,
+        watchedEpisodes: number,
+      ): SeriesStatus => {
+        const seasons = tmdbId
+          ? (tmdbDetailsMap.get(tmdbId) || [])
+              .filter((item) => item.season_number > 0)
+              .sort((a, b) => a.season_number - b.season_number)
+          : [];
+        const lastSeason = seasons[seasons.length - 1];
+        const seasonTotal = getSeasonTotal(tmdbId, season);
+        const completedEntireSeries = Boolean(
+          lastSeason
+          && season === lastSeason.season_number
+          && seasonTotal > 0
+          && watchedEpisodes >= seasonTotal,
+        );
+        return completedEntireSeries ? 'watched' : 'watching';
+      };
 
       const watched: SeriesEntry[] = seriesEntries.map((e) => {
         const temporada = e.season ?? 1;
@@ -765,7 +829,7 @@ export async function listSeries(userId: string) {
           user_id: userId,
           titulo: e.title ?? '',
           capa_url: e.posterPath ?? null,
-          status: getSeriesStatus(episodios_vistos, total_episodios),
+          status: getSeriesProgressStatus(e.providerExternalId, temporada, episodios_vistos),
           temporada,
           total_episodios,
           episodios_vistos,
@@ -914,6 +978,55 @@ export async function updateSeries(
 
       if (!providerExternalId) {
         return localData.updateSeries(seriesId, updates);
+      }
+
+      // Move a watched/watching series back to the watchlist.
+      if (updates.status === 'watchlist') {
+        const watchEntriesRes = await apiClient.get<{
+          id: string;
+          providerExternalId: string;
+          type: string;
+          title: string;
+          posterPath: string | null;
+          season?: number | null;
+        }[]>('/watch-entries');
+        const item = watchEntriesRes.data.find((entry) => entry.id === seriesId);
+
+        if (item) {
+          await apiClient.delete(`/watch-entries/${seriesId}`);
+          const season = Math.max(1, updates.temporada ?? item.season ?? 1);
+          const res = await apiClient.post<{
+            id: string;
+            providerExternalId: string;
+            type: string;
+            title: string;
+            posterPath: string | null;
+            season?: number | null;
+            createdAt: string;
+          }>('/watchlist', {
+            type: 'series',
+            providerExternalId: item.providerExternalId,
+            season,
+          });
+
+          return {
+            id: res.data.id,
+            user_id: '',
+            titulo: res.data.title ?? item.title,
+            capa_url: res.data.posterPath ?? item.posterPath,
+            status: 'watchlist',
+            source_movie_id: res.data.providerExternalId ?? item.providerExternalId,
+            temporada: res.data.season ?? season,
+            total_episodios: updates.total_episodios ?? 0,
+            episodios_vistos: 0,
+            plataforma_slug: updates.plataforma_slug ?? null,
+            avaliacao: updates.avaliacao ?? null,
+            rating: null,
+            review: null,
+            streaming_data: null,
+            created_at: res.data.createdAt,
+          } as SeriesEntry;
+        }
       }
 
       // If status changed to 'watched' or 'watching' from watchlist, move from watchlist to watch-entries

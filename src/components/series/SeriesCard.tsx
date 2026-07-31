@@ -169,11 +169,27 @@ export default function SeriesCard({
     setSaveError(null);
     setIsSaving(true);
     try {
+      const regularSeasons = seasonMeta
+        .filter((season) => season.season_number > 0)
+        .sort((a, b) => a.season_number - b.season_number);
+      const lastSeason = regularSeasons[regularSeasons.length - 1];
+      const completedEntireSeries = Boolean(
+        lastSeason
+        && temporada === lastSeason.season_number
+        && episodiosVistos >= totalEpisodios,
+      );
+      const status = completedEntireSeries
+        ? 'watched'
+        : episodiosVistos > 0 || series.status !== 'watchlist'
+          ? 'watching'
+          : 'watchlist';
+
       await onSaveProgress({
         id: series.id,
         episodios_vistos: episodiosVistos,
         temporada,
         total_episodios: totalEpisodios,
+        status,
       });
       setOpen(false);
     } catch (error) {
@@ -183,17 +199,52 @@ export default function SeriesCard({
     }
   };
 
-  const toggleStatus = (event?: React.MouseEvent | Event) => {
+  const toggleStatus = async (event?: React.MouseEvent | Event) => {
     if (event) {
       event.preventDefault();
       if ('stopPropagation' in event) event.stopPropagation();
     }
     if (!canEdit) return;
     const nextStatus = series.status === 'watched' ? 'watchlist' : 'watched';
-    onSaveProgress({
+
+    if (nextStatus === 'watchlist') {
+      await onSaveProgress({
+        id: series.id,
+        status: nextStatus,
+        temporada: series.temporada,
+        total_episodios: series.total_episodios,
+        episodios_vistos: 0,
+      });
+      return;
+    }
+
+    let seasons = seasonMeta;
+    if (seasons.length === 0) {
+      let currentId = tmdbSeriesId || Number(series.source_movie_id);
+      if (!Number.isFinite(currentId) || currentId <= 0) {
+        const picked = (await searchSeries(series.titulo))[0];
+        currentId = picked?.id || 0;
+      }
+      if (currentId > 0) {
+        const details = await getTvDetails(currentId);
+        seasons = details?.seasons || [];
+        setTmdbSeriesId(currentId);
+        setSeasonMeta(seasons);
+      }
+    }
+    const regularSeasons = seasons
+      .filter((season) => season.season_number > 0)
+      .sort((a, b) => a.season_number - b.season_number);
+    const lastSeason = regularSeasons[regularSeasons.length - 1];
+    const temporada = lastSeason?.season_number || series.temporada || 1;
+    const totalEpisodios = Math.max(lastSeason?.episode_count || series.total_episodios, 1);
+
+    await onSaveProgress({
       id: series.id,
       status: nextStatus,
-      episodios_vistos: nextStatus === 'watched' ? Math.max(series.total_episodios, 1) : 0,
+      temporada,
+      total_episodios: totalEpisodios,
+      episodios_vistos: totalEpisodios,
     });
   };
 
@@ -407,7 +458,7 @@ export default function SeriesCard({
                         <DropdownMenu.Item
                           onSelect={(e) => {
                             e.preventDefault();
-                            toggleStatus(e);
+                            void toggleStatus(e);
                           }}
                           className="flex items-center gap-2 px-2 py-2 text-xs text-brand-text rounded-md cursor-pointer outline-none hover:bg-brand-gold/10 hover:text-brand-gold transition-colors focus:bg-brand-gold/10 focus:text-brand-gold"
                         >

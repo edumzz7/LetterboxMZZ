@@ -4,7 +4,7 @@ import { Loader2, Tv, Eye, Plus, Trash2, Edit3, Star, ArrowLeft, Play, Video } f
 import { useLocation } from 'wouter';
 import { useSeries } from '../../hooks/useSeries';
 import { useUsers } from '../../hooks/useUsers';
-import { getTvDetailsRawWithFallback, getTvCredits, getTvWatchProviders, getTvSeasonEpisodes, getTvYouTubeTrailer } from '../../lib/tmdb';
+import { getTvDetailsRawWithFallback, getTvCredits, getTvWatchProviders, getTvSeasonEpisodes, getTvYouTubeTrailer, type TMDBTvSeasonMeta } from '../../lib/tmdb';
 import { getSeriesCineratsStats } from '../../lib/appData';
 import StarRatingInput from '../ui/StarRatingInput';
 import ReviewModal from '../ui/ReviewModal';
@@ -105,11 +105,21 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
   const creators: Array<{ id: number; name: string }> = series?.created_by || [];
   const cast = credits?.cast?.slice(0, 6) || [];
   const genres = series?.genres?.map((g: any) => g.name).join(', ') || '';
-  const seasonsList = series?.seasons || [];
+  const seasonsList = useMemo<TMDBTvSeasonMeta[]>(
+    () => series?.seasons || [],
+    [series?.seasons],
+  );
 
   const activeSeasonMeta = useMemo(() => {
-    return seasonsList.find((s: any) => s.season_number === selectedSeason);
+    return seasonsList.find((season) => season.season_number === selectedSeason);
   }, [seasonsList, selectedSeason]);
+  const regularSeasons = useMemo(
+    () => seasonsList
+      .filter((season) => season.season_number > 0)
+      .sort((a, b) => a.season_number - b.season_number),
+    [seasonsList],
+  );
+  const lastSeasonMeta = regularSeasons[regularSeasons.length - 1];
 
   const isPending =
     addSeriesMutation.isPending ||
@@ -120,16 +130,22 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
   const handleAddSeries = async (status: 'watchlist' | 'watching' | 'watched') => {
     if (!series) return;
     const totalEpsOfSeason = activeSeasonMeta?.episode_count || 1;
-    const totalEpsOfAllSeries = series.number_of_episodes || 1;
+    const targetSeason = status === 'watched'
+      ? (lastSeasonMeta?.season_number || selectedSeason)
+      : selectedSeason;
+    const targetSeasonEpisodes = status === 'watched'
+      ? (lastSeasonMeta?.episode_count || totalEpsOfSeason)
+      : totalEpsOfSeason;
 
     await addSeriesMutation.mutateAsync({
       titulo: series.name,
       capa_url: series.poster_path ? `https://image.tmdb.org/t/p/w500${series.poster_path}` : null,
       status,
-      temporada: status === 'watched' ? (seasonsList[seasonsList.length - 1]?.season_number || 1) : selectedSeason,
-      total_episodios: status === 'watched' ? totalEpsOfAllSeries : totalEpsOfSeason,
-      episodios_vistos: status === 'watched' ? totalEpsOfAllSeries : 0,
+      temporada: targetSeason,
+      total_episodios: targetSeasonEpisodes,
+      episodios_vistos: status === 'watched' ? targetSeasonEpisodes : 0,
       plataforma_slug: 'stremio',
+      source_movie_id: String(series.id),
       rating: null,
       streaming_data: JSON.stringify(providers),
     });
@@ -139,6 +155,16 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
   const handleUpdateEpisodeProgress = async (episodeNumber: number) => {
     if (!userSeriesDoc) return;
     const totalEpsOfSeason = activeSeasonMeta?.episode_count || 1;
+    const completedSeries = Boolean(
+      lastSeasonMeta
+      && selectedSeason === lastSeasonMeta.season_number
+      && episodeNumber >= totalEpsOfSeason,
+    );
+    const nextStatus = completedSeries
+      ? 'watched'
+      : episodeNumber > 0 || userSeriesDoc.status !== 'watchlist'
+        ? 'watching'
+        : 'watchlist';
 
     setIsUpdatingProgress(true);
     try {
@@ -147,6 +173,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
         temporada: selectedSeason,
         total_episodios: totalEpsOfSeason,
         episodios_vistos: episodeNumber,
+        status: nextStatus,
       });
       cineratsQuery.refetch();
     } finally {
@@ -157,7 +184,17 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
   const handleToggleWatchlistOnly = async () => {
     if (!series) return;
     if (userSeriesDoc) {
-      await deleteSeriesMutation.mutateAsync(userSeriesDoc.id);
+      if (userSeriesDoc.status === 'watchlist') {
+        await deleteSeriesMutation.mutateAsync(userSeriesDoc.id);
+      } else {
+        await updateProgressMutation.mutateAsync({
+          id: userSeriesDoc.id,
+          status: 'watchlist',
+          temporada: userSeriesDoc.temporada,
+          total_episodios: userSeriesDoc.total_episodios,
+          episodios_vistos: 0,
+        });
+      }
       cineratsQuery.refetch();
     } else {
       await handleAddSeries('watchlist');

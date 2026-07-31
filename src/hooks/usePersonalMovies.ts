@@ -45,7 +45,14 @@ export function usePersonalMovieMutations(userId: string | null) {
     onSuccess: (data, variables) => {
       if (data) {
         queryClient.setQueryData(['personal-movies', userId], (old: PersonalMovie[] = []) =>
-          old.map((m) => (m.id === variables.id ? { ...m, ...data } : m))
+          old.map((m) => {
+            if (m.id !== variables.id) return m;
+            const merged = { ...m, ...data };
+            if (!data.user_id) merged.user_id = m.user_id;
+            if (!data.titulo) merged.titulo = m.titulo;
+            if (!data.capa_url) merged.capa_url = m.capa_url;
+            return merged;
+          })
         );
       } else {
         void queryClient.invalidateQueries({ queryKey: ['personal-movies', userId] });

@@ -731,7 +731,10 @@ export async function updateSeries(
   const current = items[index];
   requireSession(current.user_id);
   const next: SeriesEntry = { ...current, ...updates };
-  if (updates.episodios_vistos !== undefined || updates.total_episodios !== undefined) {
+  if (
+    updates.status === undefined
+    && (updates.episodios_vistos !== undefined || updates.total_episodios !== undefined)
+  ) {
     next.status = getSeriesStatus(next.episodios_vistos, next.total_episodios);
   }
   items[index] = next;

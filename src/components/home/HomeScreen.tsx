@@ -200,14 +200,16 @@ export default function HomeScreen({ userId, movies, series }: HomeScreenProps) 
     staleTime: 1000 * 60 * 60,
   });
   const topSeriesQuery = useQuery({
-    queryKey: ['home-top-rated-series-v2'],
+    queryKey: ['home-top-rated-series-v3'],
     queryFn: getTopRatedSeries,
-    staleTime: 1000 * 60 * 60 * 12,
+    staleTime: 1000 * 60 * 60 * 24,
+    refetchInterval: 1000 * 60 * 60 * 24,
   });
   const topMoviesQuery = useQuery({
-    queryKey: ['home-top-rated-movies-v2'],
+    queryKey: ['home-top-rated-movies-v3'],
     queryFn: getTopRatedMovies,
-    staleTime: 1000 * 60 * 60 * 12,
+    staleTime: 1000 * 60 * 60 * 24,
+    refetchInterval: 1000 * 60 * 60 * 24,
   });
   const relatedQuery = useQuery({
     queryKey: ['home-related-v2', userId, watchedSeed?.type, watchedSeed?.id],

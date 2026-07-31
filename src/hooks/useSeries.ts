@@ -52,6 +52,7 @@ export function useSeriesMutations(userId: string | null) {
             const merged = { ...s, ...data };
             if (!merged.capa_url && s.capa_url) merged.capa_url = s.capa_url;
             if (!merged.titulo && s.titulo) merged.titulo = s.titulo;
+            if (!merged.user_id && s.user_id) merged.user_id = s.user_id;
             return merged;
           })
         );

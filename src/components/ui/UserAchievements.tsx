@@ -115,6 +115,7 @@ interface UserAchievementsProps {
   series: SeriesEntry[];
   users: RankedUser[];
   userId: string;
+  currentUserId: string;
   isLoading?: boolean;
   maxVisible?: number;
 }
@@ -124,6 +125,7 @@ export default function UserAchievements({
   series,
   users,
   userId,
+  currentUserId,
   isLoading = false,
   maxVisible,
 }: UserAchievementsProps) {
@@ -134,14 +136,14 @@ export default function UserAchievements({
 
   const { data: userFavorites = [], isLoading: favsLoading } = useQuery({
     queryKey: ['user_favorites_list', userId],
-    queryFn: listFavorites,
-    enabled: !!userId,
+    queryFn: () => listFavorites(currentUserId),
+    enabled: !!userId && userId === currentUserId,
   });
 
   const { data: favoritedByCount = 0, isLoading: favoritedByLoading } = useQuery({
     queryKey: ['favorited_by_count', userId],
     queryFn: () => countFavoritedBy(userId),
-    enabled: !!userId,
+    enabled: !!userId && userId === currentUserId,
   });
 
   const { data: userActivities = [], isLoading: activitiesLoading } = useQuery({

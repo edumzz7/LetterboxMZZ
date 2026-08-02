@@ -1,8 +1,12 @@
-import { useMemo } from 'react';
-import { Star, Tv, Clapperboard, Heart, Film } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Star, Tv, Clapperboard, Heart, Film, RefreshCw, X } from 'lucide-react';
 import { useUserReviews } from '../../hooks/useReviews';
+import { useQueryClient } from '@tanstack/react-query';
 import { getReviewReaction } from '../../lib/reviewReactions';
+import { searchMovies, searchSeries } from '../../lib/tmdb';
+import { updateUserProfile } from '../../lib/appData';
 import type { RankedUser } from '../../types/app';
+import PreferenceSearchInput, { type PreferenceSearchItem } from './PreferenceSearchInput';
 
 interface DashboardTabProps {
   user: RankedUser;
@@ -21,6 +25,69 @@ function formatDate(dateStr?: string) {
 
 export default function DashboardTab({ user, isOwnDashboard }: DashboardTabProps) {
   const reviewsQuery = useUserReviews(user.id);
+  const queryClient = useQueryClient();
+  const [isEditingPreferences, setIsEditingPreferences] = useState(false);
+  const [isSavingPreferences, setIsSavingPreferences] = useState(false);
+  const [preferencesError, setPreferencesError] = useState<string | null>(null);
+  const [favoriteMovie, setFavoriteMovie] = useState(user.favorite_movie || '');
+  const [favoriteMovie2, setFavoriteMovie2] = useState(user.favorite_movie_2 || '');
+  const [favoriteSeries, setFavoriteSeries] = useState(user.favorite_series || '');
+  const [favoriteGenre, setFavoriteGenre] = useState(user.favorite_genre || '');
+  const [watchPreference, setWatchPreference] = useState<'home' | 'cinema' | ''>(user.watch_preference || '');
+
+  useEffect(() => {
+    setFavoriteMovie(user.favorite_movie || '');
+    setFavoriteMovie2(user.favorite_movie_2 || '');
+    setFavoriteSeries(user.favorite_series || '');
+    setFavoriteGenre(user.favorite_genre || '');
+    setWatchPreference(user.watch_preference || '');
+  }, [user]);
+
+  const beginPreferencesEdit = () => {
+    setPreferencesError(null);
+    setIsEditingPreferences(true);
+  };
+
+  const cancelPreferencesEdit = () => {
+    setFavoriteMovie(user.favorite_movie || '');
+    setFavoriteMovie2(user.favorite_movie_2 || '');
+    setFavoriteSeries(user.favorite_series || '');
+    setFavoriteGenre(user.favorite_genre || '');
+    setWatchPreference(user.watch_preference || '');
+    setPreferencesError(null);
+    setIsEditingPreferences(false);
+  };
+
+  const savePreferences = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setIsSavingPreferences(true);
+    setPreferencesError(null);
+    try {
+      await updateUserProfile(user.id, {
+        favorite_movie: favoriteMovie.trim() || undefined,
+        favorite_movie_2: favoriteMovie2.trim() || undefined,
+        favorite_series: favoriteSeries.trim() || undefined,
+        favorite_genre: favoriteGenre.trim() || undefined,
+        watch_preference: watchPreference || undefined,
+      });
+      await queryClient.invalidateQueries({ queryKey: ['users'] });
+      setIsEditingPreferences(false);
+    } catch (error) {
+      setPreferencesError(error instanceof Error ? error.message : 'Falha ao salvar preferências.');
+    } finally {
+      setIsSavingPreferences(false);
+    }
+  };
+
+  const movieSearchFn = async (query: string): Promise<PreferenceSearchItem[]> => {
+    const results = await searchMovies(query);
+    return results.map((result) => ({ id: result.id, title: result.title, release_date: result.release_date, poster_path: result.poster_path }));
+  };
+
+  const seriesSearchFn = async (query: string): Promise<PreferenceSearchItem[]> => {
+    const results = await searchSeries(query);
+    return results.map((result) => ({ id: result.id, title: result.name, release_date: result.first_air_date, poster_path: result.poster_path }));
+  };
 
   const averageRating = useMemo(() => {
     const reviews = reviewsQuery.data || [];
@@ -55,7 +122,8 @@ export default function DashboardTab({ user, isOwnDashboard }: DashboardTabProps
   const EmptyStateShortcut = () => (
     isOwnDashboard ? (
       <button
-        onClick={() => window.dispatchEvent(new Event('open-edit-profile'))}
+        type="button"
+        onClick={beginPreferencesEdit}
         className="text-brand-gold hover:underline text-sm font-medium mt-1 text-left w-fit"
       >
         + Adicionar
@@ -67,6 +135,49 @@ export default function DashboardTab({ user, isOwnDashboard }: DashboardTabProps
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-500">
+      <div className="col-span-1 flex items-center justify-between border-b border-[#222] pb-3 md:col-span-2 lg:col-span-3">
+        <div>
+          <p className="text-xs uppercase tracking-[0.25em] text-brand-text-muted">Preferências pessoais</p>
+          <p className="mt-1 text-sm text-brand-text-muted/70">Seus favoritos e preferências de visualização.</p>
+        </div>
+        {isOwnDashboard && (
+          <button
+            type="button"
+            onClick={beginPreferencesEdit}
+            aria-label="Atualizar preferências"
+            title="Atualizar preferências"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-brand-gold/40 text-brand-gold transition hover:bg-brand-gold/10"
+          >
+            <RefreshCw size={16} />
+          </button>
+        )}
+      </div>
+
+      {isEditingPreferences && (
+        <form onSubmit={savePreferences} className="col-span-1 grid grid-cols-1 gap-4 rounded-2xl border border-brand-gold/25 bg-[#111] p-6 md:col-span-2 lg:col-span-3 md:grid-cols-2">
+          <PreferenceSearchInput label="Filme Favorito" placeholder="Ex: O Poderoso Chefão" value={favoriteMovie} onChange={setFavoriteMovie} searchFn={movieSearchFn} />
+          <PreferenceSearchInput label="Melhor Filme Que Viu" placeholder="Ex: Matrix" value={favoriteMovie2} onChange={setFavoriteMovie2} searchFn={movieSearchFn} />
+          <PreferenceSearchInput label="Série Favorita" placeholder="Ex: Breaking Bad" value={favoriteSeries} onChange={setFavoriteSeries} searchFn={seriesSearchFn} />
+          <div className="flex flex-col gap-2">
+            <label className="mb-1 block text-xs uppercase tracking-[0.14em] text-brand-text-muted">Gênero Favorito</label>
+            <input type="text" value={favoriteGenre} onChange={(event) => setFavoriteGenre(event.target.value)} placeholder="Ex: Ficção Científica" className="w-full rounded-lg border border-[#222] bg-[#151515] px-3 py-2 text-sm text-brand-text placeholder-brand-text-muted/50 transition focus:border-brand-gold/40 focus:outline-none" />
+          </div>
+          <div className="flex flex-col gap-2 md:col-span-2">
+            <span className="mb-1 block text-xs uppercase tracking-[0.14em] text-brand-text-muted">Onde prefere assistir</span>
+            <div className="flex flex-wrap gap-5 text-sm text-brand-text">
+              <label className="flex cursor-pointer items-center gap-2"><input type="radio" name="dashboard_watch_preference" checked={watchPreference === 'home'} onChange={() => setWatchPreference('home')} /> Em Casa</label>
+              <label className="flex cursor-pointer items-center gap-2"><input type="radio" name="dashboard_watch_preference" checked={watchPreference === 'cinema'} onChange={() => setWatchPreference('cinema')} /> No Cinema</label>
+            </div>
+          </div>
+          {preferencesError && <p className="text-xs text-red-300 md:col-span-2">{preferencesError}</p>}
+          <div className="flex justify-end gap-3 md:col-span-2">
+            <button type="button" onClick={cancelPreferencesEdit} className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs uppercase tracking-[0.14em] text-brand-text-muted transition hover:text-brand-text"><X size={14} /> Cancelar</button>
+            <button type="submit" disabled={isSavingPreferences} className="rounded-lg bg-brand-gold px-4 py-2 text-xs uppercase tracking-[0.14em] text-brand-bg transition hover:bg-brand-gold/90 disabled:opacity-50">{isSavingPreferences ? 'Salvando...' : 'Salvar preferências'}</button>
+          </div>
+        </form>
+      )}
+
+      {!isEditingPreferences && <>
       <div className="bg-[#111] border border-[#222] rounded-2xl p-6 flex flex-col gap-2">
         <div className="flex items-center gap-2 text-brand-gold-alt mb-2">
           <Heart size={18} />
@@ -130,6 +241,8 @@ export default function DashboardTab({ user, isOwnDashboard }: DashboardTabProps
       </div>
 
       {/* Seção de Resenhas */}
+      </>}
+
       <div className="col-span-1 md:col-span-2 lg:col-span-3 mt-6 flex flex-col gap-6">
         <h2 className="text-sm font-semibold tracking-[0.25em] uppercase text-brand-gold">
           Últimas Resenhas

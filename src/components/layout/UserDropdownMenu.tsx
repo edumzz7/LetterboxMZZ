@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useLocation } from 'wouter';
-import { KeyRound, LogOut, Plus, Shield, UserRound, Image as ImageIcon, Settings, Upload } from 'lucide-react';
+import { KeyRound, LogOut, Plus, Shield, Settings, Upload, Image as ImageIcon, UserRound } from 'lucide-react';
 import type { SessionUser, RankedUser } from '../../types/app';
-import EditProfileModal from './EditProfileModal';
 import ProfileAvatarModal from './ProfileAvatarModal';
 import SuggestMovieModal from './SuggestMovieModal';
 import CineMatchModal from './CineMatchModal';
@@ -20,14 +19,7 @@ interface UserDropdownMenuProps {
   onLogout: () => void;
   avatarMutationPending: boolean;
   onSaveAvatar: (avatarId: string, displayName: string) => Promise<unknown>;
-  onSaveProfile: (data: {
-    display_name?: string;
-    favorite_movie?: string;
-    favorite_movie_2?: string;
-    favorite_genre?: string;
-    favorite_series?: string;
-    watch_preference?: 'home' | 'cinema';
-  }) => Promise<unknown>;
+  onOpenPreferences: () => void;
   onDeleteProfile: (currentPassword: string) => Promise<void>;
   deleteProfilePending?: boolean;
   onChangePassword: (userId: string, current: string, next: string) => Promise<void>;
@@ -43,7 +35,7 @@ export default function UserDropdownMenu({
   onLogout,
   avatarMutationPending,
   onSaveAvatar,
-  onSaveProfile,
+  onOpenPreferences,
   onDeleteProfile,
   deleteProfilePending = false,
   onChangePassword,
@@ -52,19 +44,14 @@ export default function UserDropdownMenu({
 }: UserDropdownMenuProps) {
   const [, setLocation] = useLocation();
   const [activeModal, setActiveModal] = useState<
-    'editProfile' | 'avatar' | 'suggest' | 'cineMatch' | 'changePassword' | 'adminPanel' | 'shareReview' | null
+    'avatar' | 'suggest' | 'cineMatch' | 'changePassword' | 'adminPanel' | 'shareReview' | null
   >(null);
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
-    const handleOpenEditProfile = () => setActiveModal('editProfile');
     const handleOpenCineMatch = () => setActiveModal('cineMatch');
-    window.addEventListener('open-edit-profile', handleOpenEditProfile);
     window.addEventListener('open-cinematch', handleOpenCineMatch);
-    return () => {
-      window.removeEventListener('open-edit-profile', handleOpenEditProfile);
-      window.removeEventListener('open-cinematch', handleOpenCineMatch);
-    };
+    return () => window.removeEventListener('open-cinematch', handleOpenCineMatch);
   }, []);
 
   useEffect(() => {
@@ -104,17 +91,10 @@ export default function UserDropdownMenu({
             </div>
 
             <DropdownMenu.Item
-              onSelect={() => setTimeout(() => setActiveModal('editProfile'), 50)}
-              className="flex items-center gap-2 px-2 py-2 outline-none cursor-pointer rounded hover:bg-brand-gold/10 hover:text-brand-gold transition"
-            >
-              <UserRound size={16} /> Editar Perfil
-            </DropdownMenu.Item>
-
-            <DropdownMenu.Item
               onSelect={() => setTimeout(() => setActiveModal('avatar'), 50)}
               className="flex items-center gap-2 px-2 py-2 outline-none cursor-pointer rounded hover:bg-brand-gold/10 hover:text-brand-gold transition"
             >
-              <ImageIcon size={16} /> Alterar Avatar
+              <UserRound size={16} /> Editar Perfil
             </DropdownMenu.Item>
 
             <DropdownMenu.Item
@@ -170,23 +150,14 @@ export default function UserDropdownMenu({
       </DropdownMenu.Root>
 
       {currentRankedUser && (
-        <EditProfileModal
-          user={currentRankedUser}
-          open={activeModal === 'editProfile'}
-          onOpenChange={(open) => setActiveModal(open ? 'editProfile' : null)}
-          isSaving={avatarMutationPending}
-          onSave={onSaveProfile}
-          isDeleting={deleteProfilePending}
-          onDeleteProfile={onDeleteProfile}
-        />
-      )}
-
-      {currentRankedUser && (
         <ProfileAvatarModal
           currentAvatarId={currentRankedUser.avatar_id}
           currentDisplayName={currentRankedUser.display_name}
           isSaving={avatarMutationPending}
           onSave={onSaveAvatar}
+          onOpenPreferences={onOpenPreferences}
+          onDeleteProfile={onDeleteProfile}
+          isDeleting={deleteProfilePending}
           open={activeModal === 'avatar'}
           onOpenChange={(open) => setActiveModal(open ? 'avatar' : null)}
         />

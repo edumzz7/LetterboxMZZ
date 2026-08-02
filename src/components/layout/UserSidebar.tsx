@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import { Star, Flame, ChevronDown, ChevronUp, Loader2, Film, Plus, Award } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
+import { motion } from 'motion/react';
 import type { PersonalMovie, RankedUser, SeriesEntry, TrendingMovie, AnticipatedMovie } from '../../types/app';
 import AvatarDisplay from './AvatarDisplay';
 import { useFavorites } from '../../hooks/useFavorites';
@@ -892,22 +893,38 @@ export default function UserSidebar({
           <button
             type="button"
             onClick={() => setRankingMode('geral')}
+            aria-pressed={rankingMode === 'geral'}
             className={clsx(
-              'flex-1 rounded-lg py-1.5 text-[10px] font-medium uppercase tracking-[0.1em] transition',
-              rankingMode === 'geral' ? 'bg-[#151515] text-brand-gold' : 'text-brand-text-muted hover:text-brand-text'
+              'relative flex-1 rounded-lg py-1.5 text-[10px] font-medium uppercase tracking-[0.1em] transition',
+              rankingMode === 'geral' ? 'text-brand-gold' : 'text-brand-text-muted hover:text-brand-text'
             )}
           >
-            Geral
+            {rankingMode === 'geral' && (
+              <motion.span
+                layoutId="ranking-mode-indicator"
+                className="absolute inset-0 rounded-lg bg-[#151515]"
+                transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+              />
+            )}
+            <span className="relative">Geral</span>
           </button>
           <button
             type="button"
             onClick={() => setRankingMode('amigos')}
+            aria-pressed={rankingMode === 'amigos'}
             className={clsx(
-              'flex-1 rounded-lg py-1.5 text-[10px] font-medium uppercase tracking-[0.1em] transition',
-              rankingMode === 'amigos' ? 'bg-[#151515] text-brand-gold' : 'text-brand-text-muted hover:text-brand-text'
+              'relative flex-1 rounded-lg py-1.5 text-[10px] font-medium uppercase tracking-[0.1em] transition',
+              rankingMode === 'amigos' ? 'text-brand-gold' : 'text-brand-text-muted hover:text-brand-text'
             )}
           >
-            Amigos
+            {rankingMode === 'amigos' && (
+              <motion.span
+                layoutId="ranking-mode-indicator"
+                className="absolute inset-0 rounded-lg bg-[#151515]"
+                transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+              />
+            )}
+            <span className="relative">Amigos</span>
           </button>
         </div>
 
@@ -1132,22 +1149,38 @@ export default function UserSidebar({
                 <button
                   type="button"
                   onClick={() => setRecomendadosTab('filmes')}
+                  aria-pressed={recomendadosTab === 'filmes'}
                   className={clsx(
-                    'flex-1 rounded-lg py-1 text-[9px] font-medium uppercase tracking-[0.1em] transition',
-                    recomendadosTab === 'filmes' ? 'bg-[#151515] text-brand-gold' : 'text-brand-text-muted hover:text-brand-text'
+                    'relative flex-1 rounded-lg py-1 text-[9px] font-medium uppercase tracking-[0.1em] transition',
+                    recomendadosTab === 'filmes' ? 'text-brand-gold' : 'text-brand-text-muted hover:text-brand-text'
                   )}
                 >
-                  Filmes
+                  {recomendadosTab === 'filmes' && (
+                    <motion.span
+                      layoutId="recommendation-type-indicator"
+                      className="absolute inset-0 rounded-lg bg-[#151515]"
+                      transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                    />
+                  )}
+                  <span className="relative">Filmes</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setRecomendadosTab('series')}
+                  aria-pressed={recomendadosTab === 'series'}
                   className={clsx(
-                    'flex-1 rounded-lg py-1 text-[9px] font-medium uppercase tracking-[0.1em] transition',
-                    recomendadosTab === 'series' ? 'bg-[#151515] text-brand-gold' : 'text-brand-text-muted hover:text-brand-text'
+                    'relative flex-1 rounded-lg py-1 text-[9px] font-medium uppercase tracking-[0.1em] transition',
+                    recomendadosTab === 'series' ? 'text-brand-gold' : 'text-brand-text-muted hover:text-brand-text'
                   )}
                 >
-                  Séries
+                  {recomendadosTab === 'series' && (
+                    <motion.span
+                      layoutId="recommendation-type-indicator"
+                      className="absolute inset-0 rounded-lg bg-[#151515]"
+                      transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                    />
+                  )}
+                  <span className="relative">Séries</span>
                 </button>
               </div>
 

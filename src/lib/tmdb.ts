@@ -523,13 +523,14 @@ export async function getTvSeasonEpisodes(tvId: number, seasonNumber: number): P
     }
 }
 
-export async function searchMulti(query: string): Promise<TMDBMultiResult[]> {
+export async function searchMulti(query: string, signal?: AbortSignal): Promise<TMDBMultiResult[]> {
     if (!query || !query.trim()) return [];
     if (!TMDB_API_KEY) return [];
 
     try {
         const response = await fetch(
-            `${TMDB_BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}&language=pt-BR&page=1`
+            `${TMDB_BASE_URL}/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}&language=pt-BR&page=1`,
+            { signal },
         );
         if (!response.ok) throw new Error('TMDB Multi Fetch Error');
 
@@ -538,6 +539,7 @@ export async function searchMulti(query: string): Promise<TMDBMultiResult[]> {
             (item: TMDBMultiResult) => item.media_type === 'movie' || item.media_type === 'tv'
         );
     } catch (error) {
+        if (signal?.aborted) return [];
         console.error('Error searching TMDB multi:', error);
         return [];
     }
@@ -574,7 +576,7 @@ export interface TMDBPersonDetails extends TMDBPerson {
     };
 }
 
-export async function searchPeople(query: string): Promise<TMDBPerson[]> {
+export async function searchPeople(query: string, signal?: AbortSignal): Promise<TMDBPerson[]> {
     if (!query || !query.trim()) return [];
 
     if (!TMDB_API_KEY) {
@@ -584,7 +586,8 @@ export async function searchPeople(query: string): Promise<TMDBPerson[]> {
 
     try {
         const response = await fetch(
-            `${TMDB_BASE_URL}/search/person?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}&language=pt-BR&page=1`
+            `${TMDB_BASE_URL}/search/person?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}&language=pt-BR&page=1`,
+            { signal },
         );
 
         if (!response.ok) throw new Error('TMDB Person Fetch Error');
@@ -592,6 +595,7 @@ export async function searchPeople(query: string): Promise<TMDBPerson[]> {
         const data = await response.json();
         return data.results || [];
     } catch (error) {
+        if (signal?.aborted) return [];
         console.error("Error searching TMDB people:", error);
         return [];
     }

@@ -61,23 +61,23 @@ function clearAppDataCache() {
 // User Favorites (Meus Amigos)
 // ==========================================
 
-export async function listFavorites(): Promise<UserFavorite[]> {
+export async function listFavorites(ownerUserId: string): Promise<UserFavorite[]> {
   return withFallback(
     async () => {
       const response = await apiClient.get<UserFavorite[]>('/users/me/favorites');
       return response.data;
     },
-    () => localData.listFavorites(),
+    () => localData.listFavorites(ownerUserId),
   );
 }
 
-export async function addFavorite(favoriteUserId: string): Promise<UserFavorite> {
+export async function addFavorite(favoriteUserId: string, ownerUserId: string): Promise<UserFavorite> {
   return withFallback(
     async () => {
       const response = await apiClient.post<UserFavorite>('/users/me/favorites', { favoriteUserId });
       return response.data;
     },
-    () => localData.addFavorite(favoriteUserId),
+    () => localData.addFavorite(favoriteUserId, ownerUserId),
   );
 }
 

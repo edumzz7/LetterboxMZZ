@@ -502,7 +502,7 @@ function App() {
                 <p className="text-brand-text">Grupos <span className="text-brand-gold-alt">(em breve)</span></p>
               </div>
             </details>
-            <UserDropdownMenu session={authenticatedSession} currentRankedUser={currentRankedUser} users={users} favoriteUserIds={favorites?.map((favorite) => favorite.favoriteUserId) || []} onLogout={handleLogout} avatarMutationPending={avatarMutation.isPending} adminUsername={ADMIN_USERNAME} onChangePassword={handleChangePassword} onAdminReset={handleAdminReset} onSaveAvatar={async (avatarId, displayName) => { await avatarMutation.mutateAsync({ userId: authenticatedSession.id, avatarId }); if (displayName !== currentRankedUser?.display_name) { await updateUserProfile(authenticatedSession.id, { display_name: displayName }); await refetchUsers(); } }} onSaveProfile={async (data) => { await updateUserProfile(authenticatedSession.id, data); await refetchUsers(); }} onDeleteProfile={handleDeleteProfile} deleteProfilePending={deleteProfilePending} />
+            <UserDropdownMenu session={authenticatedSession} currentRankedUser={currentRankedUser} users={users} favoriteUserIds={favorites?.map((favorite) => favorite.favoriteUserId) || []} onLogout={handleLogout} avatarMutationPending={avatarMutation.isPending} adminUsername={ADMIN_USERNAME} onChangePassword={handleChangePassword} onAdminReset={handleAdminReset} onSaveAvatar={async (avatarId, displayName) => { await avatarMutation.mutateAsync({ userId: authenticatedSession.id, avatarId }); if (displayName !== currentRankedUser?.display_name) { await updateUserProfile(authenticatedSession.id, { display_name: displayName }); await refetchUsers(); } }} onOpenPreferences={() => { setActiveTab('dashboard'); setLocation(`/${authenticatedSession.username}`); }} onDeleteProfile={handleDeleteProfile} deleteProfilePending={deleteProfilePending} />
             <UserEventBell currentUserId={authenticatedSession.id} viewedUserId={viewedUser?.id ?? authenticatedSession.id} isOwnDashboard={isOwnDashboard} friendIds={favorites?.map((favorite) => favorite.favoriteUserId) || []} />
             <button type="button" aria-label="Abrir CineMatch" title="CineMatch" onClick={() => { notifyHeaderMenuOpen('cineMatch'); window.dispatchEvent(new Event('open-cinematch')); }} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-brand-gold bg-black text-white transition hover:bg-brand-gold/10"><Shuffle size={16} /></button>
           </>}
@@ -598,6 +598,7 @@ function App() {
                     series={userSeries}
                     users={users}
                     userId={selectedUserId}
+                    currentUserId={session.id}
                     isLoading={achievementsLoading}
                   />
                 ) : null

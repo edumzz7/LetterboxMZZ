@@ -1094,19 +1094,20 @@ function writeFavorites(items: UserFavorite[]) {
   writeJson(KEYS.favorites, items);
 }
 
-export async function listFavorites(): Promise<UserFavorite[]> {
-  return readFavorites();
+export async function listFavorites(ownerUserId: string): Promise<UserFavorite[]> {
+  return readFavorites().filter((item) => item.ownerUserId === ownerUserId);
 }
 
-export async function addFavorite(favoriteUserId: string): Promise<UserFavorite> {
+export async function addFavorite(favoriteUserId: string, ownerUserId: string): Promise<UserFavorite> {
   const items = readFavorites();
-  const existing = items.find((f) => f.favoriteUserId === favoriteUserId);
+  const existing = items.find((f) => f.ownerUserId === ownerUserId && f.favoriteUserId === favoriteUserId);
   if (existing) return existing;
 
   const newFav: UserFavorite = {
     id: randomId(),
     favoriteUserId: favoriteUserId,
     createdAt: nowIso(),
+    ownerUserId,
   };
   items.push(newFav);
   writeFavorites(items);

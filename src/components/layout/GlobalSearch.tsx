@@ -21,26 +21,32 @@ export default function GlobalSearch({ users, onSelectUser, mobileOpen = false, 
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    if (!query.trim()) {
-      setResults([]);
-      setPersonResults([]);
-      setLoading(false);
+    const normalizedQuery = query.trim();
+    if (!normalizedQuery) {
       return;
     }
-    setLoading(true);
+
+    const controller = new AbortController();
+    let active = true;
     const timer = window.setTimeout(async () => {
-      try {
-        const [media, people] = await Promise.all([searchMulti(query), searchPeople(query)]);
-        setResults(media.slice(0, 5));
-        setPersonResults(people.slice(0, 5));
-      } catch {
-        setResults([]);
-        setPersonResults([]);
-      } finally {
-        setLoading(false);
-      }
-    }, 350);
-    return () => window.clearTimeout(timer);
+      if (!active) return;
+      setLoading(true);
+      const mediaPromise = searchMulti(normalizedQuery, controller.signal).then((media) => {
+        if (active) setResults(media.slice(0, 5));
+      });
+      const peoplePromise = searchPeople(normalizedQuery, controller.signal).then((people) => {
+        if (active) setPersonResults(people.slice(0, 5));
+      });
+
+      await Promise.allSettled([mediaPromise, peoplePromise]);
+      if (active) setLoading(false);
+    }, 300);
+
+    return () => {
+      active = false;
+      controller.abort();
+      window.clearTimeout(timer);
+    };
   }, [query]);
 
   const userResults = users.filter((user) => {
@@ -60,7 +66,12 @@ export default function GlobalSearch({ users, onSelectUser, mobileOpen = false, 
       <input
         type="search"
         value={query}
-        onChange={(event) => setQuery(event.target.value)}
+        onChange={(event) => {
+          setQuery(event.target.value);
+          setResults([]);
+          setPersonResults([]);
+          if (!event.target.value.trim()) setLoading(false);
+        }}
         onFocus={() => { setFocused(true); onMobileOpenChange?.(true); }}
         onBlur={() => window.setTimeout(() => { setFocused(false); onMobileOpenChange?.(false); }, 180)}
         placeholder="Pesquisar usuários, filmes, séries e pessoas"

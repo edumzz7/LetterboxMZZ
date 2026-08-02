@@ -9,7 +9,7 @@ export function useFavorites(currentUserId: string | undefined) {
 
   const { data: favorites = [], isLoading } = useQuery({
     queryKey: [FAVORITES_QUERY_KEY, currentUserId],
-    queryFn: () => listFavorites(),
+    queryFn: () => (currentUserId ? listFavorites(currentUserId) : Promise.resolve([])),
     enabled: !!currentUserId,
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
@@ -28,7 +28,7 @@ export function useFavorites(currentUserId: string | undefined) {
         }
       } else {
         // Add new favorite
-        const newFav = await addFavorite(favoriteUserId);
+        const newFav = await addFavorite(favoriteUserId, currentUserId);
         return { action: 'added', newFav };
       }
       return null;

@@ -189,7 +189,7 @@ export default function RankingScreen({ user, users, movies, series, currentUser
   const { predictionsQuery } = useOscarPredictions(currentUserId);
   const favoritesQuery = useQuery({
     queryKey: ['user_favorites_list', currentUserId],
-    queryFn: listFavorites,
+    queryFn: () => listFavorites(currentUserId),
     enabled: Boolean(currentUserId),
   });
   const favoritedByQuery = useQuery({

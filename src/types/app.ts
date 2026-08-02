@@ -95,6 +95,7 @@ export interface UserFavorite {
   id: string;
   favoriteUserId: string;
   createdAt: string;
+  ownerUserId?: string;
 }
 
 export type CineMatchMode = 'geral' | 'oscar';

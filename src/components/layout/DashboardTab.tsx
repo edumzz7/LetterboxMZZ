@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Star, Tv, Clapperboard, Heart, Film, RefreshCw, X } from 'lucide-react';
+import { useLocation } from 'wouter';
 import { useUserReviews } from '../../hooks/useReviews';
 import { useQueryClient } from '@tanstack/react-query';
 import { getReviewReaction } from '../../lib/reviewReactions';
@@ -24,6 +25,7 @@ function formatDate(dateStr?: string) {
 }
 
 export default function DashboardTab({ user, isOwnDashboard }: DashboardTabProps) {
+  const [, setLocation] = useLocation();
   const reviewsQuery = useUserReviews(user.id);
   const queryClient = useQueryClient();
   const [isEditingPreferences, setIsEditingPreferences] = useState(false);
@@ -109,6 +111,7 @@ export default function DashboardTab({ user, isOwnDashboard }: DashboardTabProps
       .filter((r) => r.review && r.review.trim().length > 0)
       .map((r) => ({
         id: r.id,
+        providerExternalId: r.providerExternalId,
         title: r.title,
         type: r.type,
         rating: Number(r.rating) || 0,
@@ -268,9 +271,15 @@ export default function DashboardTab({ user, isOwnDashboard }: DashboardTabProps
                   {/* Balão de fala */}
                   <div className="flex-1 bg-[#111] border border-[#222] rounded-2xl p-5 relative min-w-0 before:content-[''] before:absolute before:top-6 before:-left-[9px] before:w-4 before:h-4 before:rotate-45 before:bg-[#111] before:border-l before:border-b before:border-[#222] transition-colors hover:border-brand-gold/20 duration-300">
                     <div className="flex justify-between items-start gap-2 mb-1">
-                      <h4 className="font-semibold text-brand-text truncate pr-2 text-sm sm:text-base" title={item.title}>
+                      <button
+                        type="button"
+                        onClick={() => setLocation(item.type === 'movie' ? `/filme/${item.providerExternalId}` : `/serie/${item.providerExternalId}`)}
+                        disabled={!item.providerExternalId}
+                        className="block max-w-full cursor-pointer truncate pr-2 text-left text-sm font-semibold text-brand-text transition hover:text-brand-gold disabled:cursor-default disabled:hover:text-brand-text sm:text-base"
+                        title={`Abrir ${item.title}`}
+                      >
                         {item.title}
-                      </h4>
+                      </button>
                       <span className="text-[10px] text-brand-text-muted tracking-wide shrink-0">
                         {formatDate(item.date)}
                       </span>

@@ -85,6 +85,7 @@ export interface TMDBHomeMedia extends TMDBRecommendationItem {
 }
 
 export const HOME_RELATED_MIN_RATING = 7;
+export const SIMILAR_MEDIA_MIN_RATING = 3.5;
 export const HOME_RELATED_MIN_VOTES = {
     movie: 150,
     tv: 75,
@@ -133,6 +134,85 @@ export function getTvRecommendations(tvId: number, language = 'pt-BR') {
 
 export function getTvSimilar(tvId: number, language = 'pt-BR') {
     return getRecommendationList(`tv/${tvId}/similar`, language);
+}
+
+async function getDiscoverByGenres(
+    type: 'movie' | 'tv',
+    genreIds: number[],
+    excludeId: number,
+    page: number,
+): Promise<TMDBRecommendationItem[]> {
+    if (!TMDB_API_KEY) return [];
+
+    try {
+        const params = new URLSearchParams({
+            api_key: TMDB_API_KEY,
+            language: 'pt-BR',
+            sort_by: 'popularity.desc',
+            include_adult: 'false',
+            include_video: 'false',
+            'vote_average.gte': String(SIMILAR_MEDIA_MIN_RATING * 2),
+            page: String(page),
+        });
+        if (genreIds.length) params.set('with_genres', genreIds.join('|'));
+
+        const response = await fetch(`${TMDB_BASE_URL}/discover/${type}?${params.toString()}`);
+        if (!response.ok) return [];
+        const results = ((await response.json())?.results || []) as TMDBRecommendationItem[];
+        return results.filter((item) => item.id !== excludeId);
+    } catch (error) {
+        console.error(`Error discovering fallback ${type} media:`, error);
+        return [];
+    }
+}
+
+function mergeSimilarItems(
+    excludeId: number,
+    lists: TMDBRecommendationItem[][],
+): TMDBRecommendationItem[] {
+    const unique = new Map<number, TMDBRecommendationItem>();
+
+    for (const item of lists.flat()) {
+        if (
+            item.id !== excludeId
+            && !item.adult
+            && Boolean(item.poster_path)
+            && Number(item.vote_average || 0) / 2 >= SIMILAR_MEDIA_MIN_RATING
+            && !unique.has(item.id)
+        ) {
+            unique.set(item.id, item);
+        }
+    }
+
+    return Array.from(unique.values());
+}
+
+async function getSimilarWithFallback(
+    type: 'movie' | 'tv',
+    mediaId: number,
+    genreIds: number[],
+): Promise<TMDBRecommendationItem[]> {
+    const [similar, recommendations] = type === 'movie'
+        ? await Promise.all([getMovieSimilar(mediaId), getMovieRecommendations(mediaId)])
+        : await Promise.all([getTvSimilar(mediaId), getTvRecommendations(mediaId)]);
+    const primaryItems = mergeSimilarItems(mediaId, [similar, recommendations]);
+
+    if (primaryItems.length >= 3) return primaryItems;
+
+    const [discoveredFirstPage, discoveredSecondPage] = await Promise.all([
+        getDiscoverByGenres(type, genreIds, mediaId, 1),
+        getDiscoverByGenres(type, genreIds, mediaId, 2),
+    ]);
+
+    return mergeSimilarItems(mediaId, [primaryItems, discoveredFirstPage, discoveredSecondPage]);
+}
+
+export function getMovieSimilarWithFallback(movieId: number, genreIds: number[] = []) {
+    return getSimilarWithFallback('movie', movieId, genreIds);
+}
+
+export function getTvSimilarWithFallback(tvId: number, genreIds: number[] = []) {
+    return getSimilarWithFallback('tv', tvId, genreIds);
 }
 
 async function getHomeCatalog(path: string, forcedMediaType?: 'movie' | 'tv'): Promise<TMDBHomeMedia[]> {

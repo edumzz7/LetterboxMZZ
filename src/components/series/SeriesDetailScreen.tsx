@@ -4,13 +4,14 @@ import { Loader2, Tv, Eye, Plus, Trash2, Edit3, Star, ArrowLeft, Play, Video } f
 import { useLocation } from 'wouter';
 import { useSeries } from '../../hooks/useSeries';
 import { useUsers } from '../../hooks/useUsers';
-import { getTvDetailsRawWithFallback, getTvCredits, getTvWatchProviders, getTvSeasonEpisodes, getTvYouTubeTrailer, type TMDBTvSeasonMeta } from '../../lib/tmdb';
+import { getTvDetailsRawWithFallback, getTvCredits, getTvSimilarWithFallback, getTvWatchProviders, getTvSeasonEpisodes, getTvYouTubeTrailer, type TMDBTvSeasonMeta } from '../../lib/tmdb';
 import { getSeriesCineratsStats } from '../../lib/appData';
 import StarRatingInput from '../ui/StarRatingInput';
 import ReviewModal from '../ui/ReviewModal';
 import AvatarDisplay from '../layout/AvatarDisplay';
 import { generateImagePath } from '../../lib/imageUtils';
 import clsx from 'clsx';
+import SimilarMediaSection from '../ui/SimilarMediaSection';
 
 interface SeriesDetailScreenProps {
   id: string;
@@ -57,6 +58,16 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
     queryKey: ['tmdb-tv-trailer', id],
     queryFn: () => getTvYouTubeTrailer(id),
     staleTime: 1000 * 60 * 60 * 24,
+    enabled: !!seriesQuery.data,
+  });
+
+  const similarQuery = useQuery({
+    queryKey: ['tmdb-tv-similar', id],
+    queryFn: () => getTvSimilarWithFallback(
+      Number(id),
+      (seriesQuery.data?.genres || []).map((genre: { id: number }) => genre.id),
+    ),
+    staleTime: 1000 * 60 * 60,
     enabled: !!seriesQuery.data,
   });
 
@@ -246,7 +257,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
   return (
     <div className="flex-1 min-w-0 animate-in fade-in duration-500">
       {/* 1. Backdrop Hero Banner */}
-      <div className="relative -mx-5 sm:-mx-8 lg:-mx-10 -mt-8 h-[25vh] sm:h-[35vh] md:h-[40vh] overflow-hidden rounded-t-[32px] border-b border-[#151515]">
+      <div className="relative -mx-4 sm:-mx-7 lg:-mx-9 -mt-4 sm:-mt-7 lg:-mt-9 h-[25vh] sm:h-[35vh] md:h-[40vh] overflow-hidden rounded-t-3xl border-b border-[#151515]">
         {backdropUrl && (
           <>
             <img
@@ -475,6 +486,8 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
               <p className="text-xs text-brand-text-muted">Nenhuma plataforma encontrada no Brasil.</p>
             )}
           </div>
+
+          <SimilarMediaSection items={similarQuery.data || []} type="series" isLoading={similarQuery.isLoading} />
 
           {/* Seasons and Episodes Selector */}
           {seasonsList.length > 0 && (

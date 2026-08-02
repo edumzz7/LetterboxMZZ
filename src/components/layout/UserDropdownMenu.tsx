@@ -67,7 +67,7 @@ export default function UserDropdownMenu({
   return (
     <>
       <DropdownMenu.Root open={menuOpen} onOpenChange={(open) => { if (open) notifyHeaderMenuOpen('profile'); setMenuOpen(open); }}>
-        <DropdownMenu.Trigger aria-label="Abrir opções do perfil" className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-brand-gold bg-black text-white outline-none transition hover:bg-brand-gold/10 focus:ring-2 focus:ring-brand-gold/40">
+        <DropdownMenu.Trigger aria-label="Abrir opções do perfil" className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-brand-gold bg-black text-white outline-none transition hover:bg-brand-gold/10 focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0">
           <Settings size={18} />
         </DropdownMenu.Trigger>
 

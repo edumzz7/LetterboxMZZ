@@ -105,7 +105,7 @@ export default function PersonDetailScreen({ id, mode }: PersonDetailScreenProps
 
   return (
     <div className="flex-1 min-w-0 animate-in fade-in duration-500">
-      <div className="relative -mx-5 sm:-mx-8 lg:-mx-10 -mt-8 h-44 sm:h-52 lg:h-56 overflow-hidden rounded-t-[32px] bg-[#090d16]">
+      <div className="relative -mx-4 sm:-mx-7 lg:-mx-9 -mt-4 sm:-mt-7 lg:-mt-9 h-44 sm:h-52 lg:h-56 overflow-hidden rounded-t-3xl bg-[#090d16]">
         {heroPhotoUrl && <><img src={heroPhotoUrl} alt="" className="h-full w-full object-cover object-top opacity-40 blur-[1px] scale-110" /><div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" /></>}
         <button type="button" onClick={handleBack} className="absolute left-6 top-6 z-10 flex cursor-pointer items-center gap-2 rounded-xl border border-white/10 bg-black/60 px-4 py-2 text-xs uppercase tracking-widest text-brand-text backdrop-blur-md transition-all hover:border-brand-gold/30 hover:text-brand-gold">
           <ArrowLeft size={14} /> Painel

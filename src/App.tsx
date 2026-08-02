@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
-import { Film, Loader2, Menu, Shuffle } from 'lucide-react';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import { Award, BookOpen, Film, Loader2, Menu, Shuffle, Users } from 'lucide-react';
 import AppHeader from './components/layout/Header';
 import DashboardTab from './components/layout/DashboardTab';
 import UserSidebar, { RECOMMENDATIONS_STORAGE_KEY_PREFIX } from './components/layout/UserSidebar';
@@ -75,7 +76,6 @@ function App() {
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const [deleteProfilePending, setDeleteProfilePending] = useState(false);
   const [infoMenuOpen, setInfoMenuOpen] = useState(false);
-  const infoMenuRef = useRef<HTMLDetailsElement>(null);
   // If we have a stored session, skip the loading screen entirely
   const [isBootstrapping, setIsBootstrapping] = useState(!storedSession);
 
@@ -123,20 +123,9 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const closeInfoMenu = (event: MouseEvent) => {
-      if (infoMenuRef.current && !infoMenuRef.current.contains(event.target as Node)) {
-        setInfoMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', closeInfoMenu);
-    return () => document.removeEventListener('mousedown', closeInfoMenu);
-  }, []);
-
-  useEffect(() => {
     const handleOtherHeaderMenu = (event: Event) => {
       if ((event as CustomEvent<string>).detail !== 'info') {
         setInfoMenuOpen(false);
-        if (infoMenuRef.current) infoMenuRef.current.open = false;
       }
     };
     window.addEventListener(HEADER_MENU_OPEN_EVENT, handleOtherHeaderMenu);
@@ -484,24 +473,27 @@ function App() {
           hideTabs={urlUsername === 'ranking' || Boolean(matchMovie) || Boolean(matchSerie) || isPersonRoute || Boolean(matchImportTvTime)}
           onBack={(matchMovie || matchSerie || isPersonRoute || matchImportTvTime) ? () => setLocation(`/${authenticatedSession.username}`) : undefined}
           rightSlot={<>
-            <details ref={infoMenuRef} open={infoMenuOpen} onToggle={(event) => { const open = event.currentTarget.open; setInfoMenuOpen(open); if (open) notifyHeaderMenuOpen('info'); }} className="relative">
-              <summary className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-xl border border-brand-gold bg-black text-white transition hover:bg-brand-gold/10"><Menu size={18} /></summary>
-              <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-52 rounded-xl border border-[#151b28] bg-[#06080d] p-3 text-xs shadow-2xl flex flex-col gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setInfoMenuOpen(false);
-                    if (infoMenuRef.current) infoMenuRef.current.open = false;
-                    setLocation('/ranking');
-                  }}
-                  className="w-full text-left text-brand-text hover:text-brand-gold transition-colors font-medium cursor-pointer"
-                >
-                  Desempenho e Conquistas
-                </button>
-                <p className="text-brand-text">Blog CineRats <span className="text-brand-gold-alt">(em breve)</span></p>
-                <p className="text-brand-text">Grupos <span className="text-brand-gold-alt">(em breve)</span></p>
-              </div>
-            </details>
+             <DropdownMenu.Root open={infoMenuOpen} onOpenChange={(open) => { if (open) notifyHeaderMenuOpen('info'); setInfoMenuOpen(open); }}>
+               <DropdownMenu.Trigger aria-label="Abrir menu principal" title="Menu principal" className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-brand-gold bg-black text-white outline-none transition hover:bg-brand-gold/10 focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0">
+                 <Menu size={18} />
+               </DropdownMenu.Trigger>
+               <DropdownMenu.Portal>
+                 <DropdownMenu.Content className="z-50 min-w-[200px] rounded-md border border-[#151b28] bg-[#06080d] p-1 text-sm text-brand-text shadow-xl" sideOffset={8} align="end">
+                   <DropdownMenu.Item
+                     onSelect={() => setLocation('/ranking')}
+                     className="flex cursor-pointer items-center gap-2 rounded px-2 py-2 outline-none transition hover:bg-brand-gold/10 hover:text-brand-gold focus:bg-brand-gold/10 focus:text-brand-gold"
+                   >
+                     <Award size={16} /> Desempenho e Conquistas
+                   </DropdownMenu.Item>
+                   <DropdownMenu.Item disabled className="flex items-center gap-2 rounded px-2 py-2 text-brand-text-muted/70 outline-none">
+                     <BookOpen size={16} /> Blog CineRats <span className="text-xs text-brand-gold-alt">(em breve)</span>
+                   </DropdownMenu.Item>
+                   <DropdownMenu.Item disabled className="flex items-center gap-2 rounded px-2 py-2 text-brand-text-muted/70 outline-none">
+                     <Users size={16} /> Grupos <span className="text-xs text-brand-gold-alt">(em breve)</span>
+                   </DropdownMenu.Item>
+                 </DropdownMenu.Content>
+               </DropdownMenu.Portal>
+             </DropdownMenu.Root>
             <UserDropdownMenu session={authenticatedSession} currentRankedUser={currentRankedUser} users={users} favoriteUserIds={favorites?.map((favorite) => favorite.favoriteUserId) || []} onLogout={handleLogout} avatarMutationPending={avatarMutation.isPending} adminUsername={ADMIN_USERNAME} onChangePassword={handleChangePassword} onAdminReset={handleAdminReset} onSaveAvatar={async (avatarId, displayName) => { await avatarMutation.mutateAsync({ userId: authenticatedSession.id, avatarId }); if (displayName !== currentRankedUser?.display_name) { await updateUserProfile(authenticatedSession.id, { display_name: displayName }); await refetchUsers(); } }} onOpenPreferences={() => { setActiveTab('dashboard'); setLocation(`/${authenticatedSession.username}`); }} onDeleteProfile={handleDeleteProfile} deleteProfilePending={deleteProfilePending} />
             <UserEventBell currentUserId={authenticatedSession.id} viewedUserId={viewedUser?.id ?? authenticatedSession.id} isOwnDashboard={isOwnDashboard} friendIds={favorites?.map((favorite) => favorite.favoriteUserId) || []} />
             <button type="button" aria-label="Abrir CineMatch" title="CineMatch" onClick={() => { notifyHeaderMenuOpen('cineMatch'); window.dispatchEvent(new Event('open-cinematch')); }} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-brand-gold bg-black text-white transition hover:bg-brand-gold/10"><Shuffle size={16} /></button>
@@ -512,7 +504,7 @@ function App() {
           <div className={isProfileRoute ? 'grid grid-cols-1 gap-6 xl:grid-cols-[260px_minmax(0,1fr)_260px]' : 'min-w-0'}>
             {isProfileRoute && viewedUser && <aside className="contents xl:flex xl:flex-col xl:gap-5"><div className="order-1 xl:order-none"><ProfileSummary user={viewedUser} users={users} currentUserId={authenticatedSession.id} movies={personalMovies} series={userSeries} isLoading={achievementsLoading} onSelectUser={selectUser} /></div><div className="order-3 xl:order-none"><UserSidebar users={users} currentUserId={authenticatedSession.id} selectedUserId={selectedUserId || authenticatedSession.id} onSelectUser={selectUser} isOpen={false} onClose={() => undefined} section="discover" /></div></aside>}
 
-            <main className="order-2 min-w-0 rounded-3xl border border-[#151b28] bg-[#06080d] p-4 xl:order-none sm:p-7 lg:p-9">
+            <main className={`order-2 min-w-0 rounded-3xl border border-[#151b28] bg-[#06080d] p-4 xl:order-none sm:p-7 lg:p-9 ${matchMovie || matchSerie || isPersonRoute ? 'overflow-hidden' : ''}`}>
               {matchMovie ? <MovieDetailScreen id={movieParams.id} currentUserId={session.id} /> : matchSerie ? <SeriesDetailScreen id={serieParams.id} currentUserId={session.id} /> : matchActor ? <PersonDetailScreen id={actorParams.id} mode="actor" /> : matchDirector ? <PersonDetailScreen id={directorParams.id} mode="director" /> : matchImportTvTime ? <ImportTvTimePage currentUserId={session.id} onBack={() => setLocation(`/${authenticatedSession.username}`)} /> : urlUsername === 'ranking' && currentRankedUser ? <RankingScreen user={currentRankedUser} users={users} movies={personalMovies} series={userSeries} currentUserId={session.id} isLoading={personalMoviesQuery.isLoading || userSeriesQuery.isLoading} /> : urlUsername && !viewedUser ? <div className="py-20 text-center text-brand-text-muted">Usuário não encontrado.</div> : viewedUser && <div className="animate-in fade-in duration-500">{activeTab === 'home' && isOwnDashboard ? <HomeScreen userId={session.id} movies={personalMovies} series={userSeries} /> : activeTab === 'dashboard' ? <DashboardTab user={viewedUser} isOwnDashboard={isOwnDashboard} /> : activeTab === 'oscars' ? <OscarPredictionsSection userId={viewedUser.id} canEdit={isOwnDashboard} /> : activeTab === 'movies' ? <PersonalMoviesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /> : activeTab === 'series' ? <SeriesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /> : <><PersonalMoviesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /><SeriesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /></>}</div>}
             </main>
 

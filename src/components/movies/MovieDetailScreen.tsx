@@ -5,13 +5,14 @@ import { useLocation } from 'wouter';
 import { usePersonalMovies } from '../../hooks/usePersonalMovies';
 import { useSocialActions } from '../../hooks/useSocialActions';
 import { useUsers } from '../../hooks/useUsers';
-import { getMovieDetailsWithFallback, getMovieCredits, getMovieWatchProviders, getMovieYouTubeTrailer } from '../../lib/tmdb';
+import { getMovieDetailsWithFallback, getMovieCredits, getMovieSimilarWithFallback, getMovieWatchProviders, getMovieYouTubeTrailer } from '../../lib/tmdb';
 import { getMovieCineratsStats } from '../../lib/appData';
 import StarRatingInput from '../ui/StarRatingInput';
 import ReviewModal from '../ui/ReviewModal';
 import AvatarDisplay from '../layout/AvatarDisplay';
 import { generateImagePath } from '../../lib/imageUtils';
 import clsx from 'clsx';
+import SimilarMediaSection from '../ui/SimilarMediaSection';
 
 interface MovieDetailScreenProps {
   id: string;
@@ -56,6 +57,16 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
     queryKey: ['tmdb-movie-trailer', id],
     queryFn: () => getMovieYouTubeTrailer(id),
     staleTime: 1000 * 60 * 60 * 24,
+    enabled: !!movieQuery.data,
+  });
+
+  const similarQuery = useQuery({
+    queryKey: ['tmdb-movie-similar', id],
+    queryFn: () => getMovieSimilarWithFallback(
+      Number(id),
+      (movieQuery.data?.genres || []).map((genre: { id: number }) => genre.id),
+    ),
+    staleTime: 1000 * 60 * 60,
     enabled: !!movieQuery.data,
   });
 
@@ -200,7 +211,7 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
   return (
     <div className="flex-1 min-w-0 animate-in fade-in duration-500">
       {/* 1. Backdrop Hero Banner */}
-      <div className="relative -mx-5 sm:-mx-8 lg:-mx-10 -mt-8 h-[25vh] sm:h-[35vh] md:h-[40vh] overflow-hidden rounded-t-[32px] border-b border-[#151515]">
+      <div className="relative -mx-4 sm:-mx-7 lg:-mx-9 -mt-4 sm:-mt-7 lg:-mt-9 h-[25vh] sm:h-[35vh] md:h-[40vh] overflow-hidden rounded-t-3xl border-b border-[#151515]">
         {backdropUrl && (
           <>
             <img
@@ -412,6 +423,8 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
               <p className="text-xs text-brand-text-muted">Nenhuma plataforma encontrada no Brasil.</p>
             )}
           </div>
+
+          <SimilarMediaSection items={similarQuery.data || []} type="movie" isLoading={similarQuery.isLoading} />
         </div>
 
         {/* Reviews Section */}

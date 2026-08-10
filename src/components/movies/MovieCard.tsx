@@ -139,7 +139,11 @@ export default function MovieCard({
     onToggleStatus(movie, isWatched ? 'watchlist' : 'watched');
   };
 
-  const handleDelete = () => {
+  const handleDelete = (event?: Event) => {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
     if (!canEdit || !onDelete) return;
 
     if (confirm(`Deseja remover "${movie.titulo}" da lista?`)) {

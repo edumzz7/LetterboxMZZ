@@ -8,6 +8,7 @@ import {
   getMovieRecommendations,
   getMovieDetailsWithFallback,
   getMovieSimilar,
+  getFavoriteGenreRecommendations,
   getTopRatedMovies,
   getTopRatedSeries,
   getTvRecommendations,
@@ -19,6 +20,7 @@ import {
   type TMDBHomeMedia,
   type TMDBRecommendationItem,
 } from '../../lib/tmdb';
+import { getFavoriteGenre } from '../../lib/favoriteGenres';
 
 type MediaType = 'movie' | 'tv';
 type WatchedSeed = { id: number; title: string; type: MediaType };
@@ -27,6 +29,7 @@ interface HomeScreenProps {
   userId: string;
   movies: PersonalMovie[];
   series: SeriesEntry[];
+  favoriteGenre?: string | null;
 }
 
 function toHomeMedia(item: TMDBRecommendationItem, mediaType: MediaType): TMDBHomeMedia {
@@ -42,15 +45,17 @@ function HomeCard({ item }: { item: TMDBHomeMedia }) {
     <button
       type="button"
       onClick={() => setLocation(item.media_type === 'tv' ? `/serie/${item.id}` : `/filme/${item.id}`)}
-      className="group flex w-[123px] shrink-0 cursor-pointer flex-col gap-2 text-left sm:w-[141px]"
+      className="group relative z-0 flex w-[123px] shrink-0 cursor-pointer flex-col gap-2 text-left transition hover:z-10 sm:w-[141px]"
       aria-label={`Abrir ${title}`}
     >
-      <div className="aspect-[2/3] overflow-hidden rounded-xl border border-[#222] bg-black shadow-lg transition duration-300 group-hover:-translate-y-1 group-hover:border-brand-gold/70 group-hover:shadow-brand-gold/10">
-        {item.poster_path ? (
-          <img src={`https://image.tmdb.org/t/p/w500${item.poster_path}`} alt={title} loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
-        ) : (
-          <div className="flex h-full items-center justify-center text-brand-text-muted"><Clapperboard size={24} /></div>
-        )}
+      <div className="relative aspect-[2/3] rounded-xl border border-[#222] bg-black shadow-lg transition duration-300 group-hover:-translate-y-1 group-hover:border-brand-gold/70 group-hover:shadow-brand-gold/10">
+        <div className="absolute inset-px overflow-hidden rounded-[11px]">
+          {item.poster_path ? (
+            <img src={`https://image.tmdb.org/t/p/w500${item.poster_path}`} alt={title} loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+          ) : (
+            <div className="flex h-full items-center justify-center text-brand-text-muted"><Clapperboard size={24} /></div>
+          )}
+        </div>
       </div>
       <span className="truncate text-xs font-medium text-brand-text transition group-hover:text-brand-gold" title={title}>{title}</span>
       <span className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-brand-text-muted">
@@ -130,7 +135,7 @@ function MediaCarousel({ items }: { items: TMDBHomeMedia[] }) {
           event.stopPropagation();
           suppressClickRef.current = false;
         }}
-        className="flex gap-4 overflow-x-auto scroll-smooth select-none touch-pan-y [scrollbar-width:none] [&::-webkit-scrollbar]:hidden cursor-grab active:cursor-grabbing"
+        className="-my-1 flex gap-4 overflow-x-auto px-1 py-1 scroll-smooth select-none touch-pan-y [scrollbar-width:none] [&::-webkit-scrollbar]:hidden cursor-grab active:cursor-grabbing"
       >
         {items.map((item) => <HomeCard key={`${item.media_type}-${item.id}`} item={item} />)}
       </div>
@@ -178,7 +183,8 @@ function Collection({ title, subtitle, icon, items, isLoading, emptyMessage, car
   );
 }
 
-export default function HomeScreen({ userId, movies, series }: HomeScreenProps) {
+export default function HomeScreen({ userId, movies, series, favoriteGenre: favoriteGenreValue }: HomeScreenProps) {
+  const favoriteGenre = getFavoriteGenre(favoriteGenreValue);
   const watchedSeed = useMemo<WatchedSeed | null>(() => {
     const entries = [
       ...movies.filter((movie) => movie.status === 'watched').map((movie) => ({ id: Number(movie.source_movie_id), title: movie.titulo, type: 'movie' as const, createdAt: movie.created_at })),
@@ -240,6 +246,14 @@ export default function HomeScreen({ userId, movies, series }: HomeScreenProps) 
     },
     staleTime: 1000 * 60 * 60,
   });
+  const favoriteGenreQuery = useQuery({
+    queryKey: ['home-favorite-genre-v1', userId, favoriteGenre?.key],
+    enabled: Boolean(favoriteGenre),
+    queryFn: () => favoriteGenre ? getFavoriteGenreRecommendations(favoriteGenre, knownMediaIds, userId) : Promise.resolve([]),
+    staleTime: 1000 * 60 * 60 * 24,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+  });
 
   return (
     <div className="space-y-12 animate-in fade-in duration-500">
@@ -251,6 +265,16 @@ export default function HomeScreen({ userId, movies, series }: HomeScreenProps) 
 
       <Collection title="Tendências da semana" subtitle="O que está movimentando o catálogo agora." icon={<Flame size={19} />} items={weeklyQuery.data || []} isLoading={weeklyQuery.isLoading} emptyMessage="Não foi possível carregar as tendências agora." carousel limit={10} />
       <Collection title={watchedSeed ? `Porque você assistiu ${watchedSeed.title}` : 'Porque você assistiu'} subtitle="Relacionados ao seu último título marcado como visto." icon={<Sparkles size={19} />} items={relatedQuery.data || []} isLoading={relatedQuery.isLoading} emptyMessage={watchedSeed ? 'Não encontramos recomendações que atendam aos critérios agora.' : 'Marque um filme ou série como visto para receber recomendações personalizadas.'} carousel />
+      <Collection
+        title="Baseado no seu gênero favorito"
+        subtitle={favoriteGenre ? `Sugestões de ${favoriteGenre.label}.` : 'Escolha um gênero para personalizar esta seleção.'}
+        icon={<Sparkles size={19} />}
+        items={favoriteGenreQuery.data || []}
+        isLoading={favoriteGenreQuery.isLoading}
+        emptyMessage={favoriteGenre ? 'Não encontramos sugestões desse gênero agora.' : 'Atualize seu gênero favorito no Painel Pessoal e atualize a página.'}
+        carousel
+        limit={10}
+      />
       <Collection title="Séries bem avaliadas" subtitle="10 séries com notas consistentes!" icon={<Tv size={19} />} items={topSeriesQuery.data || []} isLoading={topSeriesQuery.isLoading} emptyMessage="Não foi possível carregar as séries bem avaliadas agora." carousel limit={10} />
       <Collection title="Filmes bem avaliados" subtitle="10 filmes com notas consistentes!" icon={<Clapperboard size={19} />} items={topMoviesQuery.data || []} isLoading={topMoviesQuery.isLoading} emptyMessage="Não foi possível carregar os filmes bem avaliados agora." carousel limit={10} />
     </div>

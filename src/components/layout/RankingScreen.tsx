@@ -14,6 +14,7 @@ import {
 } from '../../lib/achievements';
 import { listFavorites, listUserActivity } from '../../lib/appData';
 import { countFavoritedBy } from '../../lib/localData';
+import { getFavoriteGenreLabel } from '../../lib/favoriteGenres';
 import type { ActivityEntry, PersonalMovie, RankedUser, SeriesEntry } from '../../types/app';
 
 interface RankingScreenProps {
@@ -24,12 +25,6 @@ interface RankingScreenProps {
   currentUserId: string;
   isLoading?: boolean;
 }
-
-const GENRE_LABELS: Record<string, string> = {
-  action: 'Ação', adventure: 'Aventura', animation: 'Animação', comedy: 'Comédia', crime: 'Crime',
-  documentary: 'Documentário', drama: 'Drama', family: 'Família', horror: 'Terror', mystery: 'Mistério',
-  romance: 'Romance', 'sci-fi': 'Ficção científica', thriller: 'Suspense', war: 'Guerra', western: 'Faroeste',
-};
 
 const LEVEL_META = {
   1: {
@@ -207,7 +202,7 @@ export default function RankingScreen({ user, users, movies, series, currentUser
   const favorites = favoritesQuery.data || [];
   const activities = useMemo(() => activitiesQuery.data || [], [activitiesQuery.data]);
   const favoriteDirector = getFavoriteDirector(movies);
-  const favoriteGenre = user.favorite_genre ? (GENRE_LABELS[user.favorite_genre] || user.favorite_genre) : null;
+  const favoriteGenre = getFavoriteGenreLabel(user.favorite_genre);
   const longestStreak = getLongestStreak(activities, movies, series);
   const betterThanPercent = users.length <= 1
     ? 100

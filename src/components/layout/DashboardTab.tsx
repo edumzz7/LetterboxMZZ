@@ -6,6 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { getReviewReaction } from '../../lib/reviewReactions';
 import { searchMovies, searchSeries } from '../../lib/tmdb';
 import { updateUserProfile } from '../../lib/appData';
+import { FAVORITE_GENRES, getFavoriteGenre } from '../../lib/favoriteGenres';
 import type { RankedUser } from '../../types/app';
 import PreferenceSearchInput, { type PreferenceSearchItem } from './PreferenceSearchInput';
 
@@ -69,7 +70,7 @@ export default function DashboardTab({ user, isOwnDashboard }: DashboardTabProps
         favorite_movie: favoriteMovie.trim() || undefined,
         favorite_movie_2: favoriteMovie2.trim() || undefined,
         favorite_series: favoriteSeries.trim() || undefined,
-        favorite_genre: favoriteGenre.trim() || undefined,
+        favorite_genre: getFavoriteGenre(favoriteGenre)?.key || '',
         watch_preference: watchPreference || undefined,
       });
       await queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -163,7 +164,21 @@ export default function DashboardTab({ user, isOwnDashboard }: DashboardTabProps
           <PreferenceSearchInput label="Série Favorita" placeholder="Ex: Breaking Bad" value={favoriteSeries} onChange={setFavoriteSeries} searchFn={seriesSearchFn} />
           <div className="flex flex-col gap-2">
             <label className="mb-1 block text-xs uppercase tracking-[0.14em] text-brand-text-muted">Gênero Favorito</label>
-            <input type="text" value={favoriteGenre} onChange={(event) => setFavoriteGenre(event.target.value)} placeholder="Ex: Ficção Científica" className="w-full rounded-lg border border-[#222] bg-[#151515] px-3 py-2 text-sm text-brand-text placeholder-brand-text-muted/50 transition focus:border-brand-gold/40 focus:outline-none" />
+            <select
+              value={getFavoriteGenre(favoriteGenre) ? favoriteGenre : ''}
+              onChange={(event) => setFavoriteGenre(event.target.value)}
+              className="w-full rounded-lg border border-[#222] bg-[#151515] px-3 py-2 text-sm text-brand-text transition focus:border-brand-gold/40 focus:outline-none"
+            >
+              <option value="">Selecione um gênero</option>
+              {FAVORITE_GENRES.map((genre) => (
+                <option key={genre.key} value={genre.key}>{genre.label}</option>
+              ))}
+            </select>
+            {favoriteGenre && !getFavoriteGenre(favoriteGenre) && (
+              <p className="text-xs leading-relaxed text-amber-200/80">
+                O gênero salvo anteriormente não está mais disponível. Escolha uma nova opção para atualizar.
+              </p>
+            )}
           </div>
           <div className="flex flex-col gap-2 md:col-span-2">
             <span className="mb-1 block text-xs uppercase tracking-[0.14em] text-brand-text-muted">Onde prefere assistir</span>
@@ -217,7 +232,7 @@ export default function DashboardTab({ user, isOwnDashboard }: DashboardTabProps
           <h3 className="text-xs tracking-widest uppercase">Gênero Favorito</h3>
         </div>
         {user.favorite_genre ? (
-          <p className="text-lg font-light text-brand-text">{user.favorite_genre}</p>
+          <p className="text-lg font-light text-brand-text">{getFavoriteGenre(user.favorite_genre)?.label || user.favorite_genre}</p>
         ) : <EmptyStateShortcut />}
       </div>
 

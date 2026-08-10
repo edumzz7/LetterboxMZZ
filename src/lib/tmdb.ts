@@ -1,3 +1,5 @@
+import type { FavoriteGenreOption } from './favoriteGenres';
+
 const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY;
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 
@@ -213,6 +215,66 @@ export function getMovieSimilarWithFallback(movieId: number, genreIds: number[] 
 
 export function getTvSimilarWithFallback(tvId: number, genreIds: number[] = []) {
     return getSimilarWithFallback('tv', tvId, genreIds);
+}
+
+export const FAVORITE_GENRE_MIN_RATING = 3.5;
+const FAVORITE_GENRE_CACHE_PREFIX = 'cinerats:home-favorite-genre:v1';
+
+function randomGenrePage() {
+    return Math.floor(Math.random() * 5) + 1;
+}
+
+function shuffleItems<T>(items: T[]) {
+    const shuffled = [...items];
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+        const swapIndex = Math.floor(Math.random() * (index + 1));
+        [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+    }
+    return shuffled;
+}
+
+export async function getFavoriteGenreRecommendations(
+    genre: FavoriteGenreOption,
+    excludedIds: ReadonlySet<number> = new Set(),
+    userId = 'anonymous',
+): Promise<TMDBHomeMedia[]> {
+    const cacheKey = `${FAVORITE_GENRE_CACHE_PREFIX}:${userId}:${genre.key}`;
+    const cached = readCachedHomeCatalog(cacheKey);
+    if (cached) {
+        const availableCached = cached.filter((item) => !excludedIds.has(item.id));
+        if (availableCached.length >= 10) return availableCached.slice(0, 10);
+    }
+
+    const moviePage = randomGenrePage();
+    const tvPage = randomGenrePage();
+    const [movieFirst, movieSecond, tvFirst, tvSecond] = await Promise.all([
+        getDiscoverByGenres('movie', genre.movieGenreIds, -1, moviePage),
+        getDiscoverByGenres('movie', genre.movieGenreIds, -1, moviePage + 1),
+        getDiscoverByGenres('tv', genre.tvGenreIds, -1, tvPage),
+        getDiscoverByGenres('tv', genre.tvGenreIds, -1, tvPage + 1),
+    ]);
+
+    const unique = new Map<string, TMDBHomeMedia>();
+    const addItems = (items: TMDBRecommendationItem[], mediaType: 'movie' | 'tv') => {
+        for (const item of items) {
+            if (
+                excludedIds.has(item.id)
+                || item.adult
+                || !item.poster_path
+                || Number(item.vote_average || 0) < FAVORITE_GENRE_MIN_RATING * 2
+            ) continue;
+
+            const key = `${mediaType}-${item.id}`;
+            if (!unique.has(key)) unique.set(key, { ...item, media_type: mediaType });
+        }
+    };
+
+    addItems([...movieFirst, ...movieSecond], 'movie');
+    addItems([...tvFirst, ...tvSecond], 'tv');
+
+    const recommendations = shuffleItems(Array.from(unique.values())).slice(0, 10);
+    writeCachedHomeCatalog(cacheKey, recommendations);
+    return recommendations;
 }
 
 async function getHomeCatalog(path: string, forcedMediaType?: 'movie' | 'tv'): Promise<TMDBHomeMedia[]> {

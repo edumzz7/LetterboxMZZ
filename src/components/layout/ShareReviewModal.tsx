@@ -64,7 +64,11 @@ export default function ShareReviewModal({
   const combinedItems = [...watchedMovies, ...watchedSeries]
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
+  const ratedItems = combinedItems.filter((item) => Number.isFinite(Number(item.rating)) && Number(item.rating) > 0);
+
   const [selectedKey, setSelectedKey] = useState<string>(''); // Formato: type-id (ex: "movie-123")
+  const [mediaFilter, setMediaFilter] = useState<'all' | 'movie' | 'series'>('all');
+  const [titleFilter, setTitleFilter] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImages, setGeneratedImages] = useState<string[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -72,7 +76,13 @@ export default function ShareReviewModal({
   const postRefPhoto = useRef<HTMLDivElement>(null);
   const postRefDark = useRef<HTMLDivElement>(null);
 
-  const selectedItem = combinedItems.find(item => `${item.type}-${item.id}` === selectedKey);
+  const filteredItems = ratedItems.filter((item) => {
+    const matchesType = mediaFilter === 'all' || item.type === mediaFilter;
+    const matchesTitle = item.titulo.toLocaleLowerCase().includes(titleFilter.trim().toLocaleLowerCase());
+    return matchesType && matchesTitle;
+  });
+
+  const selectedItem = ratedItems.find(item => `${item.type}-${item.id}` === selectedKey);
 
   // Rewrite TMDB image URLs to go through our proxy (same-origin, no CORS issues)
   const getProxiedImageUrl = (item: SharedItem | undefined) => {
@@ -93,6 +103,8 @@ export default function ShareReviewModal({
     if (!nextOpen) {
       setTimeout(() => {
         setSelectedKey('');
+        setMediaFilter('all');
+        setTitleFilter('');
         setGeneratedImages([]);
         setCurrentImageIndex(0);
         setIsGenerating(false);
@@ -140,24 +152,27 @@ export default function ShareReviewModal({
 
   const handleShare = async () => {
     if (generatedImages.length === 0 || !selectedItem) return;
-    
+
     try {
       const response = await fetch(generatedImages[currentImageIndex]);
       const blob = await response.blob();
       const styleName = currentImageIndex === 0 ? 'foto' : 'escuro';
       const file = new File([blob], `review-${selectedItem.titulo.toLowerCase().replace(/\s+/g, '-')}-${styleName}.png`, { type: 'image/png' });
-      
-      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: 'Resenha Cinerats',
-          text: `Confira minha resenha de ${selectedItem.titulo} no CineRats!`,
-        });
-      } else {
-        alert("Compartilhamento direto com o Instagram não suportado no seu navegador/dispositivo atual. Por favor, baixe a imagem e poste manualmente.");
+
+      if (!navigator.share || !navigator.canShare || !navigator.canShare({ files: [file] })) {
+        alert('O compartilhamento de imagens não está disponível neste dispositivo. Baixe a imagem e poste manualmente no Instagram.');
+        return;
       }
+
+      await navigator.share({
+        files: [file],
+        title: 'Resenha CineRats',
+        text: `Confira minha resenha de ${selectedItem.titulo} no CineRats!`,
+      });
     } catch (error) {
-      console.error('Error sharing', error);
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      console.error('Falha ao compartilhar', error);
+      alert('Não foi possível abrir o compartilhamento. Você pode baixar a imagem e postar manualmente.');
     }
   };
 
@@ -191,40 +206,93 @@ export default function ShareReviewModal({
     <Dialog.Root open={open} onOpenChange={handleOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40" />
-        <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-[92vw] max-w-xl max-h-[90vh] overflow-y-auto translate-x-[-50%] translate-y-[-50%] border border-[#222] bg-brand-bg p-6 shadow-lg rounded-xl">
-          <Dialog.Title className="flex items-center gap-2 text-lg text-brand-gold tracking-widest uppercase mb-4">
+        <Dialog.Content className="fixed left-[50%] top-[50%] z-50 flex max-h-[calc(100dvh-1rem)] w-[calc(100vw-1.5rem)] max-w-xl translate-x-[-50%] translate-y-[-50%] flex-col overflow-hidden rounded-2xl border border-[#222] bg-brand-bg p-4 shadow-lg sm:max-h-[90vh] sm:p-6">
+          <Dialog.Title className="mb-4 flex shrink-0 items-center gap-2 pr-8 text-base uppercase tracking-[0.18em] text-brand-gold sm:text-lg">
             <Instagram size={20} /> Postar no Instagram
           </Dialog.Title>
 
           {generatedImages.length === 0 && (
-            <div className="flex flex-col gap-4">
+            <div className="flex min-h-0 flex-col gap-4 overflow-y-auto pr-1">
               <div>
-                <label className="block text-xs uppercase tracking-[0.14em] text-brand-text-muted mb-2">
-                  Selecione um título avaliado (Filme ou Série)
+                <p className="mb-2 text-xs uppercase tracking-[0.14em] text-brand-text-muted">
+                  Escolha o tipo de mídia
+                </p>
+                <div className="grid grid-cols-3 gap-2" role="group" aria-label="Filtrar tipo de mídia">
+                  {([
+                    ['all', 'Todos'],
+                    ['movie', 'Filmes'],
+                    ['series', 'Séries'],
+                  ] as const).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setMediaFilter(value)}
+                      aria-pressed={mediaFilter === value}
+                      className={`rounded-xl border px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] transition ${mediaFilter === value ? 'border-brand-gold/60 bg-brand-gold/10 text-brand-gold' : 'border-[#222] bg-[#151515] text-brand-text-muted hover:border-brand-gold/40 hover:text-brand-text'}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="share-review-title-filter" className="mb-2 block text-xs uppercase tracking-[0.14em] text-brand-text-muted">
+                  Filtrar por título
                 </label>
-                <select
-                  value={selectedKey}
-                  onChange={(e) => setSelectedKey(e.target.value)}
-                  className="w-full bg-[#151515] border border-[#222] rounded-lg px-3 py-3 text-sm text-brand-text focus:border-brand-gold/40 focus:outline-none transition"
-                >
-                  <option value="">-- Escolha um item --</option>
-                  {combinedItems.map((item) => {
+                <input
+                  id="share-review-title-filter"
+                  type="search"
+                  value={titleFilter}
+                  onChange={(event) => setTitleFilter(event.target.value)}
+                  placeholder="Digite o nome da mídia"
+                  className="w-full rounded-xl border border-[#222] bg-[#151515] px-3 py-3 text-sm text-brand-text placeholder-brand-text-muted/50 transition focus:border-brand-gold/40 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <p className="text-xs uppercase tracking-[0.14em] text-brand-text-muted">Mídias avaliadas</p>
+                  <span className="text-[10px] uppercase tracking-[0.12em] text-brand-text-muted/70">{filteredItems.length} encontrada{filteredItems.length === 1 ? '' : 's'}</span>
+                </div>
+                <div className="flex max-h-[min(42vh,380px)] flex-col gap-2 overflow-y-auto pr-1">
+                  {filteredItems.map((item) => {
+                    const itemKey = `${item.type}-${item.id}`;
+                    const isSelected = selectedKey === itemKey;
                     const tag = item.type === 'movie' ? 'Filme' : 'Série';
                     return (
-                      <option key={`${item.type}-${item.id}`} value={`${item.type}-${item.id}`}>
-                        [{tag}] {item.titulo} {item.rating ? `(${item.rating} ⭐)` : ''}
-                      </option>
+                      <button
+                        key={itemKey}
+                        type="button"
+                        onClick={() => setSelectedKey(itemKey)}
+                        aria-pressed={isSelected}
+                        className={`flex min-w-0 items-center gap-3 rounded-xl border p-2 text-left transition ${isSelected ? 'border-brand-gold/70 bg-brand-gold/10' : 'border-[#222] bg-[#151515] hover:border-brand-gold/40'}`}
+                      >
+                        <div className="h-14 w-10 shrink-0 overflow-hidden rounded-md bg-black">
+                          {getProxiedImageUrl(item) ? <img src={getProxiedImageUrl(item) || undefined} alt={item.titulo} className="h-full w-full object-cover" /> : null}
+                        </div>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm text-brand-text">{item.titulo}</span>
+                          <span className="mt-1 block text-[10px] uppercase tracking-[0.12em] text-brand-text-muted">{tag} · {item.rating} / 5</span>
+                        </span>
+                        <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs ${isSelected ? 'border-brand-gold bg-brand-gold text-brand-bg' : 'border-[#444] text-transparent'}`} aria-hidden="true">✓</span>
+                      </button>
                     );
                   })}
-                </select>
+                  {filteredItems.length === 0 && (
+                    <p className="rounded-xl border border-dashed border-[#333] px-4 py-6 text-center text-sm text-brand-text-muted">
+                      {ratedItems.length === 0 ? 'Você ainda não possui mídias avaliadas para compartilhar.' : 'Nenhuma mídia avaliada corresponde aos filtros.'}
+                    </p>
+                  )}
+                </div>
               </div>
 
               {selectedItem && (
-                <div className="flex justify-end mt-4">
+                <div className="flex justify-end pt-1">
                   <button
                     onClick={generateImage}
                     disabled={isGenerating}
-                    className="flex items-center gap-2 px-6 py-3 text-xs font-semibold uppercase tracking-[0.14em] bg-brand-gold text-brand-bg rounded-lg disabled:opacity-50 hover:bg-brand-gold/90 transition"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-gold px-6 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-brand-bg transition hover:bg-brand-gold/90 disabled:opacity-50 sm:w-auto"
                   >
                     {isGenerating ? 'Gerando...' : 'Gerar Imagem'}
                   </button>
@@ -234,36 +302,38 @@ export default function ShareReviewModal({
           )}
 
           {generatedImages.length > 0 && (
-            <div className="flex flex-col items-center gap-6 mt-4">
-              <p className="text-xs uppercase tracking-[0.14em] text-brand-text-muted">Preview da Imagem</p>
+            <div className="flex min-h-0 flex-col items-center gap-3 overflow-y-auto pr-1 sm:gap-4">
+              <p className="shrink-0 text-xs uppercase tracking-[0.14em] text-brand-text-muted">Preview da Imagem</p>
               
-              <div className="flex items-center gap-3 w-full justify-center">
-                {generatedImages.length > 1 && (
+              <div className="grid w-full min-w-0 grid-cols-[2.5rem_minmax(0,1fr)_2.5rem] items-center justify-items-center gap-2 sm:gap-3">
+                {generatedImages.length > 1 ? (
                   <button
                     onClick={() => setCurrentImageIndex((prev) => (prev === 0 ? generatedImages.length - 1 : prev - 1))}
-                    className="p-3 bg-[#151515] border border-[#222] hover:border-brand-gold/40 hover:text-brand-gold rounded-full text-white transition shrink-0 flex items-center justify-center w-10 h-10 active:scale-95"
+                    className="flex h-10 w-10 items-center justify-center rounded-full border border-[#222] bg-[#151515] p-3 text-white transition hover:border-brand-gold/40 hover:text-brand-gold active:scale-95"
                     title="Versão anterior"
+                    aria-label="Versão anterior"
                   >
                     &#8592;
                   </button>
-                )}
+                ) : <div aria-hidden="true" />}
                 
-                <div className="relative w-[270px] h-[480px] rounded-lg overflow-hidden border border-brand-gold/30 shadow-2xl flex items-center justify-center bg-black">
-                  <img src={generatedImages[currentImageIndex]} alt="Preview" className="w-full h-full object-contain" />
+                <div className="relative aspect-[9/16] w-full max-w-[270px] overflow-hidden rounded-lg border border-brand-gold/30 bg-black shadow-2xl">
+                  <img src={generatedImages[currentImageIndex]} alt="Preview" className="absolute inset-0 h-full w-full object-cover" />
                 </div>
 
-                {generatedImages.length > 1 && (
+                {generatedImages.length > 1 ? (
                   <button
                     onClick={() => setCurrentImageIndex((prev) => (prev === generatedImages.length - 1 ? 0 : prev + 1))}
-                    className="p-3 bg-[#151515] border border-[#222] hover:border-brand-gold/40 hover:text-brand-gold rounded-full text-white transition shrink-0 flex items-center justify-center w-10 h-10 active:scale-95"
+                    className="flex h-10 w-10 items-center justify-center rounded-full border border-[#222] bg-[#151515] p-3 text-white transition hover:border-brand-gold/40 hover:text-brand-gold active:scale-95"
                     title="Próxima versão"
+                    aria-label="Próxima versão"
                   >
                     &#8594;
                   </button>
-                )}
+                ) : <div aria-hidden="true" />}
               </div>
 
-              <div className="flex items-center gap-2 justify-center w-full">
+              <div className="flex w-full shrink-0 items-center justify-center gap-2">
                 {generatedImages.map((_, idx) => (
                   <button
                     key={idx}
@@ -273,24 +343,24 @@ export default function ShareReviewModal({
                 ))}
               </div>
 
-              <div className="flex items-center gap-4 w-full mt-2">
+              <div className="grid w-full shrink-0 grid-cols-3 gap-2 pt-1 sm:gap-3">
                 <button
                   onClick={() => { setGeneratedImages([]); setCurrentImageIndex(0); }}
-                  className="flex-1 px-4 py-3 border border-[#333] text-brand-text hover:border-brand-gold/40 rounded-lg text-xs uppercase tracking-[0.14em] transition"
+                  className="min-w-0 rounded-xl border border-[#333] px-2 py-3 text-[10px] uppercase tracking-[0.1em] text-brand-text transition hover:border-brand-gold/40 sm:px-4 sm:text-xs sm:tracking-[0.14em]"
                 >
                   Voltar
                 </button>
                 <button
                   onClick={handleDownload}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-white/10 border border-[#333] text-brand-text rounded-lg text-xs uppercase font-bold tracking-[0.14em] hover:bg-white/20 transition"
+                  className="flex min-w-0 items-center justify-center gap-1 rounded-xl border border-[#333] bg-white/10 px-2 py-3 text-[10px] font-bold uppercase tracking-[0.1em] text-brand-text transition hover:bg-white/20 sm:gap-2 sm:px-4 sm:text-xs sm:tracking-[0.14em]"
                 >
-                  <Download size={16} /> Baixar
+                  <Download size={14} /> <span>Baixar</span>
                 </button>
                 <button
                   onClick={handleShare}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-brand-gold text-brand-bg rounded-lg text-xs uppercase font-bold tracking-[0.14em] hover:bg-brand-gold/90 transition"
+                  className="flex min-w-0 items-center justify-center gap-1 rounded-xl bg-brand-gold px-2 py-3 text-[10px] font-bold uppercase tracking-[0.1em] text-brand-bg transition hover:bg-brand-gold/90 sm:gap-2 sm:px-4 sm:text-xs sm:tracking-[0.14em]"
                 >
-                  <Instagram size={16} /> Postar
+                  <Instagram size={14} /> <span>Postar</span>
                 </button>
               </div>
             </div>

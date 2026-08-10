@@ -14,6 +14,7 @@ export function useSeriesMutations(userId: string | null) {
       status,
       plataforma_slug,
       avaliacao,
+      is_retroactive,
     }: {
       id: string;
       episodios_vistos?: number;
@@ -22,6 +23,7 @@ export function useSeriesMutations(userId: string | null) {
       status?: SeriesStatus;
       plataforma_slug?: string;
       avaliacao?: number;
+      is_retroactive?: boolean;
     }) => {
       const nextStatus =
         status ??
@@ -40,6 +42,7 @@ export function useSeriesMutations(userId: string | null) {
         status: nextStatus,
         plataforma_slug,
         avaliacao,
+        is_retroactive,
         source_movie_id: cachedEntry?.source_movie_id,
       });
     },

@@ -12,6 +12,7 @@ import AvatarDisplay from '../layout/AvatarDisplay';
 import { generateImagePath } from '../../lib/imageUtils';
 import clsx from 'clsx';
 import SimilarMediaSection from '../ui/SimilarMediaSection';
+import WatchedTimingDialog from '../movies/WatchedTimingDialog';
 
 interface SeriesDetailScreenProps {
   id: string;
@@ -30,6 +31,12 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [selectedSeason, setSelectedSeason] = useState(1);
   const [isUpdatingProgress, setIsUpdatingProgress] = useState(false);
+  const [isWatchedTimingOpen, setIsWatchedTimingOpen] = useState(false);
+  const [pendingSeriesCompletion, setPendingSeriesCompletion] = useState<{
+    temporada: number;
+    total_episodios: number;
+    episodios_vistos: number;
+  } | null>(null);
 
   // 1. Fetch TMDB TV Details (Raw)
   const seriesQuery = useQuery({
@@ -138,7 +145,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
     deleteSeriesMutation.isPending ||
     rateSeriesMutation.isPending;
 
-  const handleAddSeries = async (status: 'watchlist' | 'watching' | 'watched') => {
+  const handleAddSeries = async (status: 'watchlist' | 'watching' | 'watched', isRetroactive = false) => {
     if (!series) return;
     const totalEpsOfSeason = activeSeasonMeta?.episode_count || 1;
     const targetSeason = status === 'watched'
@@ -159,8 +166,26 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
       source_movie_id: String(series.id),
       rating: null,
       streaming_data: JSON.stringify(providers),
+      is_retroactive: status === 'watched' ? isRetroactive : false,
     });
-    cineratsQuery.refetch();
+    await cineratsQuery.refetch();
+  };
+
+  const saveSeriesProgress = async (
+    progress: {
+      id: string;
+      temporada: number;
+      total_episodios: number;
+      episodios_vistos: number;
+      status: 'watchlist' | 'watching' | 'watched';
+    },
+    isRetroactive = false,
+  ) => {
+    await updateProgressMutation.mutateAsync({
+      ...progress,
+      is_retroactive: isRetroactive,
+    });
+    await cineratsQuery.refetch();
   };
 
   const handleUpdateEpisodeProgress = async (episodeNumber: number) => {
@@ -177,19 +202,67 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
         ? 'watching'
         : 'watchlist';
 
+    if (completedSeries) {
+      setPendingSeriesCompletion({
+        temporada: selectedSeason,
+        total_episodios: totalEpsOfSeason,
+        episodios_vistos: episodeNumber,
+      });
+      setIsWatchedTimingOpen(true);
+      return;
+    }
+
     setIsUpdatingProgress(true);
     try {
-      await updateProgressMutation.mutateAsync({
+      await saveSeriesProgress({
         id: userSeriesDoc.id,
         temporada: selectedSeason,
         total_episodios: totalEpsOfSeason,
         episodios_vistos: episodeNumber,
         status: nextStatus,
       });
-      cineratsQuery.refetch();
     } finally {
       setIsUpdatingProgress(false);
     }
+  };
+
+  const handleConfirmWatched = async (isRetroactive: boolean) => {
+    if (!series) return;
+
+    if (pendingSeriesCompletion && userSeriesDoc) {
+      await saveSeriesProgress(
+        {
+          id: userSeriesDoc.id,
+          ...pendingSeriesCompletion,
+          status: 'watched',
+        },
+        isRetroactive,
+      );
+      setPendingSeriesCompletion(null);
+      return;
+    }
+
+    if (userSeriesDoc) {
+      const totalEpsOfSeries = lastSeasonMeta?.episode_count || activeSeasonMeta?.episode_count || 1;
+      await saveSeriesProgress(
+        {
+          id: userSeriesDoc.id,
+          temporada: lastSeasonMeta?.season_number || selectedSeason,
+          total_episodios: totalEpsOfSeries,
+          episodios_vistos: totalEpsOfSeries,
+          status: 'watched',
+        },
+        isRetroactive,
+      );
+      return;
+    }
+
+    await handleAddSeries('watched', isRetroactive);
+  };
+
+  const handleWatchedTimingOpenChange = (open: boolean) => {
+    setIsWatchedTimingOpen(open);
+    if (!open) setPendingSeriesCompletion(null);
   };
 
   const handleToggleWatchlistOnly = async () => {
@@ -320,15 +393,18 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
                   <Play size={12} className="fill-brand-text text-brand-text" />
                   Acompanhar
                 </button>
-                <button
-                  onClick={() => handleAddSeries('watched')}
-                  disabled={isPending}
-                  className="flex items-center gap-2 py-3 px-6 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all active:scale-95 border bg-black/45 border-[#222] text-brand-text hover:border-brand-gold/35 hover:text-brand-gold disabled:opacity-50"
-                >
-                  <Eye size={14} />
-                  Marcar Vista
-                </button>
               </>
+            )}
+
+            {(!userSeriesDoc || userSeriesDoc.status === 'watchlist') && (
+              <button
+                onClick={() => setIsWatchedTimingOpen(true)}
+                disabled={isPending}
+                className="flex items-center gap-2 py-3 px-6 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all active:scale-95 border bg-black/45 border-[#222] text-brand-text hover:border-brand-gold/35 hover:text-brand-gold disabled:opacity-50"
+              >
+                <Eye size={14} />
+                Marcar Vista
+              </button>
             )}
 
             {userSeriesDoc && (
@@ -653,6 +729,15 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
           }}
         />
       )}
+
+      <WatchedTimingDialog
+        open={isWatchedTimingOpen}
+        onOpenChange={handleWatchedTimingOpenChange}
+        mediaTitle={series.name}
+        mediaType="series"
+        isPending={isPending || isUpdatingProgress}
+        onConfirm={handleConfirmWatched}
+      />
     </div>
   );
 }

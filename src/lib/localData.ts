@@ -662,7 +662,7 @@ export async function addPersonalMovie(
 
 export async function updatePersonalMovie(
   movieId: string,
-  updates: Partial<Pick<PersonalMovie, 'status' | 'plataforma_slug' | 'avaliacao'>>,
+  updates: Partial<Pick<PersonalMovie, 'status' | 'plataforma_slug' | 'avaliacao' | 'is_retroactive'>>,
 ) {
   const items = readPersonalMovies();
   const index = items.findIndex((item) => item.id === movieId);
@@ -672,7 +672,7 @@ export async function updatePersonalMovie(
   const next = { ...previous, ...updates };
   items[index] = next;
   writePersonalMovies(items);
-  const isRetroactive = previous.is_retroactive || previous.plataforma_slug?.endsWith('|retroactive') || previous.source_movie_id?.endsWith('|retroactive') || previous.source_movie_id === 'retroactive';
+  const isRetroactive = next.is_retroactive || previous.plataforma_slug?.endsWith('|retroactive') || previous.source_movie_id?.endsWith('|retroactive') || previous.source_movie_id === 'retroactive';
   if (previous.status !== 'watched' && next.status === 'watched' && !isRetroactive) {
     updateUserMcoins(next.user_id, 30);
     addActivity(next.user_id, `assistiu ao filme ${next.titulo}.`, 30);
@@ -722,7 +722,7 @@ export async function addSeries(
 export async function updateSeries(
   seriesId: string,
   updates: Partial<
-    Pick<SeriesEntry, 'status' | 'temporada' | 'total_episodios' | 'episodios_vistos' | 'plataforma_slug' | 'avaliacao'>
+    Pick<SeriesEntry, 'status' | 'temporada' | 'total_episodios' | 'episodios_vistos' | 'plataforma_slug' | 'avaliacao' | 'is_retroactive'>
   >,
 ) {
   const items = readSeries();
@@ -740,7 +740,7 @@ export async function updateSeries(
   items[index] = next;
   writeSeries(items);
   
-  const isRetroactive = current.is_retroactive || current.plataforma_slug?.endsWith('|retroactive');
+  const isRetroactive = next.is_retroactive || current.plataforma_slug?.endsWith('|retroactive');
   if (current.status === 'watchlist' && next.status === 'watching' && !isRetroactive) {
     updateUserMcoins(next.user_id, 20);
     addActivity(next.user_id, `iniciou a serie ${next.titulo}.`, 20);

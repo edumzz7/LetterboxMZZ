@@ -13,6 +13,7 @@ import AvatarDisplay from '../layout/AvatarDisplay';
 import { generateImagePath } from '../../lib/imageUtils';
 import clsx from 'clsx';
 import SimilarMediaSection from '../ui/SimilarMediaSection';
+import WatchedTimingDialog from './WatchedTimingDialog';
 
 interface MovieDetailScreenProps {
   id: string;
@@ -29,6 +30,7 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
     setLocation('/');
   };
   const [isReviewOpen, setIsReviewOpen] = useState(false);
+  const [isWatchedTimingOpen, setIsWatchedTimingOpen] = useState(false);
 
   // 1. Fetch TMDB Movie Details
   const movieQuery = useQuery({
@@ -139,20 +141,15 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
     }
   };
 
-  const handleToggleWatched = async () => {
+  const handleConfirmWatched = async (isRetroactive: boolean) => {
     if (!movie) return;
     if (userMovieDoc) {
-      if (userMovieDoc.status === 'watched') {
-        // If watched, change to watchlist
-        await updateStatusMutation.mutateAsync({ id: userMovieDoc.id, status: 'watchlist' });
-        cineratsQuery.refetch();
-      } else {
-        // If watchlist, change to watched
-        await updateStatusMutation.mutateAsync({ id: userMovieDoc.id, status: 'watched' });
-        cineratsQuery.refetch();
-      }
+      await updateStatusMutation.mutateAsync({
+        id: userMovieDoc.id,
+        status: 'watched',
+        is_retroactive: isRetroactive,
+      });
     } else {
-      // Add as watched
       await addMovieMutation.mutateAsync({
         titulo: movie.title,
         ano_lancamento: releaseYear ? parseInt(releaseYear, 10) : null,
@@ -163,9 +160,22 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
         plataforma_slug: 'stremio',
         rating: null,
         streaming_data: JSON.stringify(providers),
+        is_retroactive: isRetroactive,
       });
-      cineratsQuery.refetch();
     }
+    await cineratsQuery.refetch();
+  };
+
+  const handleToggleWatched = async () => {
+    if (!movie) return;
+    if (userMovieDoc?.status === 'watched') {
+      // If watched, change to watchlist immediately.
+      await updateStatusMutation.mutateAsync({ id: userMovieDoc.id, status: 'watchlist' });
+      await cineratsQuery.refetch();
+      return;
+    }
+
+    setIsWatchedTimingOpen(true);
   };
 
   const handleSaveRatingAndReview = async (stars: number, review: string) => {
@@ -499,6 +509,14 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
           }}
         />
       )}
+
+      <WatchedTimingDialog
+        open={isWatchedTimingOpen}
+        onOpenChange={setIsWatchedTimingOpen}
+        mediaTitle={movie.title}
+        isPending={isPending}
+        onConfirm={handleConfirmWatched}
+      />
     </div>
   );
 }

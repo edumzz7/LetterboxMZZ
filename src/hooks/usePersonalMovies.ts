@@ -40,8 +40,8 @@ export function usePersonalMovieMutations(userId: string | null) {
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: MovieStatus }) =>
-      updatePersonalMovie(id, { status }),
+    mutationFn: ({ id, status, is_retroactive }: { id: string; status: MovieStatus; is_retroactive?: boolean }) =>
+      updatePersonalMovie(id, { status, is_retroactive }),
     onSuccess: (data, variables) => {
       if (data) {
         queryClient.setQueryData(['personal-movies', userId], (old: PersonalMovie[] = []) =>

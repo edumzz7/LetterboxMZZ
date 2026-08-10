@@ -649,7 +649,7 @@ export async function addPersonalMovie(
 
 export async function updatePersonalMovie(
   movieId: string,
-  updates: Partial<Pick<PersonalMovie, 'status' | 'plataforma_slug' | 'avaliacao'>>,
+  updates: Partial<Pick<PersonalMovie, 'status' | 'plataforma_slug' | 'avaliacao' | 'is_retroactive'>>,
 ) {
   return withFallback(
     async () => {
@@ -711,7 +711,7 @@ export async function updatePersonalMovie(
             const res = await apiClient.post<{ id: string; type: string; points: number; providerExternalId: string; createdAt: string }>('/watch-entries', {
               type: item.type,
               providerExternalId: item.providerExternalId,
-              isRetroactive: false,
+              isRetroactive: updates.is_retroactive ?? false,
             });
             return {
               id: res.data.id,
@@ -728,6 +728,7 @@ export async function updatePersonalMovie(
               review: null,
               streaming_data: null,
               created_at: res.data.createdAt,
+              is_retroactive: updates.is_retroactive,
             } as PersonalMovie;
           }
         } catch {
@@ -940,7 +941,7 @@ export async function updateSeries(
   updates: Partial<
     Pick<
       SeriesEntry,
-      'status' | 'temporada' | 'total_episodios' | 'episodios_vistos' | 'plataforma_slug' | 'avaliacao' | 'source_movie_id'
+      'status' | 'temporada' | 'total_episodios' | 'episodios_vistos' | 'plataforma_slug' | 'avaliacao' | 'source_movie_id' | 'is_retroactive'
     >
   >,
 ) {
@@ -1041,7 +1042,7 @@ export async function updateSeries(
               providerExternalId: item.providerExternalId,
               season: updates.temporada,
               episode: updates.episodios_vistos,
-              isRetroactive: false,
+              isRetroactive: updates.is_retroactive ?? false,
             });
             return {
               id: res.data.id,
@@ -1059,6 +1060,7 @@ export async function updateSeries(
               review: null,
               streaming_data: null,
               created_at: res.data.createdAt,
+              is_retroactive: updates.is_retroactive,
             } as SeriesEntry;
           }
         } catch {
@@ -1073,7 +1075,7 @@ export async function updateSeries(
           providerExternalId,
           season: updates.temporada,
           episode: updates.episodios_vistos,
-          isRetroactive: false,
+          isRetroactive: updates.is_retroactive ?? false,
         });
         return {
           id: res.data.id,
@@ -1091,6 +1093,7 @@ export async function updateSeries(
           review: null,
           streaming_data: null,
           created_at: res.data.createdAt,
+          is_retroactive: updates.is_retroactive,
         } as SeriesEntry;
       }
 

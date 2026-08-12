@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { Award, BookOpen, Film, History, Loader2, Menu, Shuffle, Users } from 'lucide-react';
+import { Award, BookOpen, CircleHelp, Film, History, Loader2, Menu, Shuffle, Users } from 'lucide-react';
 import AppHeader from './components/layout/Header';
 import DashboardTab from './components/layout/DashboardTab';
 import UserSidebar, { RECOMMENDATIONS_STORAGE_KEY_PREFIX } from './components/layout/UserSidebar';
@@ -27,6 +27,7 @@ import GlobalSearch from './components/layout/GlobalSearch';
 import ProfileSummary from './components/layout/ProfileSummary';
 import ProfilePageSkeleton from './components/layout/ProfilePageSkeleton';
 import ChangelogsScreen from './components/layout/ChangelogsScreen';
+import FaqScreen from './components/layout/FaqScreen';
 import LatestUpdatesSection from './components/layout/LatestUpdatesSection';
 import { HEADER_MENU_OPEN_EVENT, notifyHeaderMenuOpen } from './lib/headerMenu';
 import {
@@ -69,6 +70,7 @@ function App() {
   const [matchDirector, directorParams] = useRoute('/director/:id');
   const [matchImportTvTime] = useRoute('/import-tvtime');
   const [matchChangelogs] = useRoute('/changelogs');
+  const [matchFaq] = useRoute('/faq');
   const [matchRequestPasswordReset] = useRoute('/conta/esqueci-senha');
   const [matchConfirmPasswordReset] = useRoute('/conta/resetar-senha');
   const [authError, setAuthError] = useState<string | null>(null);
@@ -165,7 +167,7 @@ function App() {
   const users: RankedUser[] = usersQuery.data || [];
   const urlUsername = match ? params.username : null;
   const isAchievementsRoute = urlUsername === 'conquistas' || urlUsername === 'ranking';
-  const viewedUser = matchChangelogs || isAchievementsRoute ? null : urlUsername
+  const viewedUser = matchChangelogs || matchFaq || isAchievementsRoute ? null : urlUsername
     ? (users.find((user) => user.username === urlUsername) || null)
     : (users.find((user) => user.id === session?.id) || null);
 
@@ -463,7 +465,7 @@ function App() {
     }
   };
   const isPersonRoute = Boolean(matchActor || matchDirector);
-  const isProfileRoute = Boolean(viewedUser && !matchMovie && !matchSerie && !isPersonRoute && !matchImportTvTime && !matchChangelogs && !isAchievementsRoute);
+  const isProfileRoute = Boolean(viewedUser && !matchMovie && !matchSerie && !isPersonRoute && !matchImportTvTime && !matchChangelogs && !matchFaq && !isAchievementsRoute);
 
   return (
     <div className="min-h-screen bg-brand-bg text-brand-text">
@@ -478,8 +480,8 @@ function App() {
             setLocation(`/${authenticatedSession.username}`);
           }}
           searchSlot={<GlobalSearch users={users} onSelectUser={selectUser} />}
-          hideTabs={isAchievementsRoute || Boolean(matchMovie) || Boolean(matchSerie) || isPersonRoute || Boolean(matchImportTvTime) || Boolean(matchChangelogs)}
-          onBack={(matchMovie || matchSerie || isPersonRoute || matchImportTvTime) ? () => setLocation(`/${authenticatedSession.username}`) : undefined}
+          hideTabs={isAchievementsRoute || Boolean(matchMovie) || Boolean(matchSerie) || isPersonRoute || Boolean(matchImportTvTime) || Boolean(matchChangelogs) || Boolean(matchFaq)}
+          onBack={(matchMovie || matchSerie || isPersonRoute || matchImportTvTime || matchFaq) ? () => setLocation(`/${authenticatedSession.username}`) : undefined}
           rightSlot={<>
              <DropdownMenu.Root open={infoMenuOpen} onOpenChange={(open) => { if (open) notifyHeaderMenuOpen('info'); setInfoMenuOpen(open); }}>
                <DropdownMenu.Trigger aria-label="Abrir menu principal" title="Menu principal" className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-brand-gold bg-black text-white outline-none transition hover:bg-brand-gold/10 focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0">
@@ -493,12 +495,18 @@ function App() {
                    >
                      <Award size={16} /> Desempenho e Conquistas
                    </DropdownMenu.Item>
-                   <DropdownMenu.Item
-                     onSelect={() => setLocation('/changelogs')}
+                    <DropdownMenu.Item
+                      onSelect={() => setLocation('/changelogs')}
                      className="flex cursor-pointer items-center gap-2 rounded px-2 py-2 outline-none transition hover:bg-brand-gold/10 hover:text-brand-gold focus:bg-brand-gold/10 focus:text-brand-gold"
                    >
-                     <History size={16} /> Changelogs
-                   </DropdownMenu.Item>
+                      <History size={16} /> Changelogs
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item
+                      onSelect={() => setLocation('/faq')}
+                      className="flex cursor-pointer items-center gap-2 rounded px-2 py-2 outline-none transition hover:bg-brand-gold/10 hover:text-brand-gold focus:bg-brand-gold/10 focus:text-brand-gold"
+                    >
+                      <CircleHelp size={16} /> F.A.Q.
+                    </DropdownMenu.Item>
                    <DropdownMenu.Item disabled className="flex items-center gap-2 rounded px-2 py-2 text-brand-text-muted/70 outline-none">
                      <BookOpen size={16} /> Blog CineRats <span className="text-xs text-brand-gold-alt">(em breve)</span>
                    </DropdownMenu.Item>
@@ -519,7 +527,7 @@ function App() {
             {isProfileRoute && viewedUser && <aside className="contents xl:flex xl:flex-col xl:gap-5"><div className="order-1 xl:order-none"><ProfileSummary user={viewedUser} users={users} currentUserId={authenticatedSession.id} movies={personalMovies} series={userSeries} isLoading={achievementsLoading} onSelectUser={selectUser} /></div><div className="order-3 xl:order-none"><UserSidebar users={users} currentUserId={authenticatedSession.id} selectedUserId={selectedUserId || authenticatedSession.id} onSelectUser={selectUser} isOpen={false} onClose={() => undefined} section="discover" /></div></aside>}
 
             <main className={`order-2 min-w-0 rounded-3xl border border-[#151b28] bg-[#06080d] p-4 xl:order-none sm:p-7 lg:p-9 ${matchMovie || matchSerie || isPersonRoute ? 'overflow-hidden' : ''}`}>
-              {matchChangelogs ? <ChangelogsScreen /> : matchMovie ? <MovieDetailScreen id={movieParams.id} currentUserId={session.id} /> : matchSerie ? <SeriesDetailScreen id={serieParams.id} currentUserId={session.id} /> : matchActor ? <PersonDetailScreen id={actorParams.id} mode="actor" /> : matchDirector ? <PersonDetailScreen id={directorParams.id} mode="director" /> : matchImportTvTime ? <ImportTvTimePage currentUserId={session.id} onBack={() => setLocation(`/${authenticatedSession.username}`)} /> : isAchievementsRoute && currentRankedUser ? <RankingScreen user={currentRankedUser} users={users} movies={personalMovies} series={userSeries} currentUserId={session.id} isLoading={personalMoviesQuery.isLoading || userSeriesQuery.isLoading} /> : urlUsername && !viewedUser ? <div className="py-20 text-center text-brand-text-muted">Usuário não encontrado.</div> : viewedUser && <div className="animate-in fade-in duration-500">{activeTab === 'home' && isOwnDashboard ? <HomeScreen userId={session.id} movies={personalMovies} series={userSeries} favoriteGenre={viewedUser.favorite_genre} /> : activeTab === 'dashboard' ? <DashboardTab user={viewedUser} isOwnDashboard={isOwnDashboard} /> : activeTab === 'oscars' ? <OscarPredictionsSection userId={viewedUser.id} canEdit={isOwnDashboard} /> : activeTab === 'movies' ? <PersonalMoviesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /> : activeTab === 'series' ? <SeriesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /> : <><PersonalMoviesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /><SeriesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /></>}</div>}
+              {matchFaq ? <FaqScreen /> : matchChangelogs ? <ChangelogsScreen /> : matchMovie ? <MovieDetailScreen id={movieParams.id} currentUserId={session.id} /> : matchSerie ? <SeriesDetailScreen id={serieParams.id} currentUserId={session.id} /> : matchActor ? <PersonDetailScreen id={actorParams.id} mode="actor" /> : matchDirector ? <PersonDetailScreen id={directorParams.id} mode="director" /> : matchImportTvTime ? <ImportTvTimePage currentUserId={session.id} onBack={() => setLocation(`/${authenticatedSession.username}`)} /> : isAchievementsRoute && currentRankedUser ? <RankingScreen user={currentRankedUser} users={users} movies={personalMovies} series={userSeries} currentUserId={session.id} isLoading={personalMoviesQuery.isLoading || userSeriesQuery.isLoading} /> : urlUsername && !viewedUser ? <div className="py-20 text-center text-brand-text-muted">Usuário não encontrado.</div> : viewedUser && <div className="animate-in fade-in duration-500">{activeTab === 'home' && isOwnDashboard ? <HomeScreen userId={session.id} movies={personalMovies} series={userSeries} favoriteGenre={viewedUser.favorite_genre} /> : activeTab === 'dashboard' ? <DashboardTab user={viewedUser} isOwnDashboard={isOwnDashboard} /> : activeTab === 'oscars' ? <OscarPredictionsSection userId={viewedUser.id} canEdit={isOwnDashboard} /> : activeTab === 'movies' ? <PersonalMoviesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /> : activeTab === 'series' ? <SeriesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /> : <><PersonalMoviesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /><SeriesSection userId={viewedUser.id} canEdit={isOwnDashboard} currentUserId={session.id} /></>}</div>}
             </main>
 
             {isProfileRoute && viewedUser && <aside className="order-4 flex flex-col gap-5 xl:order-none"><LatestUpdatesSection /><UserSidebar users={users} currentUserId={session.id} selectedUserId={selectedUserId || session.id} onSelectUser={selectUser} isOpen={false} onClose={() => undefined} section="ranking" /></aside>}

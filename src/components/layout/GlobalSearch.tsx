@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Loader2, Search, Film, UserRound } from 'lucide-react';
 import { useLocation } from 'wouter';
 import type { RankedUser } from '../../types/app';
@@ -18,6 +18,7 @@ export default function GlobalSearch({ users, onSelectUser, mobileOpen = false, 
   const [results, setResults] = useState<TMDBMultiResult[]>([]);
   const [personResults, setPersonResults] = useState<TMDBPerson[]>([]);
   const [loading, setLoading] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [, setLocation] = useLocation();
 
   useEffect(() => {
@@ -57,6 +58,7 @@ export default function GlobalSearch({ users, onSelectUser, mobileOpen = false, 
   const close = () => {
     setQuery('');
     setFocused(false);
+    inputRef.current?.blur();
     onMobileOpenChange?.(false);
   };
 
@@ -64,6 +66,7 @@ export default function GlobalSearch({ users, onSelectUser, mobileOpen = false, 
     <div className={`relative z-40 w-full max-w-2xl transition-all max-md:max-w-none ${mobileOpen ? 'max-md:w-full' : 'max-md:w-10'}`}>
       <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-gold" />
       <input
+        ref={inputRef}
         type="search"
         value={query}
         onChange={(event) => {
@@ -72,6 +75,7 @@ export default function GlobalSearch({ users, onSelectUser, mobileOpen = false, 
           setPersonResults([]);
           if (!event.target.value.trim()) setLoading(false);
         }}
+        onPointerDown={() => { if (!mobileOpen) onMobileOpenChange?.(true); }}
         onFocus={() => { setFocused(true); onMobileOpenChange?.(true); }}
         onBlur={() => window.setTimeout(() => { setFocused(false); onMobileOpenChange?.(false); }, 180)}
         placeholder="Pesquisar usuários, filmes, séries e pessoas"

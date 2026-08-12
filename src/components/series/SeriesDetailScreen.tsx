@@ -396,7 +396,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
               </>
             )}
 
-            {(!userSeriesDoc || userSeriesDoc.status === 'watchlist') && (
+            {userSeriesDoc?.status !== 'watched' && (
               <button
                 onClick={() => setIsWatchedTimingOpen(true)}
                 disabled={isPending}

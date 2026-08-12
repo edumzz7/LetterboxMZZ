@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOGS: ChangelogEntry[] = [
   {
+    date: '2026-08-12',
+    title: 'Novidades e correções',
+    items: [
+      'Blindagem da pontuação na adição de séries como vistas, com um modal de confirmação da data de consumo da mídia.',
+      'Correção de bug no comportamento mobile durante uma sequência de pesquisas.',
+      'Criação da página de F.A.Q.',
+    ],
+  },
+  {
     date: '2026-08-10',
     title: 'Novidades e correções',
     items: [

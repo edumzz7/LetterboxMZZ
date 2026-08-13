@@ -10,7 +10,7 @@ export default function LatestUpdatesSection() {
         <div>
           <p className="mb-2 font-semibold text-brand-text">10/08 - NEW</p>
           <ul className="list-inside list-disc space-y-1.5 pl-1 text-brand-text-muted/90">
-            <li>Implementada tela de F.A.Q (link para a página <button type="button" onClick={() => setLocation('/faq')} className="cursor-pointer text-brand-text underline decoration-brand-gold/60 underline-offset-2 transition hover:text-brand-gold">faq</button>)</li>
+            <li>Implementada tela de <button type="button" onClick={() => setLocation('/faq')} className="cursor-pointer text-brand-text underline decoration-brand-gold/60 underline-offset-2 transition hover:text-brand-gold">F.A.Q.</button></li>
             <li><button type="button" onClick={() => setLocation('/changelogs')} className="cursor-pointer text-brand-text underline decoration-brand-gold/60 underline-offset-2 transition hover:text-brand-gold">Changelogs</button> completo</li>
             <li>Adição da tela Home com as tendências da semana e sugestões por gênero e última mídia assistida</li>
             <li>Implementação da recuperação de senha</li>

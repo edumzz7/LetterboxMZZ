@@ -431,6 +431,7 @@ export default function MovieCard({
           onSkip={async (stars) => {
             await handleRate(stars, movie.review);
           }}
+          watchedAt={movie.status === 'watched' ? movie.created_at : null}
         />
       )}
 

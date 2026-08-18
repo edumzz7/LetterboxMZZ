@@ -1160,12 +1160,24 @@ export async function rateMovie(
       const entry = watchEntriesRes.data.find((e) => e.id === movieId);
       const providerExternalId = entry?.providerExternalId ?? movieId;
 
-      await apiClient.post('/reviews', {
+      // Prepare request body
+      const requestBody: {
+        providerExternalId: string;
+        type: string;
+        rating: number;
+        review?: string;
+      } = {
         providerExternalId,
         type: 'movie',
         rating: stars,
-        review: review ?? undefined,
-      });
+      };
+
+      // Only include review if it has content
+      if (review && review.trim()) {
+        requestBody.review = review;
+      }
+
+      await apiClient.post('/reviews', requestBody);
     },
     () => localData.rateMovie(actorUserId, movieId, _movieTitle, stars, review),
   );
@@ -1184,12 +1196,24 @@ export async function rateSeries(
       const entry = watchEntriesRes.data.find((e) => e.id === seriesId);
       const providerExternalId = entry?.providerExternalId ?? seriesId;
 
-      await apiClient.post('/reviews', {
+      // Prepare request body
+      const requestBody: {
+        providerExternalId: string;
+        type: string;
+        rating: number;
+        review?: string;
+      } = {
         providerExternalId,
         type: 'series',
         rating: stars,
-        review: review ?? undefined,
-      });
+      };
+
+      // Only include review if it has content
+      if (review && review.trim()) {
+        requestBody.review = review;
+      }
+
+      await apiClient.post('/reviews', requestBody);
     },
     () => localData.rateSeries(actorUserId, seriesId, stars, review),
   );

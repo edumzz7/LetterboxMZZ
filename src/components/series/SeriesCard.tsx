@@ -747,6 +747,7 @@ export default function SeriesCard({
           onSkip={async (stars) => {
             await handleRate(stars, series.review);
           }}
+          watchedAt={series.status === 'watched' ? series.created_at : null}
         />
       )}
 

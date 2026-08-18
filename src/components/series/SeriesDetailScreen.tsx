@@ -727,6 +727,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
           onSkip={async (stars) => {
             await handleSaveRatingAndReview(stars, userSeriesDoc.review || '');
           }}
+          watchedAt={userSeriesDoc.status === 'watched' ? userSeriesDoc.created_at : null}
         />
       )}
 

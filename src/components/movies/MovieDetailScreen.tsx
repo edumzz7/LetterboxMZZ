@@ -507,6 +507,7 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
           onSave={async (stars, text) => {
             await handleSaveRatingAndReview(stars, text);
           }}
+          watchedAt={userMovieDoc.status === 'watched' ? userMovieDoc.created_at : null}
         />
       )}
 

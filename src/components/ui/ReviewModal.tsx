@@ -1,9 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, Clock, AlertCircle } from 'lucide-react';
 import clsx from 'clsx';
 import StarRatingInput from './StarRatingInput';
 import { generateImagePath } from '../../lib/imageUtils';
+import {
+  validateReviewText,
+  sanitizeReviewText,
+  MIN_REVIEW_LENGTH,
+  getReviewDeadlineMessage,
+  canEarnPointsForReview,
+} from '../../lib/reviewValidation';
 
 interface ReviewModalProps {
   isOpen: boolean;
@@ -15,6 +22,7 @@ interface ReviewModalProps {
   isReadOnly: boolean;
   onSave: (rating: number, review: string) => Promise<void> | void;
   onSkip?: (rating: number) => Promise<void> | void;
+  watchedAt?: Date | string | null; // Data em que foi assistido (para deadline de 72h)
 }
 
 export default function ReviewModal({
@@ -27,6 +35,7 @@ export default function ReviewModal({
   isReadOnly,
   onSave,
   onSkip,
+  watchedAt,
 }: ReviewModalProps) {
   const [rating, setRating] = useState(Number(initialRating) || 0);
   const [review, setReview] = useState(initialReview);
@@ -42,15 +51,49 @@ export default function ReviewModal({
     }
   }, [isOpen, initialRating, initialReview]);
 
+  // Calcular caracteres após sanitização
+  const sanitizedLength = useMemo(() => {
+    return sanitizeReviewText(review).length;
+  }, [review]);
+
+  // Validar se pode ganhar pontos (dentro de 72h)
+  const canEarnPoints = useMemo(() => {
+    if (!watchedAt) return true; // Se não temos a data, assumimos que pode
+    return canEarnPointsForReview(watchedAt);
+  }, [watchedAt]);
+
+  // Mensagem de deadline
+  const deadlineMessage = useMemo(() => {
+    if (!watchedAt) return null;
+    return getReviewDeadlineMessage(watchedAt);
+  }, [watchedAt]);
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    // Validar review text antes de enviar (apenas se tiver conteúdo)
+    // Review é opcional, então só validamos se o usuário começou a escrever
+    if (review && review.trim()) {
+      const validationError = validateReviewText(review);
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
+    }
+
     setIsSaving(true);
     try {
       await onSave(rating, review);
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Falha ao salvar resenha.');
+      // Tratar erro 422 específico da API
+      const errorMessage = err instanceof Error ? err.message : 'Falha ao salvar resenha.';
+      if (errorMessage.includes('at least 25 characters') || errorMessage.includes('mínimo')) {
+        setError(`A review deve ter no mínimo ${MIN_REVIEW_LENGTH} caracteres (sem contar espaços extras)`);
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setIsSaving(false);
     }
@@ -125,11 +168,51 @@ export default function ReviewModal({
                 <textarea
                   value={review}
                   onChange={(e) => setReview(e.target.value)}
-                  className="w-full min-h-[120px] bg-[#0a0f1e] border border-[#222] text-brand-text p-3.5 rounded-xl focus:outline-none focus:border-brand-gold transition-colors text-sm placeholder-brand-text-muted resize-none"
+                  className={clsx(
+                    "w-full min-h-[120px] bg-[#0a0f1e] border text-brand-text p-3.5 rounded-xl focus:outline-none transition-colors text-sm placeholder-brand-text-muted resize-none",
+                    review && sanitizedLength < MIN_REVIEW_LENGTH
+                      ? "border-red-400/50 focus:border-red-400"
+                      : "border-[#222] focus:border-brand-gold"
+                  )}
                   placeholder="Escreva seus pensamentos sobre esta obra (opcional)..."
                   disabled={isSaving || isSkipping}
                   maxLength={1000}
                 />
+                {/* Contador de caracteres */}
+                {review && (
+                  <div className="flex items-center justify-between text-xs">
+                    <span className={clsx(
+                      "font-light",
+                      sanitizedLength >= MIN_REVIEW_LENGTH ? "text-green-400" : "text-red-400"
+                    )}>
+                      {sanitizedLength}/{MIN_REVIEW_LENGTH} caracteres
+                    </span>
+                    {sanitizedLength < MIN_REVIEW_LENGTH && (
+                      <span className="text-brand-text-muted flex items-center gap-1">
+                        <AlertCircle size={12} />
+                        Mínimo não atingido
+                      </span>
+                    )}
+                  </div>
+                )}
+                {/* Indicador de deadline de 72h */}
+                {watchedAt && deadlineMessage && (
+                  <div className={clsx(
+                    "flex items-center gap-2 text-xs p-2 rounded-lg border",
+                    canEarnPoints
+                      ? "bg-green-950/20 border-green-500/30 text-green-400"
+                      : "bg-yellow-950/20 border-yellow-500/30 text-yellow-400"
+                  )}>
+                    <Clock size={14} />
+                    <span>{deadlineMessage}</span>
+                  </div>
+                )}
+                {watchedAt && !canEarnPoints && (
+                  <div className="flex items-center gap-2 text-xs p-2 rounded-lg border bg-gray-950/20 border-gray-500/30 text-gray-400">
+                    <AlertCircle size={14} />
+                    <span>Prazo de 72h expirado. Você não ganhará pontos por esta review.</span>
+                  </div>
+                )}
               </div>
             )}
 

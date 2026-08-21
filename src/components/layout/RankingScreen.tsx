@@ -12,8 +12,7 @@ import {
   type Achievement,
   type AchievementProgressContext,
 } from '../../lib/achievements';
-import { listFavorites, listUserActivity } from '../../lib/appData';
-import { countFavoritedBy } from '../../lib/localData';
+import { listUserAchievementIds, listUserActivity } from '../../lib/appData';
 import { getFavoriteGenreLabel } from '../../lib/favoriteGenres';
 import type { ActivityEntry, PersonalMovie, RankedUser, SeriesEntry } from '../../types/app';
 
@@ -182,14 +181,9 @@ function AchievementCard({
 
 export default function RankingScreen({ user, users, movies, series, currentUserId, isLoading = false }: RankingScreenProps) {
   const { predictionsQuery } = useOscarPredictions(currentUserId);
-  const favoritesQuery = useQuery({
-    queryKey: ['user_favorites_list', currentUserId],
-    queryFn: () => listFavorites(currentUserId),
-    enabled: Boolean(currentUserId),
-  });
-  const favoritedByQuery = useQuery({
-    queryKey: ['favorited_by_count', currentUserId],
-    queryFn: () => countFavoritedBy(currentUserId),
+  const achievementIdsQuery = useQuery({
+    queryKey: ['user_achievement_ids', currentUserId],
+    queryFn: () => listUserAchievementIds(currentUserId),
     enabled: Boolean(currentUserId),
   });
   const activitiesQuery = useQuery({
@@ -199,7 +193,7 @@ export default function RankingScreen({ user, users, movies, series, currentUser
   });
 
   const predictions = useMemo(() => predictionsQuery.data || [], [predictionsQuery.data]);
-  const favorites = favoritesQuery.data || [];
+  const achievementIds = useMemo(() => new Set(achievementIdsQuery.data || []), [achievementIdsQuery.data]);
   const activities = useMemo(() => activitiesQuery.data || [], [activitiesQuery.data]);
   const favoriteDirector = getFavoriteDirector(movies);
   const favoriteGenre = getFavoriteGenreLabel(user.favorite_genre);
@@ -214,10 +208,10 @@ export default function RankingScreen({ user, users, movies, series, currentUser
     users,
     userId: currentUserId,
     predictions,
-    favoritesCount: favorites.length,
-    favoritedByCount: favoritedByQuery.data || 0,
+    favoritesCount: achievementIds.has('vereador') ? 10 : 0,
+    favoritedByCount: achievementIds.has('eleito') ? 10 : 0,
     activities,
-  }), [activities, currentUserId, favoritedByQuery.data, favorites.length, movies, predictions, series, users]);
+  }), [achievementIds, activities, currentUserId, movies, predictions, series, users]);
 
   const achievementEntries = useMemo(() => {
     const unlockedIds = new Set(ACHIEVEMENTS.filter((achievement) => achievement.check(
@@ -243,7 +237,7 @@ export default function RankingScreen({ user, users, movies, series, currentUser
 
   const unlockedCount = achievementEntries.filter((entry) => entry.unlocked).length;
   const nextAchievement = achievementEntries.find((entry) => !entry.unlocked) || null;
-  const loading = isLoading || predictionsQuery.isLoading || favoritesQuery.isLoading || favoritedByQuery.isLoading || activitiesQuery.isLoading;
+  const loading = isLoading || predictionsQuery.isLoading || achievementIdsQuery.isLoading || activitiesQuery.isLoading;
 
   if (loading) {
     return (

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Film, Loader2, Lock, UserRound } from 'lucide-react';
+import { Film, Loader2, Lock, Mail, UserRound } from 'lucide-react';
 
 type Mode = 'login' | 'register';
 
@@ -117,7 +117,7 @@ export default function AuthScreen({
                   E-mail
                 </label>
                 <div className="flex items-center gap-3 border border-[#222] rounded-2xl px-4 py-3 bg-[#090d18]">
-                  <UserRound size={16} className="text-brand-gold-alt shrink-0 opacity-0" />
+                  <Mail size={16} className="text-brand-gold-alt shrink-0" />
                   <input
                     id="email"
                     type="email"

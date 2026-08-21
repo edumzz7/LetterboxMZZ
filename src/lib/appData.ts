@@ -71,6 +71,28 @@ export async function listFavorites(ownerUserId: string): Promise<UserFavorite[]
   );
 }
 
+export async function listUserAchievementIds(userId: string): Promise<string[]> {
+  return withFallback(
+    async () => {
+      const response = await apiClient.get<{ key?: string; id?: string }[]>(`/users/${userId}/achievements`);
+      return response.data
+        .map((achievement) => achievement.key ?? achievement.id)
+        .filter((key): key is string => Boolean(key));
+    },
+    async () => {
+      const [favorites, favoritedByCount] = await Promise.all([
+        localData.listFavorites(userId),
+        localData.countFavoritedBy(userId),
+      ]);
+
+      return [
+        ...(favorites.length >= 10 ? ['vereador'] : []),
+        ...(favoritedByCount >= 10 ? ['eleito'] : []),
+      ];
+    },
+  );
+}
+
 export async function addFavorite(favoriteUserId: string, ownerUserId: string): Promise<UserFavorite> {
   return withFallback(
     async () => {

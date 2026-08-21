@@ -333,6 +333,18 @@ const MOVIE_GENRES: Record<string, string> = {
   'django livre': 'western', 'por um punhado de dólares': 'western', 'os oito odiados': 'western'
 };
 
+function countRatedMovies(movies: PersonalMovie[], rating: number) {
+  return movies.filter(
+    (movie) => movie.status === 'watched' && (movie.rating === rating || movie.avaliacao === rating),
+  ).length;
+}
+
+function countRatedSeries(series: SeriesEntry[], rating: number) {
+  return series.filter(
+    (item) => item.status !== 'watchlist' && (item.rating === rating || item.avaliacao === rating),
+  ).length;
+}
+
 export const ACHIEVEMENTS: Achievement[] = [
   // FILMES
   {
@@ -739,9 +751,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     secret: true,
     level: 3,
     check: (movies, series) => {
-      const mCount = movies.filter((m) => m.status === 'watched' && (m.rating === 1 || m.avaliacao === 1)).length;
-      const sCount = series.filter((s) => (s.rating === 1 || s.avaliacao === 1)).length;
-      return mCount + sCount >= 10;
+      return countRatedMovies(movies, 1) + countRatedSeries(series, 1) >= 10;
     },
   },
   {
@@ -752,9 +762,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     secret: true,
     level: 3,
     check: (movies, series) => {
-      const mCount = movies.filter((m) => m.status === 'watched' && (m.rating === 5 || m.avaliacao === 5)).length;
-      const sCount = series.filter((s) => (s.rating === 5 || s.avaliacao === 5)).length;
-      return mCount + sCount >= 20;
+      return countRatedMovies(movies, 5) + countRatedSeries(series, 5) >= 20;
     },
   },
   {
@@ -1141,8 +1149,8 @@ export function getAchievementProgress(
     case 'review_20': return progressRatio(reviews, 20);
     case 'oscar_bet': return progressRatio(predictions.length, 1);
     case 'oscar_tigrinho': return progressRatio(predictions.length, 5);
-    case 'hater': return progressRatio(movies.filter((movie) => movie.rating === 1 || movie.avaliacao === 1).length + series.filter((item) => item.rating === 1 || item.avaliacao === 1).length, 10);
-    case 'coracao_mole': return progressRatio(movies.filter((movie) => movie.rating === 5 || movie.avaliacao === 5).length + series.filter((item) => item.rating === 5 || item.avaliacao === 5).length, 20);
+    case 'hater': return progressRatio(countRatedMovies(movies, 1) + countRatedSeries(series, 1), 10);
+    case 'coracao_mole': return progressRatio(countRatedMovies(movies, 5) + countRatedSeries(series, 5), 20);
     case 'director_fan': return progressRatio(directorFanCount, 5);
     case 'founder': return unlocked ? 100 : 0;
     case 'je_parlo_mucho': return progressRatio(uniqueNonEnglishLanguages(movies), 3);

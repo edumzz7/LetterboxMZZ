@@ -5,8 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getUnlockedAchievements, type Achievement } from '../../lib/achievements';
 import type { PersonalMovie, SeriesEntry, RankedUser } from '../../types/app';
 import { useOscarPredictions } from '../../hooks/useOscarPredictions';
-import { listFavorites, listUserActivity } from '../../lib/appData';
-import { countFavoritedBy } from '../../lib/localData';
+import { listUserAchievementIds, listUserActivity } from '../../lib/appData';
 
 interface AchievementBadgeProps {
   achievement: Achievement;
@@ -115,7 +114,6 @@ interface UserAchievementsProps {
   series: SeriesEntry[];
   users: RankedUser[];
   userId: string;
-  currentUserId: string;
   isLoading?: boolean;
   maxVisible?: number;
 }
@@ -125,7 +123,6 @@ export default function UserAchievements({
   series,
   users,
   userId,
-  currentUserId,
   isLoading = false,
   maxVisible,
 }: UserAchievementsProps) {
@@ -134,16 +131,10 @@ export default function UserAchievements({
   const isPredictionsLoading = predictionsQuery.isLoading;
   const predictions = predictionsQuery.data || [];
 
-  const { data: userFavorites = [], isLoading: favsLoading } = useQuery({
-    queryKey: ['user_favorites_list', userId],
-    queryFn: () => listFavorites(currentUserId),
-    enabled: !!userId && userId === currentUserId,
-  });
-
-  const { data: favoritedByCount = 0, isLoading: favoritedByLoading } = useQuery({
-    queryKey: ['favorited_by_count', userId],
-    queryFn: () => countFavoritedBy(userId),
-    enabled: !!userId && userId === currentUserId,
+  const { data: userAchievementIds = [], isLoading: achievementsLoading } = useQuery({
+    queryKey: ['user_achievement_ids', userId],
+    queryFn: () => listUserAchievementIds(userId),
+    enabled: !!userId,
   });
 
   const { data: userActivities = [], isLoading: activitiesLoading } = useQuery({
@@ -152,7 +143,7 @@ export default function UserAchievements({
     enabled: !!userId,
   });
 
-  if (isLoading || isPredictionsLoading || favsLoading || favoritedByLoading || activitiesLoading) {
+  if (isLoading || isPredictionsLoading || achievementsLoading || activitiesLoading) {
     return (
       <div className="flex items-center gap-1.5 opacity-50 py-1">
         <Icons.Loader2 size={12} className="animate-spin text-brand-gold" />
@@ -161,14 +152,15 @@ export default function UserAchievements({
     );
   }
 
+  const favoriteAchievementIds = new Set(userAchievementIds);
   const unlocked = getUnlockedAchievements(
     movies,
     series,
     users,
     userId,
     predictions,
-    userFavorites.length,
-    favoritedByCount,
+    favoriteAchievementIds.has('vereador') ? 10 : 0,
+    favoriteAchievementIds.has('eleito') ? 10 : 0,
     userActivities
   );
 

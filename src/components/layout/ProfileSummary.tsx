@@ -69,7 +69,7 @@ export default function ProfileSummary({ user, users, currentUserId, movies, ser
 
       {slide === 'profile' && <div className="mt-4 border-t border-white/10 pt-3">
         <p className="text-center text-[9px] font-semibold uppercase tracking-[0.22em] text-brand-gold-alt">Insígnias</p>
-        <div className="mt-3 flex justify-center"><UserAchievements movies={movies} series={series} users={users} userId={user.id} currentUserId={currentUserId} isLoading={isLoading} maxVisible={10} /></div>
+        <div className="mt-3 flex justify-center"><UserAchievements movies={movies} series={series} users={users} userId={user.id} isLoading={isLoading} maxVisible={10} /></div>
       </div>}
 
       {false && <div className="mt-5 border-t border-white/10 pt-4">

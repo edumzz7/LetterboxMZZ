@@ -612,7 +612,6 @@ function App() {
                     series={userSeries}
                     users={users}
                     userId={selectedUserId}
-                    currentUserId={session.id}
                     isLoading={achievementsLoading}
                   />
                 ) : null

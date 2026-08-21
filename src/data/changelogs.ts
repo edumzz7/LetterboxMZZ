@@ -1,10 +1,29 @@
 export interface ChangelogEntry {
   date: string;
   title: string;
-  items: string[];
+  items: Array<string | ChangelogLinkItem>;
+}
+
+export interface ChangelogLinkItem {
+  before: string;
+  linkText: string;
+  linkHref: string;
+  after?: string;
 }
 
 export const CHANGELOGS: ChangelogEntry[] = [
+  {
+    date: '2026-08-17',
+    title: 'Sistema de pontos',
+    items: [
+      {
+        before: 'Atualização no sistema de pontos, detalhes em ',
+        linkText: 'Conquistas',
+        linkHref: '/conquistas',
+        after: '.',
+      },
+    ],
+  },
   {
     date: '2026-08-12',
     title: 'Novidades e correções',

@@ -1,4 +1,5 @@
 import { CalendarDays, Sparkles } from 'lucide-react';
+import { useLocation } from 'wouter';
 import { CHANGELOGS } from '../../data/changelogs';
 
 function formatDate(date: string) {
@@ -10,6 +11,8 @@ function formatDate(date: string) {
 }
 
 export default function ChangelogsScreen() {
+  const [, setLocation] = useLocation();
+
   return (
     <div className="animate-in fade-in duration-500 space-y-10">
       <header className="border-b border-[#151515] pb-8">
@@ -42,8 +45,16 @@ export default function ChangelogsScreen() {
                 </div>
                 <ul className="mt-5 space-y-4 text-sm font-light leading-relaxed text-brand-text-muted">
                   {entry.items.map((item) => (
-                    <li key={item} className="relative pl-5 before:absolute before:left-0 before:top-[0.65em] before:h-1.5 before:w-1.5 before:rounded-full before:bg-brand-gold">
-                      {item}
+                    <li key={typeof item === 'string' ? item : `${item.before}-${item.linkHref}`} className="relative pl-5 before:absolute before:left-0 before:top-[0.65em] before:h-1.5 before:w-1.5 before:rounded-full before:bg-brand-gold">
+                      {typeof item === 'string' ? item : (
+                        <>
+                          {item.before}
+                          <button type="button" onClick={() => setLocation(item.linkHref)} className="text-brand-text underline decoration-brand-gold/60 underline-offset-2 transition hover:text-brand-gold">
+                            {item.linkText}
+                          </button>
+                          {item.after}
+                        </>
+                      )}
                     </li>
                   ))}
                 </ul>

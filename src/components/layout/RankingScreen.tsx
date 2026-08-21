@@ -1,5 +1,5 @@
 import type React from 'react';
-import { createElement, useMemo } from 'react';
+import { createElement, useEffect, useMemo } from 'react';
 import * as Icons from 'lucide-react';
 import clsx from 'clsx';
 import { useQuery } from '@tanstack/react-query';
@@ -64,14 +64,14 @@ const SECRET_META = {
 const HEX_CLIP_PATH = 'polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0 50%)';
 
 const MCOIN_RULES = [
-  ['Assistir a um filme', '+30 MC'],
-  ['Assistir a um filme indicado', '+40 MC'],
-  ['Iniciar uma série', '+20 MC'],
-  ['Finalizar uma série', '+50 MC'],
+  ['Assistir a uma mídia', '1 MC a cada 10 min'],
+  ['Limite diário de consumo', '24 MC'],
+  ['Assistir a uma mídia indicada', '+1 MC de bônus'],
+  ['Bônus para quem indicou após a mídia ser assistida', '+3 MC'],
   ['Indicar um filme ou série', '+5 MC'],
-  ['Avaliar um filme ou série', '+5 MC'],
-  ['Escrever uma resenha', '+5 MC'],
-  ['Reagir a um filme ou receber indicação', '0 MC'],
+  ['Avaliar uma mídia dentro de 72h', '+2 MC'],
+  ['Escrever uma resenha dentro de 72h', '+2 MC'],
+  ['Adicionar à watchlist ou reagir', '0 MC'],
 ];
 
 function getIcon(achievement: Achievement): React.ElementType {
@@ -239,6 +239,19 @@ export default function RankingScreen({ user, users, movies, series, currentUser
   const nextAchievement = achievementEntries.find((entry) => !entry.unlocked) || null;
   const loading = isLoading || predictionsQuery.isLoading || achievementIdsQuery.isLoading || activitiesQuery.isLoading;
 
+  useEffect(() => {
+    if (loading || window.location.hash !== '#pontuacao') return;
+
+    const target = document.getElementById('pontuacao');
+    if (!target) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [loading]);
+
   if (loading) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center gap-3 text-brand-gold">
@@ -326,7 +339,7 @@ export default function RankingScreen({ user, users, movies, series, currentUser
         </div>
       </section>
 
-      <section className="rounded-3xl border border-[#151b28] bg-[#06080d] p-5 sm:p-7">
+      <section id="pontuacao" className="scroll-mt-6 rounded-3xl border border-[#151b28] bg-[#06080d] p-5 sm:p-7">
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-brand-gold/30 bg-brand-gold/10 text-brand-gold"><Icons.Coins size={19} /></div>
           <div>
@@ -342,7 +355,7 @@ export default function RankingScreen({ user, users, movies, series, currentUser
             </div>
           ))}
         </div>
-        <p className="mt-4 text-[11px] leading-relaxed text-brand-text-muted">Ações retroativas não geram MCoins. Alterar uma avaliação ou resenha já pontuada também não gera pontos novamente.</p>
+        <p className="mt-4 text-[11px] leading-relaxed text-brand-text-muted">Ações retroativas não geram MCoins. Resenhas precisam ter pelo menos 25 caracteres e ser feitas em até 72 horas após o consumo. Alterar uma avaliação ou resenha já pontuada não gera pontos novamente.</p>
       </section>
     </div>
   );

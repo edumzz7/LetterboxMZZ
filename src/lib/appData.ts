@@ -1092,31 +1092,152 @@ export async function updateSeries(
 
       // Episode progress: append a new watch-entry (table is append-only)
       if (updates.episodios_vistos !== undefined) {
-        const res = await apiClient.post<{ id: string; type: string; points: number; providerExternalId: string; season?: number | null; episode?: number | null; createdAt: string }>('/watch-entries', {
-          type: 'series',
-          providerExternalId,
-          season: updates.temporada,
-          episode: updates.episodios_vistos,
-          isRetroactive: updates.is_retroactive ?? false,
-        });
-        return {
-          id: res.data.id,
-          user_id: '',
-          titulo: itemTitle ?? '',
-          capa_url: itemPosterPath ?? null,
-          status: updates.status ?? 'watching',
-          source_movie_id: providerExternalId,
-          temporada: res.data.season ?? updates.temporada ?? 1,
-          total_episodios: updates.total_episodios ?? 0,
-          episodios_vistos: updates.episodios_vistos,
-          plataforma_slug: updates.plataforma_slug ?? null,
-          avaliacao: updates.avaliacao ?? null,
-          rating: null,
-          review: null,
-          streaming_data: null,
-          created_at: res.data.createdAt,
-          is_retroactive: updates.is_retroactive,
-        } as SeriesEntry;
+        // Get current series data to determine previous episode
+        let previousEpisode = 0;
+        let previousSeason = updates.temporada ?? 1;
+
+        try {
+          const weRes = await apiClient.get<{ id: string; type: string; providerExternalId: string; season?: number | null; episode?: number | null; createdAt: string }[]>('/watch-entries');
+          const seriesEntries = weRes.data
+            .filter((e) => e.type === 'series' && e.providerExternalId === providerExternalId)
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+          if (seriesEntries.length > 0) {
+            const lastEntry = seriesEntries[0];
+            previousEpisode = lastEntry.episode ?? 0;
+            previousSeason = lastEntry.season ?? 1;
+          }
+        } catch {
+          // If we can't get previous data, just mark the single episode
+          previousEpisode = 0;
+        }
+
+        const currentSeason = updates.temporada ?? 1;
+        const currentEpisode = updates.episodios_vistos;
+
+        // Calculate episodes to mark
+        const episodes: Array<{ season: number; episode: number }> = [];
+
+        if (currentSeason === previousSeason) {
+          // Same season: mark all episodes from previous + 1 to current
+          for (let ep = previousEpisode + 1; ep <= currentEpisode; ep++) {
+            episodes.push({ season: currentSeason, episode: ep });
+          }
+        } else if (currentSeason > previousSeason) {
+          // Different season: need to fetch TMDB data to know how many episodes each season has
+          try {
+            const tmdbDetails = await getTvDetailsWithCache(Number(providerExternalId));
+            if (tmdbDetails && tmdbDetails.seasons) {
+              const regularSeasons = tmdbDetails.seasons
+                .filter((s) => s.season_number > 0)
+                .sort((a, b) => a.season_number - b.season_number);
+
+              // Complete previous season
+              const prevSeasonData = regularSeasons.find((s) => s.season_number === previousSeason);
+              if (prevSeasonData) {
+                for (let ep = previousEpisode + 1; ep <= prevSeasonData.episode_count; ep++) {
+                  episodes.push({ season: previousSeason, episode: ep });
+                }
+              }
+
+              // Complete all intermediate seasons
+              for (let s = previousSeason + 1; s < currentSeason; s++) {
+                const seasonData = regularSeasons.find((season) => season.season_number === s);
+                if (seasonData) {
+                  for (let ep = 1; ep <= seasonData.episode_count; ep++) {
+                    episodes.push({ season: s, episode: ep });
+                  }
+                }
+              }
+
+              // Mark episodes in current season up to currentEpisode
+              for (let ep = 1; ep <= currentEpisode; ep++) {
+                episodes.push({ season: currentSeason, episode: ep });
+              }
+            } else {
+              // Fallback: just mark the current episode if can't get TMDB data
+              episodes.push({ season: currentSeason, episode: currentEpisode });
+            }
+          } catch {
+            // Fallback: just mark the current episode
+            episodes.push({ season: currentSeason, episode: currentEpisode });
+          }
+        } else {
+          // Going backwards? Just mark the single episode
+          episodes.push({ season: currentSeason, episode: currentEpisode });
+        }
+
+        // Remove duplicates and episodes already watched
+        const uniqueEpisodes = episodes.filter((ep, index, self) =>
+          index === self.findIndex((e) => e.season === ep.season && e.episode === ep.episode)
+        );
+
+        if (uniqueEpisodes.length === 0) {
+          // No episodes to mark, just return current state
+          return localData.updateSeries(seriesId, updates);
+        }
+
+        // Use batch endpoint if multiple episodes, single endpoint otherwise
+        if (uniqueEpisodes.length > 1) {
+          const res = await apiClient.post<{
+            entries: Array<{ id: string; type: string; points: number; season: number; episode: number; createdAt: string }>;
+            totalPoints: number;
+            providerExternalId: string;
+          }>('/watch-entries/batch', {
+            type: 'series',
+            providerExternalId,
+            episodes: uniqueEpisodes,
+            isRetroactive: updates.is_retroactive ?? false,
+          });
+
+          // Return the last entry as the "current" state
+          const lastEntry = res.data.entries[res.data.entries.length - 1];
+          return {
+            id: lastEntry.id,
+            user_id: '',
+            titulo: itemTitle ?? '',
+            capa_url: itemPosterPath ?? null,
+            status: updates.status ?? 'watching',
+            source_movie_id: providerExternalId,
+            temporada: lastEntry.season,
+            total_episodios: updates.total_episodios ?? 0,
+            episodios_vistos: lastEntry.episode,
+            plataforma_slug: updates.plataforma_slug ?? null,
+            avaliacao: updates.avaliacao ?? null,
+            rating: null,
+            review: null,
+            streaming_data: null,
+            created_at: lastEntry.createdAt,
+            is_retroactive: updates.is_retroactive,
+          } as SeriesEntry;
+        } else {
+          // Single episode: use existing endpoint
+          const res = await apiClient.post<{ id: string; type: string; points: number; providerExternalId: string; season?: number | null; episode?: number | null; createdAt: string }>('/watch-entries', {
+            type: 'series',
+            providerExternalId,
+            season: uniqueEpisodes[0].season,
+            episode: uniqueEpisodes[0].episode,
+            isRetroactive: updates.is_retroactive ?? false,
+          });
+          return {
+            id: res.data.id,
+            user_id: '',
+            titulo: itemTitle ?? '',
+            capa_url: itemPosterPath ?? null,
+            status: updates.status ?? 'watching',
+            source_movie_id: providerExternalId,
+            temporada: res.data.season ?? updates.temporada ?? 1,
+            total_episodios: updates.total_episodios ?? 0,
+            episodios_vistos: updates.episodios_vistos,
+            plataforma_slug: updates.plataforma_slug ?? null,
+            avaliacao: updates.avaliacao ?? null,
+            rating: null,
+            review: null,
+            streaming_data: null,
+            created_at: res.data.createdAt,
+            is_retroactive: updates.is_retroactive,
+          } as SeriesEntry;
+        }
       }
 
       // For other field-level updates (plataforma, avaliacao) fall back to localData

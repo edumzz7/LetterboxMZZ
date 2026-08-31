@@ -748,6 +748,7 @@ export default function SeriesCard({
             await handleRate(stars, series.review);
           }}
           watchedAt={series.status === 'watched' ? series.created_at : null}
+          isRetroactive={Boolean(series.is_retroactive)}
         />
       )}
 

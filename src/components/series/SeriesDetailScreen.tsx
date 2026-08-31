@@ -728,6 +728,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
             await handleSaveRatingAndReview(stars, userSeriesDoc.review || '');
           }}
           watchedAt={userSeriesDoc.status === 'watched' ? userSeriesDoc.created_at : null}
+          isRetroactive={Boolean(userSeriesDoc.is_retroactive)}
         />
       )}
 

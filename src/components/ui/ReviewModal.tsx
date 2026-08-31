@@ -23,6 +23,7 @@ interface ReviewModalProps {
   onSave: (rating: number, review: string) => Promise<void> | void;
   onSkip?: (rating: number) => Promise<void> | void;
   watchedAt?: Date | string | null; // Data em que foi assistido (para deadline de 72h)
+  isRetroactive?: boolean;
 }
 
 export default function ReviewModal({
@@ -36,6 +37,7 @@ export default function ReviewModal({
   onSave,
   onSkip,
   watchedAt,
+  isRetroactive,
 }: ReviewModalProps) {
   const [rating, setRating] = useState(Number(initialRating) || 0);
   const [review, setReview] = useState(initialReview);
@@ -58,15 +60,16 @@ export default function ReviewModal({
 
   // Validar se pode ganhar pontos (dentro de 72h)
   const canEarnPoints = useMemo(() => {
+    if (isRetroactive) return false;
     if (!watchedAt) return true; // Se não temos a data, assumimos que pode
     return canEarnPointsForReview(watchedAt);
-  }, [watchedAt]);
+  }, [isRetroactive, watchedAt]);
 
   // Mensagem de deadline
   const deadlineMessage = useMemo(() => {
-    if (!watchedAt) return null;
+    if (!watchedAt || isRetroactive) return null;
     return getReviewDeadlineMessage(watchedAt);
-  }, [watchedAt]);
+  }, [isRetroactive, watchedAt]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -196,7 +199,13 @@ export default function ReviewModal({
                   </div>
                 )}
                 {/* Indicador de deadline de 72h */}
-                {watchedAt && deadlineMessage && (
+                {isRetroactive && (
+                  <div className="flex items-center gap-2 text-xs p-2 rounded-lg border bg-yellow-950/20 border-yellow-500/30 text-yellow-400">
+                    <AlertCircle size={14} />
+                    <span>Esta mídia foi marcada como vista há mais tempo. Salvar a avaliação ou a resenha não gerará pontos.</span>
+                  </div>
+                )}
+                {!isRetroactive && watchedAt && deadlineMessage && (
                   <div className={clsx(
                     "flex items-center gap-2 text-xs p-2 rounded-lg border",
                     canEarnPoints
@@ -207,7 +216,7 @@ export default function ReviewModal({
                     <span>{deadlineMessage}</span>
                   </div>
                 )}
-                {watchedAt && !canEarnPoints && (
+                {!isRetroactive && watchedAt && !canEarnPoints && (
                   <div className="flex items-center gap-2 text-xs p-2 rounded-lg border bg-gray-950/20 border-gray-500/30 text-gray-400">
                     <AlertCircle size={14} />
                     <span>Prazo de 72h expirado. Você não ganhará pontos por esta review.</span>

@@ -242,11 +242,14 @@ export default function MovieCard({
               <DropdownMenu.Content
                 side="bottom"
                 align="end"
+                onClick={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
                 className="min-w-[180px] bg-[#0a0f1e]/95 backdrop-blur-md border border-[#222] rounded-xl p-1.5 shadow-xl shadow-black/50 z-20 animate-in fade-in zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:zoom-out-95"
               >
                 <DropdownMenu.Item
                   onSelect={(e) => {
                     e.preventDefault();
+                    e.stopPropagation();
                     setTimeout(() => handleOpenSynopsis(), 50);
                   }}
                   className="flex items-center gap-2 px-2 py-2 text-xs text-brand-text rounded-md cursor-pointer outline-none hover:bg-brand-gold/10 hover:text-brand-gold transition-colors focus:bg-brand-gold/10 focus:text-brand-gold"
@@ -270,7 +273,7 @@ export default function MovieCard({
                     )}
                   >
                     <Plus size={14} />
-                    {addedToWatchlist ? 'Adicionado à Wishlist' : 'Adicionar à Wishlist'}
+                    {addedToWatchlist ? 'Adicionado à Watchlist' : 'Adicionar à Watchlist'}
                   </DropdownMenu.Item>
                 )}
 
@@ -280,7 +283,7 @@ export default function MovieCard({
                     className="flex items-center gap-2 px-2 py-2 text-xs text-brand-text rounded-md cursor-pointer outline-none hover:bg-brand-gold/10 hover:text-brand-gold transition-colors focus:bg-brand-gold/10 focus:text-brand-gold"
                   >
                     {isWatched ? <Eye size={14} /> : <EyeOff size={14} />}
-                    {isWatched ? 'Mudar para Wishlist' : 'Marcar como visto'}
+                    {isWatched ? 'Mudar para Watchlist' : 'Marcar como visto'}
                   </DropdownMenu.Item>
                 )}
                 
@@ -432,6 +435,7 @@ export default function MovieCard({
             await handleRate(stars, movie.review);
           }}
           watchedAt={movie.status === 'watched' ? movie.created_at : null}
+          isRetroactive={Boolean(movie.is_retroactive)}
         />
       )}
 

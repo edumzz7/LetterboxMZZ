@@ -508,6 +508,7 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
             await handleSaveRatingAndReview(stars, text);
           }}
           watchedAt={userMovieDoc.status === 'watched' ? userMovieDoc.created_at : null}
+          isRetroactive={Boolean(userMovieDoc.is_retroactive)}
         />
       )}
 

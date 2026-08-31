@@ -548,7 +548,7 @@ export async function listPersonalMovies(userId: string) {
   return withFallback(
     async () => {
       const [watchEntriesRes, watchlistRes, reviewsRes] = await Promise.all([
-        apiClient.get<{ id: string; type: string; points: number; providerExternalId: string; season?: number | null; episode?: number | null; createdAt: string; title: string; posterPath: string | null }[]>(`/users/${userId}/watch-entries`),
+        apiClient.get<{ id: string; type: string; points: number; providerExternalId: string; season?: number | null; episode?: number | null; createdAt: string; title: string; posterPath: string | null; isRetroactive?: boolean; is_retroactive?: boolean }[]>(`/users/${userId}/watch-entries`),
         apiClient.get<{ id: string; providerExternalId: string; type: string; title: string; posterPath: string | null; season?: number | null; episode?: number | null; createdAt: string }[]>(`/watchlist/users/${userId}`),
         apiClient.get<{ id: string; mediaItemId: string; providerExternalId: string; type: 'movie' | 'series'; rating: number; review: string | null; createdAt: string; title: string; posterPath: string | null }[]>(`/users/${userId}/reviews`),
       ]);
@@ -579,6 +579,7 @@ export async function listPersonalMovies(userId: string) {
             review: review?.review ?? null,
             streaming_data: null,
             created_at: e.createdAt,
+            is_retroactive: Boolean(e.isRetroactive ?? e.is_retroactive) || e.points === 0,
           };
         });
 
@@ -672,6 +673,7 @@ export async function addPersonalMovie(
 export async function updatePersonalMovie(
   movieId: string,
   updates: Partial<Pick<PersonalMovie, 'status' | 'plataforma_slug' | 'avaliacao' | 'is_retroactive'>>,
+  userId?: string | null,
 ) {
   return withFallback(
     async () => {
@@ -683,7 +685,7 @@ export async function updatePersonalMovie(
           type: string;
           title: string;
           posterPath: string | null;
-        }[]>('/watch-entries');
+        }[]>(userId ? `/users/${userId}/watch-entries` : '/watch-entries');
         const item = watchEntriesRes.data.find((entry) => entry.id === movieId);
 
         if (item) {
@@ -785,7 +787,7 @@ export async function listSeries(userId: string) {
   return withFallback(
     async () => {
       const [watchEntriesRes, watchlistRes, reviewsRes] = await Promise.all([
-        apiClient.get<{ id: string; type: string; points: number; providerExternalId: string; season?: number | null; episode?: number | null; createdAt: string; title: string; posterPath: string | null }[]>(`/users/${userId}/watch-entries`),
+        apiClient.get<{ id: string; type: string; points: number; providerExternalId: string; season?: number | null; episode?: number | null; createdAt: string; title: string; posterPath: string | null; isRetroactive?: boolean; is_retroactive?: boolean }[]>(`/users/${userId}/watch-entries`),
         apiClient.get<{ id: string; providerExternalId: string; type: string; title: string; posterPath: string | null; season?: number | null; episode?: number | null; createdAt: string }[]>(`/watchlist/users/${userId}`),
         apiClient.get<{ id: string; mediaItemId: string; providerExternalId: string; type: 'movie' | 'series'; rating: number; review: string | null; createdAt: string; title: string; posterPath: string | null }[]>(`/users/${userId}/reviews`),
       ]);
@@ -863,6 +865,7 @@ export async function listSeries(userId: string) {
           review: review?.review ?? null,
           streaming_data: null,
           created_at: e.createdAt,
+          is_retroactive: Boolean(e.isRetroactive ?? e.is_retroactive) || e.points === 0,
         };
       });
 

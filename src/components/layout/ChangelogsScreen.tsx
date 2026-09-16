@@ -1,4 +1,4 @@
-import { CalendarDays, Sparkles } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Sparkles } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { CHANGELOGS } from '../../data/changelogs';
 
@@ -16,7 +16,15 @@ export default function ChangelogsScreen() {
   return (
     <div className="animate-in fade-in duration-500 space-y-10">
       <header className="border-b border-[#151515] pb-8">
-        <p className="text-xs uppercase tracking-[0.24em] text-brand-gold-alt">CineRats</p>
+        <button
+          type="button"
+          onClick={() => window.history.back()}
+          className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.16em] text-brand-text-muted transition hover:text-brand-gold"
+        >
+          <ArrowLeft size={13} />
+          Voltar
+        </button>
+        <p className="mt-4 text-xs uppercase tracking-[0.24em] text-brand-gold-alt">CineRats</p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <h1 className="text-3xl font-extralight uppercase tracking-[0.08em] text-brand-text sm:text-4xl">Changelogs</h1>
           <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-gold/30 bg-brand-gold/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] text-brand-gold">

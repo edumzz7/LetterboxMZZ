@@ -28,8 +28,8 @@ const Header = ({ activeTab, onTabChange, canAccessOscars, canAccessHome, onGoHo
   ];
 
   return (
-    <header className="relative z-30 overflow-visible rounded-2xl border border-[#151b28] bg-[#06080d] shadow-[0_12px_36px_rgba(0,0,0,0.2)]">
-      <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 border-b border-white/5 px-3 py-3 sm:gap-5 sm:px-5">
+    <header className="relative left-1/2 z-30 w-screen -translate-x-1/2 overflow-visible border-b border-[#151b28] bg-[#06080d] shadow-[0_12px_36px_rgba(0,0,0,0.2)]">
+      <div className="mx-auto grid w-full max-w-[1700px] grid-cols-[auto_1fr_auto] items-center gap-3 border-b border-white/5 px-4 py-3 sm:gap-5 sm:px-6 lg:px-8">
         <button type="button" onClick={onGoHome} aria-label="Ir para a página inicial" className={clsx('shrink-0 text-xl sm:text-2xl font-semibold tracking-[0.12em] uppercase text-brand-text transition hover:opacity-80', mobileSearchOpen && 'max-md:hidden')}>
           <span className="text-brand-gold">C</span>ine<span className="text-brand-gold">R</span>ats
         </button>
@@ -40,7 +40,7 @@ const Header = ({ activeTab, onTabChange, canAccessOscars, canAccessHome, onGoHo
       </div>
 
       {!hideTabs && (
-        <nav className="flex min-h-14 items-center justify-center gap-0 overflow-x-auto px-2 sm:px-5">
+        <nav className="mx-auto flex min-h-14 w-full max-w-[1700px] items-center justify-center gap-0 overflow-x-auto px-4 sm:px-6 lg:px-8">
           {onBack && <button onClick={onBack} className="p-2 text-brand-gold hover:bg-white/5 rounded-lg transition" aria-label="Voltar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>}
           {tabs.filter((tab) => tab.show !== false).map((tab) => (
             <button key={tab.id} type="button" onClick={() => onTabChange(tab.id)} className={clsx('whitespace-nowrap border-r border-white/10 px-3 py-1.5 text-[10px] uppercase tracking-[0.12em] transition last:border-r-0 sm:px-5 sm:text-xs', activeTab === tab.id ? 'text-brand-gold font-semibold border-b-2 border-b-brand-gold' : 'text-brand-text-muted hover:text-brand-text')}>

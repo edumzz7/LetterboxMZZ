@@ -139,9 +139,9 @@ export default function UserEventBell({
         }}
         aria-label={buttonLabel}
         title={buttonLabel}
-        className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-brand-gold bg-black text-white transition hover:bg-brand-gold/10"
+        className="relative inline-flex h-11 w-11 items-center justify-center rounded-full text-white transition hover:bg-white/5 hover:text-brand-gold"
       >
-        <Bell size={14} />
+        <Bell size={20} />
         {isOwnDashboard && unseenCount > 0 ? (
           <span className="absolute -top-2 -right-2 min-w-5 h-5 px-1 rounded-full bg-brand-gold text-[#0f172a] text-[10px] font-semibold flex items-center justify-center">
             +{unseenCount}

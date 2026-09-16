@@ -9,7 +9,8 @@ import {
   type ImportError,
 } from '../lib/appData';
 
-export function useImportTvTime(_userId: string) {
+export function useImportTvTime(userId: string) {
+  void userId;
   const [isUploading, setIsUploading] = useState(false);
   const [isLoadingErrors, setIsLoadingErrors] = useState(false);
   const [currentImport, setCurrentImport] = useState<DataImport | null>(null);

@@ -19,7 +19,7 @@ export default function AddMovieDialog(props: AddMovieDialogProps) {
   const [open, setOpen] = useState(false);
   const [titulo, setTitulo] = useState('');
   const [ano, setAno] = useState(new Date().getFullYear().toString());
-  const [_categoria, _setCategoria] = useState('');
+  const [, setCategoria] = useState('');
   const [capaUrl, setCapaUrl] = useState('');
   const [searchResults, setSearchResults] = useState<TMDBMovie[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -47,7 +47,7 @@ export default function AddMovieDialog(props: AddMovieDialogProps) {
     setOpen(false);
     setTitulo('');
     setAno(new Date().getFullYear().toString());
-    _setCategoria('');
+    setCategoria('');
     setCapaUrl('');
     setSearchResults([]);
     setShowDropdown(false);

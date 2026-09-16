@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Award, BadgeHelp, BookOpen, CircleDollarSign, ContactRound, Gem, Group, Search, Trophy } from 'lucide-react';
+import { ArrowLeft, Award, BadgeHelp, BookOpen, CircleDollarSign, ContactRound, Gem, Group, Search, Trophy } from 'lucide-react';
 import { Link } from 'wouter';
 
 interface FaqItem {
@@ -211,7 +211,15 @@ export default function FaqScreen() {
   return (
     <div className="animate-in fade-in duration-500">
       <div className="mb-8 flex flex-col gap-3 border-b border-white/5 pb-6 sm:mb-10 sm:pb-8">
-        <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => window.history.back()}
+          className="inline-flex w-fit items-center gap-1.5 text-[10px] uppercase tracking-[0.16em] text-brand-text-muted transition hover:text-brand-gold"
+        >
+          <ArrowLeft size={13} />
+          Voltar
+        </button>
+        <div className="mt-1 flex items-center gap-3">
           <BadgeHelp size={24} className="text-brand-gold" />
           <h1 className="text-2xl font-light tracking-[0.16em] text-brand-gold uppercase sm:text-3xl">F.A.Q.</h1>
         </div>

@@ -23,31 +23,43 @@ export default function SynopsisModal({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isOpen && movieId) {
+    if (!isOpen) return;
+
+    let cancelled = false;
+
+    const loadSynopsis = async () => {
+      if (!movieId) {
+        setSynopsis('Sinopse não disponível para este título.');
+        return;
+      }
+
       setIsLoading(true);
       setError(null);
-      
-      const fetchPromise = mediaType === 'tv'
-        ? getTvDetailsRawWithFallback(movieId)
-        : getMovieDetailsWithFallback(movieId);
 
-      fetchPromise
-        .then((data) => {
-          if (data && data.overview) {
-            setSynopsis(data.overview);
-          } else {
-            setSynopsis('Sinopse não disponível para este título.');
-          }
-        })
-        .catch(() => {
+      try {
+        const data = mediaType === 'tv'
+          ? await getTvDetailsRawWithFallback(movieId)
+          : await getMovieDetailsWithFallback(movieId);
+
+        if (!cancelled) {
+          setSynopsis(data?.overview || 'Sinopse não disponível para este título.');
+        }
+      } catch {
+        if (!cancelled) {
           setError('Falha ao carregar a sinopse.');
-        })
-        .finally(() => {
+        }
+      } finally {
+        if (!cancelled) {
           setIsLoading(false);
-        });
-    } else if (isOpen && !movieId) {
-      setSynopsis('Sinopse não disponível para este título.');
-    }
+        }
+      }
+    };
+
+    void loadSynopsis();
+
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen, movieId, mediaType]);
 
   return (

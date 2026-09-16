@@ -29,7 +29,13 @@ export interface TMDBTvDetails {
     id: number;
     number_of_seasons: number;
     number_of_episodes: number;
+    certification?: string;
     seasons: TMDBTvSeasonMeta[];
+}
+
+export interface TMDBGenre {
+    id: number;
+    name: string;
 }
 
 export interface TMDBSeasonEpisode {
@@ -86,8 +92,29 @@ export interface TMDBHomeMedia extends TMDBRecommendationItem {
     media_type: 'movie' | 'tv';
 }
 
+export interface TMDBCatalogItem extends TMDBRecommendationItem {
+    original_language?: string;
+    overview?: string;
+}
+
+export interface TMDBCatalogPage {
+    page: number;
+    totalPages: number;
+    results: TMDBCatalogItem[];
+}
+
+export interface CatalogFilters {
+    sortBy?: string;
+    genreIds?: number[];
+    providerIds?: number[];
+    languages?: string[];
+    minimumRating?: number;
+    certification?: string;
+}
+
 export const HOME_RELATED_MIN_RATING = 7;
 export const SIMILAR_MEDIA_MIN_RATING = 3.5;
+export const PUBLIC_CATALOG_MIN_VOTES = 20;
 export const HOME_RELATED_MIN_VOTES = {
     movie: 150,
     tv: 75,
@@ -368,6 +395,68 @@ export function getTopRatedSeries() {
     );
 }
 
+export async function getCatalogGenres(type: 'movie' | 'tv'): Promise<TMDBGenre[]> {
+    if (!TMDB_API_KEY) return [];
+
+    try {
+        const response = await fetch(
+            `${TMDB_BASE_URL}/genre/${type}/list?api_key=${TMDB_API_KEY}&language=pt-BR`
+        );
+        if (!response.ok) return [];
+        const data = await response.json();
+        return Array.isArray(data?.genres) ? data.genres : [];
+    } catch (error) {
+        console.error(`Error fetching TMDB ${type} genres:`, error);
+        return [];
+    }
+}
+
+/** Fetches only the requested public catalog page (at most 15 media cards). */
+export async function getCatalogPage(
+    type: 'movie' | 'tv',
+    page: number,
+    filters: CatalogFilters = {},
+): Promise<TMDBCatalogPage> {
+    if (!TMDB_API_KEY) return { page, totalPages: 0, results: [] };
+
+    try {
+        const params = new URLSearchParams({
+            api_key: TMDB_API_KEY,
+            language: 'pt-BR',
+            include_adult: 'false',
+            include_video: 'false',
+            page: String(Math.max(1, page)),
+            sort_by: filters.sortBy || 'popularity.desc',
+            'vote_count.gte': String(PUBLIC_CATALOG_MIN_VOTES),
+        });
+        if (filters.genreIds?.length) params.set('with_genres', filters.genreIds.join('|'));
+        if (filters.providerIds?.length) {
+            params.set('watch_region', 'BR');
+            params.set('with_watch_providers', filters.providerIds.join('|'));
+        }
+        if (filters.languages?.length) params.set('with_original_language', filters.languages[0]);
+        if (filters.minimumRating) params.set('vote_average.gte', String(filters.minimumRating * 2));
+        if (type === 'movie' && filters.certification) {
+            params.set('region', 'BR');
+            params.set('certification_country', 'BR');
+            params.set('certification', filters.certification);
+        }
+
+        const response = await fetch(`${TMDB_BASE_URL}/discover/${type}?${params.toString()}`);
+        if (!response.ok) return { page, totalPages: 0, results: [] };
+        const data = await response.json();
+        return {
+            page: data.page || page,
+            totalPages: Math.min(data.total_pages || 0, 500),
+            results: ((data.results || []) as TMDBCatalogItem[])
+                .filter((item) => !item.adult)
+                .slice(0, 15),
+        };
+    } catch (error) {
+        console.error(`Error fetching TMDB ${type} catalog:`, error);
+        return { page, totalPages: 0, results: [] };
+    }
+}
 export async function searchMovies(query: string): Promise<TMDBMovie[]> {
     if (!query || !query.trim()) return [];
 
@@ -577,7 +666,7 @@ export async function getTvDetails(tvId: number): Promise<TMDBTvDetails | null> 
     if (!TMDB_API_KEY || !tvId) return null;
     try {
         const response = await fetch(
-            `${TMDB_BASE_URL}/tv/${tvId}?api_key=${TMDB_API_KEY}&language=pt-BR`
+            `${TMDB_BASE_URL}/tv/${tvId}?api_key=${TMDB_API_KEY}&language=pt-BR&append_to_response=content_ratings`
         );
         if (!response.ok) throw new Error('TMDB TV Details Fetch Error');
         const data = await response.json();
@@ -585,6 +674,9 @@ export async function getTvDetails(tvId: number): Promise<TMDBTvDetails | null> 
             id: data.id,
             number_of_seasons: data.number_of_seasons ?? 0,
             number_of_episodes: data.number_of_episodes ?? 0,
+            certification: data.content_ratings?.results?.find(
+                (item: { iso_3166_1?: string }) => item.iso_3166_1 === 'BR',
+            )?.rating || undefined,
             seasons: (data.seasons || []).map((season: { season_number?: number; episode_count?: number }) => ({
                 season_number: season.season_number ?? 0,
                 episode_count: season.episode_count ?? 0,

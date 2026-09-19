@@ -28,7 +28,7 @@ const Header = ({ activeTab, onTabChange, canAccessOscars, canAccessHome, onGoHo
   ];
 
   return (
-    <header className="relative left-1/2 z-30 w-screen -translate-x-1/2 overflow-visible border-b border-[#151b28] bg-[#06080d] shadow-[0_12px_36px_rgba(0,0,0,0.2)]">
+    <header className="relative z-30 ml-[calc(50%-50vw)] w-screen overflow-visible border-b border-[#151b28] bg-[#06080d] shadow-[0_12px_36px_rgba(0,0,0,0.2)]">
       <div className="mx-auto grid w-full max-w-[1700px] grid-cols-[auto_1fr_auto] items-center gap-3 border-b border-white/5 px-4 py-3 sm:gap-5 sm:px-6 lg:px-8">
         <button type="button" onClick={onGoHome} aria-label="Ir para a página inicial" className={clsx('shrink-0 text-xl sm:text-2xl font-semibold tracking-[0.12em] uppercase text-brand-text transition hover:opacity-80', mobileSearchOpen && 'max-md:hidden')}>
           <span className="text-brand-gold">C</span>ine<span className="text-brand-gold">R</span>ats

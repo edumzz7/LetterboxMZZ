@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Loader2, Tv, Eye, Plus, Trash2, Edit3, Star, ArrowLeft, Play, Video } from 'lucide-react';
+import { Loader2, Tv, Eye, Plus, Trash2, Edit3, Star, ArrowLeft, Play, Video, Lock } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useSeries } from '../../hooks/useSeries';
 import { useUsers } from '../../hooks/useUsers';
@@ -16,7 +16,7 @@ import WatchedTimingDialog from '../movies/WatchedTimingDialog';
 
 interface SeriesDetailScreenProps {
   id: string;
-  currentUserId: string;
+  currentUserId: string | null;
 }
 
 export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailScreenProps) {
@@ -32,6 +32,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
   const [selectedSeason, setSelectedSeason] = useState(1);
   const [isUpdatingProgress, setIsUpdatingProgress] = useState(false);
   const [isWatchedTimingOpen, setIsWatchedTimingOpen] = useState(false);
+  const isGuest = !currentUserId;
   const [pendingSeriesCompletion, setPendingSeriesCompletion] = useState<{
     temporada: number;
     total_episodios: number;
@@ -101,7 +102,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
   const credits = creditsQuery.data;
   const providers = providersQuery.data || [];
   const cineratsStats = cineratsQuery.data;
-  const userSeriesList = userSeriesQuery.data || [];
+  const userSeriesList = useMemo(() => userSeriesQuery.data || [], [userSeriesQuery.data]);
   const users = usersQuery.data || [];
 
   // Match current user's local series document
@@ -122,7 +123,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
   const startYear = series?.first_air_date ? series.first_air_date.split('-')[0] : null;
   const creators: Array<{ id: number; name: string }> = series?.created_by || [];
   const cast = credits?.cast?.slice(0, 6) || [];
-  const genres = series?.genres?.map((g: any) => g.name).join(', ') || '';
+  const genres = series?.genres?.map((genre: { name: string }) => genre.name).join(', ') || '';
   const seasonsList = useMemo<TMDBTvSeasonMeta[]>(
     () => series?.seasons || [],
     [series?.seasons],
@@ -146,7 +147,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
     rateSeriesMutation.isPending;
 
   const handleAddSeries = async (status: 'watchlist' | 'watching' | 'watched', isRetroactive = false) => {
-    if (!series) return;
+    if (isGuest || !series) return;
     const totalEpsOfSeason = activeSeasonMeta?.episode_count || 1;
     const targetSeason = status === 'watched'
       ? (lastSeasonMeta?.season_number || selectedSeason)
@@ -181,6 +182,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
     },
     isRetroactive = false,
   ) => {
+    if (isGuest) return;
     await updateProgressMutation.mutateAsync({
       ...progress,
       is_retroactive: isRetroactive,
@@ -227,7 +229,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
   };
 
   const handleConfirmWatched = async (isRetroactive: boolean) => {
-    if (!series) return;
+    if (isGuest || !series) return;
 
     if (pendingSeriesCompletion && userSeriesDoc) {
       await saveSeriesProgress(
@@ -266,7 +268,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
   };
 
   const handleToggleWatchlistOnly = async () => {
-    if (!series) return;
+    if (isGuest || !series) return;
     if (userSeriesDoc) {
       if (userSeriesDoc.status === 'watchlist') {
         await deleteSeriesMutation.mutateAsync(userSeriesDoc.id);
@@ -286,9 +288,9 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
   };
 
   const handleSaveRatingAndReview = async (stars: number, review: string) => {
-    if (!userSeriesDoc) return;
+    if (isGuest || !userSeriesDoc) return;
     await rateSeriesMutation.mutateAsync({
-      actorUserId: currentUserId,
+      actorUserId: currentUserId!,
       seriesId: userSeriesDoc.id,
       stars,
       review,
@@ -371,7 +373,8 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
           <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
             <button
               onClick={handleToggleWatchlistOnly}
-              disabled={isPending}
+              disabled={isPending || isGuest}
+              title={isGuest ? 'Entre para usar a watchlist' : undefined}
               className={clsx(
                 'flex items-center gap-2 py-3 px-6 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all active:scale-95 border disabled:opacity-50',
                 userSeriesDoc?.status === 'watchlist'
@@ -379,18 +382,19 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
                   : 'bg-black/45 border-[#222] text-brand-text hover:border-brand-gold/35 hover:text-brand-gold'
               )}
             >
-              {userSeriesDoc?.status === 'watchlist' ? <Trash2 size={14} /> : <Plus size={14} />}
-              {userSeriesDoc?.status === 'watchlist' ? 'Na Watchlist' : 'Watchlist'}
+              {isGuest ? <Lock size={14} /> : userSeriesDoc?.status === 'watchlist' ? <Trash2 size={14} /> : <Plus size={14} />}
+              {isGuest ? 'Watchlist' : userSeriesDoc?.status === 'watchlist' ? 'Na Watchlist' : 'Watchlist'}
             </button>
 
             {!userSeriesDoc && (
               <>
                 <button
                   onClick={() => handleAddSeries('watching')}
-                  disabled={isPending}
+                  disabled={isPending || isGuest}
+                  title={isGuest ? 'Entre para acompanhar esta serie' : undefined}
                   className="flex items-center gap-2 py-3 px-6 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all active:scale-95 border bg-black/45 border-[#222] text-brand-text hover:border-brand-gold/35 hover:text-brand-gold disabled:opacity-50"
                 >
-                  <Play size={12} className="fill-brand-text text-brand-text" />
+                  {isGuest ? <Lock size={14} /> : <Play size={12} className="fill-brand-text text-brand-text" />}
                   Acompanhar
                 </button>
               </>
@@ -399,10 +403,11 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
             {userSeriesDoc?.status !== 'watched' && (
               <button
                 onClick={() => setIsWatchedTimingOpen(true)}
-                disabled={isPending}
+                disabled={isPending || isGuest}
+                title={isGuest ? 'Entre para marcar como vista' : undefined}
                 className="flex items-center gap-2 py-3 px-6 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all active:scale-95 border bg-black/45 border-[#222] text-brand-text hover:border-brand-gold/35 hover:text-brand-gold disabled:opacity-50"
               >
-                <Eye size={14} />
+                {isGuest ? <Lock size={14} /> : <Eye size={14} />}
                 Marcar Vista
               </button>
             )}
@@ -516,7 +521,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
                 <div>
                   <span className="font-semibold text-brand-text-muted uppercase text-xs tracking-wider block mb-3">Elenco principal:</span>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    {cast.map((actor: any) => (
+                    {cast.map((actor: { id: number; name: string; profile_path: string | null; character?: string }) => (
                       <button key={actor.id} type="button" onClick={() => setLocation(`/actor/${actor.id}`)} className="flex min-w-0 cursor-pointer items-center gap-2 text-left transition hover:text-brand-gold">
                         {actor.profile_path ? (
                           <img
@@ -578,10 +583,10 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
                   className="bg-[#0a0f1e] border border-[#222] text-xs font-semibold uppercase tracking-wider text-brand-text px-3 py-1.5 rounded-xl focus:outline-none focus:border-brand-gold cursor-pointer"
                 >
                   {seasonsList
-                    .filter((s: any) => s.season_number > 0)
-                    .map((s: any) => (
-                      <option key={s.season_number} value={s.season_number}>
-                        Temporada {s.season_number} ({s.episode_count} eps)
+                    .filter((season) => season.season_number > 0)
+                    .map((season) => (
+                      <option key={season.season_number} value={season.season_number}>
+                        Temporada {season.season_number} ({season.episode_count} eps)
                       </option>
                     ))}
                 </select>

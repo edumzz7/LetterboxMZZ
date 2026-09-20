@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Film, Loader2, Lock, Hash } from 'lucide-react';
 
 interface EnterCodeScreenProps {
@@ -21,14 +21,7 @@ export default function EnterCodeScreen({
   const [code, setCode] = useState(initialCode);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPasswordFields, setShowPasswordFields] = useState(false);
-
-  // Se já veio com código, mostra os campos de senha automaticamente
-  useEffect(() => {
-    if (initialCode) {
-      setShowPasswordFields(true);
-    }
-  }, [initialCode]);
+  const [showPasswordFields, setShowPasswordFields] = useState(Boolean(initialCode));
 
   const handleCodeSubmit = (event: React.FormEvent) => {
     event.preventDefault();

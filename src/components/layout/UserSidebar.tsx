@@ -524,7 +524,6 @@ export default function UserSidebar({
   currentUserId,
   selectedUserId,
   onSelectUser,
-  isOpen: _isOpen,
   onClose,
   section = 'discover',
 }: UserSidebarProps) {

@@ -1,6 +1,6 @@
-import * as localData from './localData';
-import apiClient from './apiClient';
-import { getTvDetailsWithCache } from './tmdbCache';
+import * as localData from "./localData";
+import apiClient from "./apiClient";
+import { getTvDetailsWithCache } from "./tmdbCache";
 import type {
   ActivityEntry,
   CineMatchMode,
@@ -14,27 +14,39 @@ import type {
   TrendingMovie,
   UserOscarPrediction,
   AnticipatedMovie,
-} from '../types/app';
+} from "../types/app";
 
-const AVATAR_IDS = ['avatar_clapper', 'avatar_popcorn', 'avatar_projector', 'avatar_girl', 'avatar_robot'];
+const AVATAR_IDS = [
+  "avatar_clapper",
+  "avatar_popcorn",
+  "avatar_projector",
+  "avatar_girl",
+  "avatar_robot",
+];
 
 // Backend availability tracking
 function isBackendUnavailable(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error ?? '');
+  const message = error instanceof Error ? error.message : String(error ?? "");
   return (
-    message.includes('Failed to fetch') ||
-    message.includes('Network request failed') ||
-    message.includes('fetch') ||
-    message.includes('ERR_NETWORK')
+    message.includes("Failed to fetch") ||
+    message.includes("Network request failed") ||
+    message.includes("fetch") ||
+    message.includes("ERR_NETWORK")
   );
 }
 
-async function withFallback<T>(remote: () => Promise<T>, local: () => Promise<T>) {
+async function withFallback<T>(
+  remote: () => Promise<T>,
+  local: () => Promise<T>,
+) {
   try {
     return await remote();
   } catch (error) {
     if (isBackendUnavailable(error)) {
-      console.warn('API indisponível. Usando modo local para esta requisição.', error);
+      console.warn(
+        "API indisponível. Usando modo local para esta requisição.",
+        error,
+      );
       return local();
     }
     throw error;
@@ -43,12 +55,124 @@ async function withFallback<T>(remote: () => Promise<T>, local: () => Promise<T>
 
 export function isIncomingNotificationMessage(message: string) {
   const normalized = message.toLowerCase();
-  return normalized.includes('para voce') || normalized.includes('ao seu filme') || normalized.includes('novo membro');
+  return (
+    normalized.includes("para voce") ||
+    normalized.includes("ao seu filme") ||
+    normalized.includes("novo membro")
+  );
 }
 
 function fallbackAvatar(userId: string) {
-  const index = Math.abs(Array.from(userId).reduce((sum, char) => sum + char.charCodeAt(0), 0)) % AVATAR_IDS.length;
+  const index =
+    Math.abs(
+      Array.from(userId).reduce((sum, char) => sum + char.charCodeAt(0), 0),
+    ) % AVATAR_IDS.length;
   return AVATAR_IDS[index];
+}
+
+type SeriesEpisodeRef = {
+  season: number;
+  episode: number;
+};
+
+type ApiSeriesWatchEntry = {
+  id: string;
+  type: string;
+  points: number;
+  providerExternalId: string;
+  season?: number | null;
+  episode?: number | null;
+  createdAt: string;
+};
+
+async function resolveSeriesEpisodes(
+  providerExternalId: string,
+  targetSeason: number,
+  targetEpisode: number,
+): Promise<SeriesEpisodeRef[]> {
+  const season = Math.max(1, Math.floor(targetSeason));
+  const episode = Math.max(1, Math.floor(targetEpisode));
+
+  if (season === 1) {
+    return Array.from({ length: episode }, (_, index) => ({
+      season: 1,
+      episode: index + 1,
+    }));
+  }
+
+  const tmdbId = Number(providerExternalId);
+  if (!Number.isFinite(tmdbId) || tmdbId <= 0) {
+    return [{ season, episode }];
+  }
+
+  try {
+    const details = await getTvDetailsWithCache(tmdbId);
+    const regularSeasons = (details?.seasons || [])
+      .filter((entry) => entry.season_number > 0)
+      .sort((a, b) => a.season_number - b.season_number);
+    const episodes: SeriesEpisodeRef[] = [];
+
+    for (const seasonMeta of regularSeasons) {
+      if (seasonMeta.season_number < season) {
+        for (
+          let currentEpisode = 1;
+          currentEpisode <= seasonMeta.episode_count;
+          currentEpisode += 1
+        ) {
+          episodes.push({
+            season: seasonMeta.season_number,
+            episode: currentEpisode,
+          });
+        }
+      }
+    }
+
+    for (
+      let currentEpisode = 1;
+      currentEpisode <= episode;
+      currentEpisode += 1
+    ) {
+      episodes.push({ season, episode: currentEpisode });
+    }
+
+    return episodes.length > 0 ? episodes : [{ season, episode }];
+  } catch {
+    return [{ season, episode }];
+  }
+}
+
+async function createSeriesWatchEntries(
+  providerExternalId: string,
+  episodes: SeriesEpisodeRef[],
+  isRetroactive: boolean,
+): Promise<ApiSeriesWatchEntry[]> {
+  if (episodes.length > 1) {
+    const response = await apiClient.post<{
+      entries: ApiSeriesWatchEntry[];
+      totalPoints: number;
+      providerExternalId: string;
+    }>("/watch-entries/batch", {
+      type: "series",
+      providerExternalId,
+      episodes,
+      isRetroactive,
+    });
+
+    return response.data.entries;
+  }
+
+  const episode = episodes[0];
+  if (!episode) return [];
+
+  const response = await apiClient.post<ApiSeriesWatchEntry>("/watch-entries", {
+    type: "series",
+    providerExternalId,
+    season: episode.season,
+    episode: episode.episode,
+    isRetroactive,
+  });
+
+  return [response.data];
 }
 
 let cachedSessionUser: { id: string; username: string } | null = null;
@@ -61,20 +185,28 @@ function clearAppDataCache() {
 // User Favorites (Meus Amigos)
 // ==========================================
 
-export async function listFavorites(ownerUserId: string): Promise<UserFavorite[]> {
+export async function listFavorites(
+  ownerUserId: string,
+): Promise<UserFavorite[]> {
   return withFallback(
     async () => {
-      const response = await apiClient.get<UserFavorite[]>('/users/me/favorites');
+      const response = await apiClient.get<UserFavorite[]>(
+        "/users/me/favorites",
+      );
       return response.data;
     },
     () => localData.listFavorites(ownerUserId),
   );
 }
 
-export async function listUserAchievementIds(userId: string): Promise<string[]> {
+export async function listUserAchievementIds(
+  userId: string,
+): Promise<string[]> {
   return withFallback(
     async () => {
-      const response = await apiClient.get<{ key?: string; id?: string }[]>(`/users/${userId}/achievements`);
+      const response = await apiClient.get<{ key?: string; id?: string }[]>(
+        `/users/${userId}/achievements`,
+      );
       return response.data
         .map((achievement) => achievement.key ?? achievement.id)
         .filter((key): key is string => Boolean(key));
@@ -86,17 +218,23 @@ export async function listUserAchievementIds(userId: string): Promise<string[]> 
       ]);
 
       return [
-        ...(favorites.length >= 10 ? ['vereador'] : []),
-        ...(favoritedByCount >= 10 ? ['eleito'] : []),
+        ...(favorites.length >= 10 ? ["vereador"] : []),
+        ...(favoritedByCount >= 10 ? ["eleito"] : []),
       ];
     },
   );
 }
 
-export async function addFavorite(favoriteUserId: string, ownerUserId: string): Promise<UserFavorite> {
+export async function addFavorite(
+  favoriteUserId: string,
+  ownerUserId: string,
+): Promise<UserFavorite> {
   return withFallback(
     async () => {
-      const response = await apiClient.post<UserFavorite>('/users/me/favorites', { favoriteUserId });
+      const response = await apiClient.post<UserFavorite>(
+        "/users/me/favorites",
+        { favoriteUserId },
+      );
       return response.data;
     },
     () => localData.addFavorite(favoriteUserId, ownerUserId),
@@ -135,8 +273,10 @@ export async function loginUser(identifier: string, password: string) {
   clearAppDataCache();
   return withFallback(
     async () => {
-      await apiClient.post('/auth/sign-in', { login: identifier, password });
-      const { data } = await apiClient.get<{ id: string; username: string }>('/auth/me');
+      await apiClient.post("/auth/sign-in", { login: identifier, password });
+      const { data } = await apiClient.get<{ id: string; username: string }>(
+        "/auth/me",
+      );
       cachedSessionUser = { id: data.id, username: data.username };
       return cachedSessionUser;
     },
@@ -144,16 +284,22 @@ export async function loginUser(identifier: string, password: string) {
   );
 }
 
-export async function registerUser(username: string, email: string, password: string) {
+export async function registerUser(
+  username: string,
+  email: string,
+  password: string,
+) {
   return withFallback(
     async () => {
-      await apiClient.post('/auth/sign-up', {
+      await apiClient.post("/auth/sign-up", {
         username,
         email,
         password,
         confirmPassword: password,
       });
-      const { data } = await apiClient.get<{ id: string; username: string }>('/auth/me');
+      const { data } = await apiClient.get<{ id: string; username: string }>(
+        "/auth/me",
+      );
       cachedSessionUser = { id: data.id, username: data.username };
       return cachedSessionUser;
     },
@@ -168,7 +314,7 @@ export async function changePassword(
 ) {
   return withFallback(
     async () => {
-      await apiClient.patch('/auth/change-password', {
+      await apiClient.patch("/auth/change-password", {
         currentPassword,
         newPassword,
         confirmNewPassword: newPassword,
@@ -181,11 +327,11 @@ export async function changePassword(
 export async function requestPasswordReset(email: string) {
   return withFallback(
     async () => {
-      await apiClient.post('/auth/password-reset', { email });
+      await apiClient.post("/auth/password-reset", { email });
     },
     async () => {
       // Local mode fallback - just log the request
-      console.log('Password reset requested for:', email);
+      console.log("Password reset requested for:", email);
     },
   );
 }
@@ -199,18 +345,20 @@ export async function confirmPasswordReset(
   clearAppDataCache();
   return withFallback(
     async () => {
-      await apiClient.patch('/auth/password-reset', {
+      await apiClient.patch("/auth/password-reset", {
         email,
         code,
         password,
         confirmPassword,
       });
-      const { data } = await apiClient.get<{ id: string; username: string }>('/auth/me');
+      const { data } = await apiClient.get<{ id: string; username: string }>(
+        "/auth/me",
+      );
       cachedSessionUser = { id: data.id, username: data.username };
       return cachedSessionUser;
     },
     async () => {
-      throw new Error('Reset de senha não disponível no modo local.');
+      throw new Error("Reset de senha não disponível no modo local.");
     },
   );
 }
@@ -237,25 +385,41 @@ export async function listUsers() {
   return listRankedUsers();
 }
 
+export interface PublicRankingEntry {
+  id: string;
+  rank: number;
+  username: string;
+  totalPoints: number;
+  displayName: string | null;
+  avatarPath: string | null;
+}
+
+export async function listPublicRanking() {
+  const response = await apiClient.get<PublicRankingEntry[]>("/users/ranking");
+  return response.data;
+}
+
 export async function listRankedUsers() {
   return withFallback(
     async () => {
-      const apiResponse = await apiClient.get<{
-        id: string;
-        username: string;
-        totalPoints: number;
-        rank: number;
-        createdAt: string;
-        preferences: {
-          favoriteMovie: string | null;
-          bestMovieWatched: string | null;
-          favoriteSeries: string | null;
-          favoriteGenre: string | null;
-          watchPreference: 'home' | 'cinema' | null;
-          displayName: string | null;
-          avatarPath: string | null;
-        } | null;
-      }[]>('/users');
+      const apiResponse = await apiClient.get<
+        {
+          id: string;
+          username: string;
+          totalPoints: number;
+          rank: number;
+          createdAt: string;
+          preferences: {
+            favoriteMovie: string | null;
+            bestMovieWatched: string | null;
+            favoriteSeries: string | null;
+            favoriteGenre: string | null;
+            watchPreference: "home" | "cinema" | null;
+            displayName: string | null;
+            avatarPath: string | null;
+          } | null;
+        }[]
+      >("/users");
 
       return apiResponse.data.map((apiUser) => {
         const prefs = apiUser.preferences;
@@ -264,7 +428,7 @@ export async function listRankedUsers() {
         let avatarId = prefs?.avatarPath ?? fallbackAvatar(apiUser.id);
         let displayName = prefs?.displayName ?? undefined;
 
-        if (avatarId && avatarId.startsWith('{')) {
+        if (avatarId && avatarId.startsWith("{")) {
           try {
             const parsed = JSON.parse(avatarId);
             avatarId = parsed.avatarId ?? fallbackAvatar(apiUser.id);
@@ -308,59 +472,65 @@ type ApiActivity = {
 
 function activityMessage(a: ApiActivity): string {
   const meta = a.metadata ?? {};
-  const title = (meta.title as string) ?? '';
-  const username = (meta.username as string) ?? '';
-  const targetUsername = (meta.targetUsername as string) ?? '';
+  const title = (meta.title as string) ?? "";
+  const username = (meta.username as string) ?? "";
+  const targetUsername = (meta.targetUsername as string) ?? "";
 
   switch (a.type) {
-    case 'new_member':
+    case "new_member":
       return `Novo membro! @${username} entrou no cinerats.`;
-    case 'favorited_user':
-      if (username && targetUsername) return `@${username} favoritou @${targetUsername}.`;
+    case "favorited_user":
+      if (username && targetUsername)
+        return `@${username} favoritou @${targetUsername}.`;
       if (targetUsername) return `Favoritou @${targetUsername}.`;
       if (username) return `@${username} favoritou um usuário.`;
-      return 'Favoritou um usuário.';
-    case 'watched_movie':
+      return "Favoritou um usuário.";
+    case "watched_movie":
       if (username && title) return `@${username} assistiu ${title}.`;
       if (title) return `Assistiu ${title}.`;
       if (username) return `@${username} assistiu um filme.`;
-      return 'Assistiu um filme.';
-    case 'watched_episode': {
+      return "Assistiu um filme.";
+    case "watched_episode": {
       const s = meta.season as number | undefined;
       const ep = meta.episode as number | undefined;
-      if (username && title && s && ep) return `@${username} assistiu ${title} T${s}E${ep}.`;
+      if (username && title && s && ep)
+        return `@${username} assistiu ${title} T${s}E${ep}.`;
       if (title && s && ep) return `Assistiu ${title} T${s}E${ep}.`;
       if (username && title) return `@${username} assistiu ${title}.`;
       if (title) return `Assistiu ${title}.`;
       if (username) return `@${username} assistiu um episódio.`;
-      return 'Assistiu um episódio.';
+      return "Assistiu um episódio.";
     }
-    case 'watched_documentary':
+    case "watched_documentary":
       if (username && title) return `@${username} assistiu ${title}.`;
       if (title) return `Assistiu ${title}.`;
       if (username) return `@${username} assistiu um documentário.`;
-      return 'Assistiu um documentário.';
-    case 'reviewed_media':
+      return "Assistiu um documentário.";
+    case "reviewed_media":
       if (username && title) return `@${username} avaliou ${title}.`;
       if (title) return `Avaliou ${title}.`;
       if (username) return `@${username} avaliou uma mídia.`;
-      return 'Avaliou uma mídia.';
-    case 'added_to_watchlist':
-      if (username && title) return `@${username} adicionou ${title} à watchlist.`;
+      return "Avaliou uma mídia.";
+    case "added_to_watchlist":
+      if (username && title)
+        return `@${username} adicionou ${title} à watchlist.`;
       if (title) return `Adicionou ${title} à watchlist.`;
       if (username) return `@${username} adicionou à watchlist.`;
-      return 'Adicionou à watchlist.';
-    case 'recommended_media':
+      return "Adicionou à watchlist.";
+    case "recommended_media":
       if (username && title) return `@${username} recomendou ${title}.`;
       if (title) return `Recomendou ${title}.`;
       if (username) return `@${username} fez uma recomendação.`;
-      return 'Fez uma recomendação.';
+      return "Fez uma recomendação.";
     default:
-      return (meta.message as string) ?? 'Atividade registrada.';
+      return (meta.message as string) ?? "Atividade registrada.";
   }
 }
 
-function mapApiActivity(a: ApiActivity, usersMap?: Map<string, string>): ActivityEntry {
+function mapApiActivity(
+  a: ApiActivity,
+  usersMap?: Map<string, string>,
+): ActivityEntry {
   // Use message from API if available, otherwise build it (fallback for local mode)
   let message = a.message;
 
@@ -391,7 +561,9 @@ function mapApiActivity(a: ApiActivity, usersMap?: Map<string, string>): Activit
 export async function listActivities(limit = 30) {
   return withFallback(
     async () => {
-      const res = await apiClient.get<ApiActivity[]>(`/activities?limit=${limit}`);
+      const res = await apiClient.get<ApiActivity[]>(
+        `/activities?limit=${limit}`,
+      );
       // API now returns messages, no need to enrich with usernames
       return res.data.map((activity) => mapApiActivity(activity));
     },
@@ -399,7 +571,9 @@ export async function listActivities(limit = 30) {
   );
 }
 
-export async function listNotifications(_userId: string, _limit = 20) {
+export async function listNotifications(userId: string, limit = 20) {
+  void userId;
+  void limit;
   // Deprecated, use listUserActivity directly instead.
   return [];
 }
@@ -407,23 +581,31 @@ export async function listNotifications(_userId: string, _limit = 20) {
 export async function listUserActivity(userIds: string[], limit = 20) {
   return withFallback(
     async () => {
-      const includesGlobal = userIds.includes('global');
+      const includesGlobal = userIds.includes("global");
 
       let activities: ApiActivity[];
 
       if (includesGlobal) {
         // Use the feed endpoint — it already merges own + favorites + new_member activities
-        const res = await apiClient.get<ApiActivity[]>(`/activities?limit=${limit}`);
+        const res = await apiClient.get<ApiActivity[]>(
+          `/activities?limit=${limit}`,
+        );
         activities = res.data;
       } else {
         // Single user profile view — fetch per user
         const results = await Promise.all(
           userIds.map((id) =>
-            apiClient.get<ApiActivity[]>(`/users/${id}/activities`).then((r) => r.data).catch(() => [] as ApiActivity[]),
+            apiClient
+              .get<ApiActivity[]>(`/users/${id}/activities`)
+              .then((r) => r.data)
+              .catch(() => [] as ApiActivity[]),
           ),
         );
         activities = results.flat();
-        activities.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        activities.sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        );
         activities = activities.slice(0, limit);
       }
 
@@ -439,7 +621,9 @@ export async function getCurrentSessionUser() {
     async () => {
       if (cachedSessionUser) return cachedSessionUser;
       try {
-        const { data } = await apiClient.get<{ id: string; username: string }>('/auth/me');
+        const { data } = await apiClient.get<{ id: string; username: string }>(
+          "/auth/me",
+        );
         cachedSessionUser = { id: data.id, username: data.username };
         return cachedSessionUser;
       } catch {
@@ -455,7 +639,7 @@ export async function logoutUser() {
   return withFallback(
     async () => {
       try {
-        await apiClient.post('/auth/sign-out');
+        await apiClient.post("/auth/sign-out");
       } catch {
         // Ignore errors and proceed with local cleanup.
       }
@@ -464,15 +648,20 @@ export async function logoutUser() {
   );
 }
 
-export async function deleteCurrentUser(userId: string, currentPassword: string) {
+export async function deleteCurrentUser(
+  userId: string,
+  currentPassword: string,
+) {
   clearAppDataCache();
   return withFallback(
     async () => {
       if (!currentPassword.trim()) {
-        throw new Error('Informe sua senha atual para confirmar a exclusao.');
+        throw new Error("Informe sua senha atual para confirmar a exclusao.");
       }
 
-      await apiClient.delete('/auth/delete-account', { data: { password: currentPassword } });
+      await apiClient.delete("/auth/delete-account", {
+        data: { password: currentPassword },
+      });
 
       clearAppDataCache();
     },
@@ -483,7 +672,7 @@ export async function deleteCurrentUser(userId: string, currentPassword: string)
 export async function updateUserAvatar(userId: string, avatarId: string) {
   return withFallback(
     async () => {
-      await apiClient.put('/users/me/preferences', { avatarPath: avatarId });
+      await apiClient.put("/users/me/preferences", { avatarPath: avatarId });
     },
     () => localData.updateUserAvatar(userId, avatarId),
   );
@@ -493,13 +682,17 @@ export async function uploadAvatarImage(file: File): Promise<string> {
   return withFallback(
     async () => {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append("file", file);
 
-      const response = await apiClient.put<{ avatarPath: string }>('/users/me/avatar', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
+      const response = await apiClient.put<{ avatarPath: string }>(
+        "/users/me/avatar",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
         },
-      });
+      );
 
       return response.data.avatarPath;
     },
@@ -507,8 +700,8 @@ export async function uploadAvatarImage(file: File): Promise<string> {
       // Fallback: create data URL for local mode
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result ?? ''));
-        reader.onerror = () => reject(new Error('Falha ao ler imagem.'));
+        reader.onload = () => resolve(String(reader.result ?? ""));
+        reader.onerror = () => reject(new Error("Falha ao ler imagem."));
         reader.readAsDataURL(file);
       });
     },
@@ -523,21 +716,27 @@ export async function updateUserProfile(
     favorite_movie_2?: string;
     favorite_genre?: string;
     favorite_series?: string;
-    watch_preference?: 'home' | 'cinema';
-  }
+    watch_preference?: "home" | "cinema";
+  },
 ) {
   return withFallback(
     async () => {
       const apiPrefs: Record<string, string | undefined> = {};
-      if (data.favorite_movie !== undefined) apiPrefs.favoriteMovie = data.favorite_movie;
-      if (data.favorite_movie_2 !== undefined) apiPrefs.bestMovieWatched = data.favorite_movie_2;
-      if (data.favorite_series !== undefined) apiPrefs.favoriteSeries = data.favorite_series;
-      if (data.favorite_genre !== undefined) apiPrefs.favoriteGenre = data.favorite_genre;
-      if (data.watch_preference !== undefined) apiPrefs.watchPreference = data.watch_preference;
-      if (data.display_name !== undefined) apiPrefs.displayName = data.display_name;
+      if (data.favorite_movie !== undefined)
+        apiPrefs.favoriteMovie = data.favorite_movie;
+      if (data.favorite_movie_2 !== undefined)
+        apiPrefs.bestMovieWatched = data.favorite_movie_2;
+      if (data.favorite_series !== undefined)
+        apiPrefs.favoriteSeries = data.favorite_series;
+      if (data.favorite_genre !== undefined)
+        apiPrefs.favoriteGenre = data.favorite_genre;
+      if (data.watch_preference !== undefined)
+        apiPrefs.watchPreference = data.watch_preference;
+      if (data.display_name !== undefined)
+        apiPrefs.displayName = data.display_name;
 
       if (Object.keys(apiPrefs).length > 0) {
-        await apiClient.put('/users/me/preferences', apiPrefs);
+        await apiClient.put("/users/me/preferences", apiPrefs);
       }
     },
     () => localData.updateUserProfile(userId, data),
@@ -548,52 +747,90 @@ export async function listPersonalMovies(userId: string) {
   return withFallback(
     async () => {
       const [watchEntriesRes, watchlistRes, reviewsRes] = await Promise.all([
-        apiClient.get<{ id: string; type: string; points: number; providerExternalId: string; season?: number | null; episode?: number | null; createdAt: string; title: string; posterPath: string | null; isRetroactive?: boolean; is_retroactive?: boolean }[]>(`/users/${userId}/watch-entries`),
-        apiClient.get<{ id: string; providerExternalId: string; type: string; title: string; posterPath: string | null; season?: number | null; episode?: number | null; createdAt: string }[]>(`/watchlist/users/${userId}`),
-        apiClient.get<{ id: string; mediaItemId: string; providerExternalId: string; type: 'movie' | 'series'; rating: number; review: string | null; createdAt: string; title: string; posterPath: string | null }[]>(`/users/${userId}/reviews`),
+        apiClient.get<
+          {
+            id: string;
+            type: string;
+            points: number;
+            providerExternalId: string;
+            season?: number | null;
+            episode?: number | null;
+            createdAt: string;
+            title: string;
+            posterPath: string | null;
+            isRetroactive?: boolean;
+            is_retroactive?: boolean;
+          }[]
+        >(`/users/${userId}/watch-entries`),
+        apiClient.get<
+          {
+            id: string;
+            providerExternalId: string;
+            type: string;
+            title: string;
+            posterPath: string | null;
+            season?: number | null;
+            episode?: number | null;
+            createdAt: string;
+          }[]
+        >(`/watchlist/users/${userId}`),
+        apiClient.get<
+          {
+            id: string;
+            mediaItemId: string;
+            providerExternalId: string;
+            type: "movie" | "series";
+            rating: number;
+            review: string | null;
+            createdAt: string;
+            title: string;
+            posterPath: string | null;
+          }[]
+        >(`/users/${userId}/reviews`),
       ]);
 
       // Create a map of reviews by providerExternalId for movies
       const reviewsMap = new Map(
         reviewsRes.data
-          .filter((r) => r.type === 'movie')
-          .map((r) => [r.providerExternalId, r])
+          .filter((r) => r.type === "movie")
+          .map((r) => [r.providerExternalId, r]),
       );
 
       const watched: PersonalMovie[] = watchEntriesRes.data
-        .filter((e) => e.type === 'movie')
+        .filter((e) => e.type === "movie")
         .map((e) => {
           const review = reviewsMap.get(e.providerExternalId);
           return {
             id: e.id,
             user_id: userId,
-            titulo: e.title ?? '',
+            titulo: e.title ?? "",
             ano_lancamento: null,
             capa_url: e.posterPath ?? null,
             plataforma_slug: null,
-            status: 'watched' as MovieStatus,
-            source: 'manual' as const,
+            status: "watched" as MovieStatus,
+            source: "manual" as const,
             source_movie_id: e.providerExternalId ?? null,
             avaliacao: review?.rating ?? null,
             rating: review?.rating ?? null,
             review: review?.review ?? null,
             streaming_data: null,
             created_at: e.createdAt,
-            is_retroactive: Boolean(e.isRetroactive ?? e.is_retroactive) || e.points === 0,
+            is_retroactive:
+              Boolean(e.isRetroactive ?? e.is_retroactive) || e.points === 0,
           };
         });
 
       const watchlist: PersonalMovie[] = watchlistRes.data
-        .filter((e) => e.type === 'movie')
+        .filter((e) => e.type === "movie")
         .map((e) => ({
           id: e.id,
           user_id: userId,
-          titulo: e.title ?? '',
+          titulo: e.title ?? "",
           ano_lancamento: null,
           capa_url: e.posterPath ?? null,
           plataforma_slug: null,
-          status: 'watchlist' as MovieStatus,
-          source: 'manual' as const,
+          status: "watchlist" as MovieStatus,
+          source: "manual" as const,
           source_movie_id: e.providerExternalId ?? null,
           avaliacao: null,
           rating: null,
@@ -603,7 +840,10 @@ export async function listPersonalMovies(userId: string) {
         }));
 
       const all = [...watched, ...watchlist];
-      all.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      all.sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      );
       return all;
     },
     () => localData.listPersonalMovies(userId),
@@ -612,15 +852,24 @@ export async function listPersonalMovies(userId: string) {
 
 export async function addPersonalMovie(
   userId: string,
-  movie: Omit<PersonalMovie, 'id' | 'user_id' | 'created_at'>,
+  movie: Omit<PersonalMovie, "id" | "user_id" | "created_at">,
 ) {
   return withFallback(
     async () => {
-      const providerExternalId = movie.source_movie_id ?? '';
+      const providerExternalId = movie.source_movie_id ?? "";
 
-      if (movie.status === 'watchlist') {
-        const res = await apiClient.post<{ id: string; providerExternalId: string; type: string; title: string; posterPath: string | null; season?: number | null; episode?: number | null; createdAt: string }>('/watchlist', {
-          type: 'movie',
+      if (movie.status === "watchlist") {
+        const res = await apiClient.post<{
+          id: string;
+          providerExternalId: string;
+          type: string;
+          title: string;
+          posterPath: string | null;
+          season?: number | null;
+          episode?: number | null;
+          createdAt: string;
+        }>("/watchlist", {
+          type: "movie",
           providerExternalId,
         });
         return {
@@ -630,8 +879,8 @@ export async function addPersonalMovie(
           ano_lancamento: movie.ano_lancamento ?? null,
           capa_url: res.data.posterPath ?? movie.capa_url ?? null,
           plataforma_slug: movie.plataforma_slug ?? null,
-          status: 'watchlist' as MovieStatus,
-          source: movie.source ?? ('manual' as const),
+          status: "watchlist" as MovieStatus,
+          source: movie.source ?? ("manual" as const),
           source_movie_id: res.data.providerExternalId ?? null,
           avaliacao: movie.avaliacao ?? null,
           rating: movie.rating ?? null,
@@ -643,8 +892,16 @@ export async function addPersonalMovie(
       }
 
       // status === 'watched'
-      const res = await apiClient.post<{ id: string; type: string; points: number; providerExternalId: string; season?: number | null; episode?: number | null; createdAt: string }>('/watch-entries', {
-        type: 'movie',
+      const res = await apiClient.post<{
+        id: string;
+        type: string;
+        points: number;
+        providerExternalId: string;
+        season?: number | null;
+        episode?: number | null;
+        createdAt: string;
+      }>("/watch-entries", {
+        type: "movie",
         providerExternalId,
         isRetroactive: movie.is_retroactive ?? false,
       });
@@ -655,8 +912,8 @@ export async function addPersonalMovie(
         ano_lancamento: movie.ano_lancamento ?? null,
         capa_url: movie.capa_url ?? null,
         plataforma_slug: movie.plataforma_slug ?? null,
-        status: 'watched' as MovieStatus,
-        source: movie.source ?? ('manual' as const),
+        status: "watched" as MovieStatus,
+        source: movie.source ?? ("manual" as const),
         source_movie_id: res.data.providerExternalId ?? null,
         avaliacao: movie.avaliacao ?? null,
         rating: movie.rating ?? null,
@@ -672,20 +929,27 @@ export async function addPersonalMovie(
 
 export async function updatePersonalMovie(
   movieId: string,
-  updates: Partial<Pick<PersonalMovie, 'status' | 'plataforma_slug' | 'avaliacao' | 'is_retroactive'>>,
+  updates: Partial<
+    Pick<
+      PersonalMovie,
+      "status" | "plataforma_slug" | "avaliacao" | "is_retroactive"
+    >
+  >,
   userId?: string | null,
 ) {
   return withFallback(
     async () => {
       // Move a watched item back to the watchlist.
-      if (updates.status === 'watchlist') {
-        const watchEntriesRes = await apiClient.get<{
-          id: string;
-          providerExternalId: string;
-          type: string;
-          title: string;
-          posterPath: string | null;
-        }[]>(userId ? `/users/${userId}/watch-entries` : '/watch-entries');
+      if (updates.status === "watchlist") {
+        const watchEntriesRes = await apiClient.get<
+          {
+            id: string;
+            providerExternalId: string;
+            type: string;
+            title: string;
+            posterPath: string | null;
+          }[]
+        >(userId ? `/users/${userId}/watch-entries` : "/watch-entries");
         const item = watchEntriesRes.data.find((entry) => entry.id === movieId);
 
         if (item) {
@@ -697,21 +961,22 @@ export async function updatePersonalMovie(
             title: string;
             posterPath: string | null;
             createdAt: string;
-          }>('/watchlist', {
+          }>("/watchlist", {
             type: item.type,
             providerExternalId: item.providerExternalId,
           });
 
           return {
             id: res.data.id,
-            user_id: '',
+            user_id: "",
             titulo: res.data.title ?? item.title,
             ano_lancamento: null,
             capa_url: res.data.posterPath ?? item.posterPath,
             plataforma_slug: updates.plataforma_slug ?? null,
-            status: 'watchlist' as MovieStatus,
-            source: 'manual' as const,
-            source_movie_id: res.data.providerExternalId ?? item.providerExternalId,
+            status: "watchlist" as MovieStatus,
+            source: "manual" as const,
+            source_movie_id:
+              res.data.providerExternalId ?? item.providerExternalId,
             avaliacao: updates.avaliacao ?? null,
             rating: null,
             review: null,
@@ -722,30 +987,46 @@ export async function updatePersonalMovie(
       }
 
       // If status changed to 'watched', move from watchlist to watch-entries
-      if (updates.status === 'watched') {
+      if (updates.status === "watched") {
         // We need to get the current item to find its providerExternalId.
         // Try to delete from watchlist (it may be a watchlist item being moved to watched).
         // The caller provides the movieId which is the watchlist entry id.
         try {
           // Get the current watchlist to find the item details
-          const watchlistRes = await apiClient.get<{ id: string; providerExternalId: string; type: string; title: string; posterPath: string | null; createdAt: string }[]>('/watchlist');
+          const watchlistRes = await apiClient.get<
+            {
+              id: string;
+              providerExternalId: string;
+              type: string;
+              title: string;
+              posterPath: string | null;
+              createdAt: string;
+              season?: number | null;
+            }[]
+          >("/watchlist");
           const item = watchlistRes.data.find((e) => e.id === movieId);
           if (item) {
             await apiClient.delete(`/watchlist/${movieId}`);
-            const res = await apiClient.post<{ id: string; type: string; points: number; providerExternalId: string; createdAt: string }>('/watch-entries', {
+            const res = await apiClient.post<{
+              id: string;
+              type: string;
+              points: number;
+              providerExternalId: string;
+              createdAt: string;
+            }>("/watch-entries", {
               type: item.type,
               providerExternalId: item.providerExternalId,
               isRetroactive: updates.is_retroactive ?? false,
             });
             return {
               id: res.data.id,
-              user_id: '',
+              user_id: "",
               titulo: item.title,
               ano_lancamento: null,
               capa_url: item.posterPath ?? null,
               plataforma_slug: updates.plataforma_slug ?? null,
-              status: 'watched' as MovieStatus,
-              source: 'manual' as const,
+              status: "watched" as MovieStatus,
+              source: "manual" as const,
               source_movie_id: item.providerExternalId ?? null,
               avaliacao: updates.avaliacao ?? null,
               rating: null,
@@ -787,28 +1068,74 @@ export async function listSeries(userId: string) {
   return withFallback(
     async () => {
       const [watchEntriesRes, watchlistRes, reviewsRes] = await Promise.all([
-        apiClient.get<{ id: string; type: string; points: number; providerExternalId: string; season?: number | null; episode?: number | null; createdAt: string; title: string; posterPath: string | null; isRetroactive?: boolean; is_retroactive?: boolean }[]>(`/users/${userId}/watch-entries`),
-        apiClient.get<{ id: string; providerExternalId: string; type: string; title: string; posterPath: string | null; season?: number | null; episode?: number | null; createdAt: string }[]>(`/watchlist/users/${userId}`),
-        apiClient.get<{ id: string; mediaItemId: string; providerExternalId: string; type: 'movie' | 'series'; rating: number; review: string | null; createdAt: string; title: string; posterPath: string | null }[]>(`/users/${userId}/reviews`),
+        apiClient.get<
+          {
+            id: string;
+            type: string;
+            points: number;
+            providerExternalId: string;
+            season?: number | null;
+            episode?: number | null;
+            createdAt: string;
+            title: string;
+            posterPath: string | null;
+            isRetroactive?: boolean;
+            is_retroactive?: boolean;
+          }[]
+        >(`/users/${userId}/watch-entries`),
+        apiClient.get<
+          {
+            id: string;
+            providerExternalId: string;
+            type: string;
+            title: string;
+            posterPath: string | null;
+            season?: number | null;
+            episode?: number | null;
+            createdAt: string;
+          }[]
+        >(`/watchlist/users/${userId}`),
+        apiClient.get<
+          {
+            id: string;
+            mediaItemId: string;
+            providerExternalId: string;
+            type: "movie" | "series";
+            rating: number;
+            review: string | null;
+            createdAt: string;
+            title: string;
+            posterPath: string | null;
+          }[]
+        >(`/users/${userId}/reviews`),
       ]);
 
-      const seriesEntries = watchEntriesRes.data.filter((e) => e.type === 'series');
-      const seriesWatchlist = watchlistRes.data.filter((e) => e.type === 'series');
+      const seriesEntries = watchEntriesRes.data.filter(
+        (e) => e.type === "series",
+      );
+      const seriesWatchlist = watchlistRes.data.filter(
+        (e) => e.type === "series",
+      );
 
       // Create a map of reviews by providerExternalId for series
       const reviewsMap = new Map(
         reviewsRes.data
-          .filter((r) => r.type === 'series')
-          .map((r) => [r.providerExternalId, r])
+          .filter((r) => r.type === "series")
+          .map((r) => [r.providerExternalId, r]),
       );
 
       // Collect unique TMDB IDs to fetch season totals
       const tmdbIds = new Set<string>();
-      for (const e of seriesEntries) if (e.providerExternalId) tmdbIds.add(e.providerExternalId);
-      for (const e of seriesWatchlist) if (e.providerExternalId) tmdbIds.add(e.providerExternalId);
+      for (const e of seriesEntries)
+        if (e.providerExternalId) tmdbIds.add(e.providerExternalId);
+      for (const e of seriesWatchlist)
+        if (e.providerExternalId) tmdbIds.add(e.providerExternalId);
 
       // Fetch TMDB details in parallel (deduplicated) with localStorage cache
-      const tmdbDetailsMap = new Map<string, { season_number: number; episode_count: number }[]>();
+      const tmdbDetailsMap = new Map<
+        string,
+        { season_number: number; episode_count: number }[]
+      >();
       await Promise.all(
         [...tmdbIds].map(async (tmdbId) => {
           const details = await getTvDetailsWithCache(Number(tmdbId));
@@ -816,7 +1143,10 @@ export async function listSeries(userId: string) {
         }),
       );
 
-      const getSeasonTotal = (tmdbId: string | null, season: number): number => {
+      const getSeasonTotal = (
+        tmdbId: string | null,
+        season: number,
+      ): number => {
         if (!tmdbId) return 0;
         const seasons = tmdbDetailsMap.get(tmdbId);
         if (!seasons) return 0;
@@ -836,12 +1166,12 @@ export async function listSeries(userId: string) {
         const lastSeason = seasons[seasons.length - 1];
         const seasonTotal = getSeasonTotal(tmdbId, season);
         const completedEntireSeries = Boolean(
-          lastSeason
-          && season === lastSeason.season_number
-          && seasonTotal > 0
-          && watchedEpisodes >= seasonTotal,
+          lastSeason &&
+          season === lastSeason.season_number &&
+          seasonTotal > 0 &&
+          watchedEpisodes >= seasonTotal,
         );
-        return completedEntireSeries ? 'watched' : 'watching';
+        return completedEntireSeries ? "watched" : "watching";
       };
 
       const watched: SeriesEntry[] = seriesEntries.map((e) => {
@@ -852,9 +1182,13 @@ export async function listSeries(userId: string) {
         return {
           id: e.id,
           user_id: userId,
-          titulo: e.title ?? '',
+          titulo: e.title ?? "",
           capa_url: e.posterPath ?? null,
-          status: getSeriesProgressStatus(e.providerExternalId, temporada, episodios_vistos),
+          status: getSeriesProgressStatus(
+            e.providerExternalId,
+            temporada,
+            episodios_vistos,
+          ),
           temporada,
           total_episodios,
           episodios_vistos,
@@ -865,16 +1199,17 @@ export async function listSeries(userId: string) {
           review: review?.review ?? null,
           streaming_data: null,
           created_at: e.createdAt,
-          is_retroactive: Boolean(e.isRetroactive ?? e.is_retroactive) || e.points === 0,
+          is_retroactive:
+            Boolean(e.isRetroactive ?? e.is_retroactive) || e.points === 0,
         };
       });
 
       const watchlist: SeriesEntry[] = seriesWatchlist.map((e) => ({
         id: e.id,
         user_id: userId,
-        titulo: e.title ?? '',
+        titulo: e.title ?? "",
         capa_url: e.posterPath ?? null,
-        status: 'watchlist' as SeriesStatus,
+        status: "watchlist" as SeriesStatus,
         temporada: e.season ?? 1,
         total_episodios: getSeasonTotal(e.providerExternalId, e.season ?? 1),
         episodios_vistos: 0,
@@ -888,7 +1223,10 @@ export async function listSeries(userId: string) {
       }));
 
       const all = [...watched, ...watchlist];
-      all.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      all.sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      );
       return all;
     },
     () => localData.listSeries(userId),
@@ -897,17 +1235,42 @@ export async function listSeries(userId: string) {
 
 export async function addSeries(
   userId: string,
-  series: Omit<SeriesEntry, 'id' | 'user_id' | 'created_at'>,
+  series: Omit<SeriesEntry, "id" | "user_id" | "created_at">,
 ) {
   return withFallback(
     async () => {
       const providerExternalId = series.source_movie_id ?? series.titulo;
       const season = Math.max(1, series.temporada || 1);
-      const episode = series.episodios_vistos > 0 ? series.episodios_vistos : undefined;
+      const episode =
+        series.episodios_vistos > 0 ? series.episodios_vistos : undefined;
+      if (series.status !== "watchlist" && episode) {
+        const createdEntries = await createSeriesWatchEntries(
+          providerExternalId,
+          await resolveSeriesEpisodes(providerExternalId, season, episode),
+          series.is_retroactive ?? false,
+        );
+        const lastEntry = createdEntries[createdEntries.length - 1]!;
+        return {
+          ...series,
+          id: lastEntry.id,
+          user_id: userId,
+          created_at: lastEntry.createdAt,
+          temporada: lastEntry.season ?? season,
+        } as SeriesEntry;
+      }
 
-      if (series.status === 'watchlist') {
-        const res = await apiClient.post<{ id: string; providerExternalId: string; type: string; title: string; posterPath: string | null; season?: number | null; episode?: number | null; createdAt: string }>('/watchlist', {
-          type: 'series',
+      if (series.status === "watchlist") {
+        const res = await apiClient.post<{
+          id: string;
+          providerExternalId: string;
+          type: string;
+          title: string;
+          posterPath: string | null;
+          season?: number | null;
+          episode?: number | null;
+          createdAt: string;
+        }>("/watchlist", {
+          type: "series",
           providerExternalId,
           season,
           episode,
@@ -917,7 +1280,7 @@ export async function addSeries(
           user_id: userId,
           titulo: res.data.title ?? series.titulo,
           capa_url: res.data.posterPath ?? series.capa_url ?? null,
-          status: 'watchlist' as SeriesStatus,
+          status: "watchlist" as SeriesStatus,
           temporada: res.data.season ?? season,
           total_episodios: series.total_episodios,
           episodios_vistos: 0,
@@ -932,8 +1295,16 @@ export async function addSeries(
       }
 
       // watching or watched → create watch-entry
-      const res = await apiClient.post<{ id: string; type: string; points: number; providerExternalId: string; season?: number | null; episode?: number | null; createdAt: string }>('/watch-entries', {
-        type: 'series',
+      const res = await apiClient.post<{
+        id: string;
+        type: string;
+        points: number;
+        providerExternalId: string;
+        season?: number | null;
+        episode?: number | null;
+        createdAt: string;
+      }>("/watch-entries", {
+        type: "series",
         providerExternalId,
         season,
         episode,
@@ -966,7 +1337,14 @@ export async function updateSeries(
   updates: Partial<
     Pick<
       SeriesEntry,
-      'status' | 'temporada' | 'total_episodios' | 'episodios_vistos' | 'plataforma_slug' | 'avaliacao' | 'source_movie_id' | 'is_retroactive'
+      | "status"
+      | "temporada"
+      | "total_episodios"
+      | "episodios_vistos"
+      | "plataforma_slug"
+      | "avaliacao"
+      | "source_movie_id"
+      | "is_retroactive"
     >
   >,
 ) {
@@ -980,25 +1358,51 @@ export async function updateSeries(
       if (!providerExternalId) {
         // Try to find the item in watchlist first, then watch-entries
         try {
-          const watchlistRes = await apiClient.get<{ id: string; providerExternalId: string; type: string; title: string; posterPath: string | null; season?: number | null; episode?: number | null; createdAt: string }[]>('/watchlist');
+          const watchlistRes = await apiClient.get<
+            {
+              id: string;
+              providerExternalId: string;
+              type: string;
+              title: string;
+              posterPath: string | null;
+              season?: number | null;
+              episode?: number | null;
+              createdAt: string;
+            }[]
+          >("/watchlist");
           const wlItem = watchlistRes.data.find((e) => e.id === seriesId);
           if (wlItem) {
             providerExternalId = wlItem.providerExternalId;
             itemTitle = wlItem.title;
             itemPosterPath = wlItem.posterPath;
           }
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
 
         if (!providerExternalId) {
           try {
-            const weRes = await apiClient.get<{ id: string; type: string; providerExternalId: string; title: string; posterPath: string | null; season?: number | null; episode?: number | null; createdAt: string }[]>('/watch-entries');
+            const weRes = await apiClient.get<
+              {
+                id: string;
+                type: string;
+                providerExternalId: string;
+                title: string;
+                posterPath: string | null;
+                season?: number | null;
+                episode?: number | null;
+                createdAt: string;
+              }[]
+            >("/watch-entries");
             const weItem = weRes.data.find((e) => e.id === seriesId);
             if (weItem) {
               providerExternalId = weItem.providerExternalId;
               itemTitle = weItem.title;
               itemPosterPath = weItem.posterPath;
             }
-          } catch { /* ignore */ }
+          } catch {
+            /* ignore */
+          }
         }
       }
 
@@ -1007,16 +1411,20 @@ export async function updateSeries(
       }
 
       // Move a watched/watching series back to the watchlist.
-      if (updates.status === 'watchlist') {
-        const watchEntriesRes = await apiClient.get<{
-          id: string;
-          providerExternalId: string;
-          type: string;
-          title: string;
-          posterPath: string | null;
-          season?: number | null;
-        }[]>('/watch-entries');
-        const item = watchEntriesRes.data.find((entry) => entry.id === seriesId);
+      if (updates.status === "watchlist") {
+        const watchEntriesRes = await apiClient.get<
+          {
+            id: string;
+            providerExternalId: string;
+            type: string;
+            title: string;
+            posterPath: string | null;
+            season?: number | null;
+          }[]
+        >("/watch-entries");
+        const item = watchEntriesRes.data.find(
+          (entry) => entry.id === seriesId,
+        );
 
         if (item) {
           await apiClient.delete(`/watch-entries/${seriesId}`);
@@ -1029,19 +1437,20 @@ export async function updateSeries(
             posterPath: string | null;
             season?: number | null;
             createdAt: string;
-          }>('/watchlist', {
-            type: 'series',
+          }>("/watchlist", {
+            type: "series",
             providerExternalId: item.providerExternalId,
             season,
           });
 
           return {
             id: res.data.id,
-            user_id: '',
+            user_id: "",
             titulo: res.data.title ?? item.title,
             capa_url: res.data.posterPath ?? item.posterPath,
-            status: 'watchlist',
-            source_movie_id: res.data.providerExternalId ?? item.providerExternalId,
+            status: "watchlist",
+            source_movie_id:
+              res.data.providerExternalId ?? item.providerExternalId,
             temporada: res.data.season ?? season,
             total_episodios: updates.total_episodios ?? 0,
             episodios_vistos: 0,
@@ -1056,14 +1465,71 @@ export async function updateSeries(
       }
 
       // If status changed to 'watched' or 'watching' from watchlist, move from watchlist to watch-entries
-      if (updates.status === 'watched' || updates.status === 'watching') {
+      if (updates.status === "watched" || updates.status === "watching") {
         try {
-          const watchlistRes = await apiClient.get<{ id: string; providerExternalId: string; type: string; title: string; posterPath: string | null; createdAt: string }[]>('/watchlist');
+          const watchlistRes = await apiClient.get<
+            {
+              id: string;
+              providerExternalId: string;
+              type: string;
+              title: string;
+              posterPath: string | null;
+              createdAt: string;
+              season?: number | null;
+            }[]
+          >("/watchlist");
           const item = watchlistRes.data.find((e) => e.id === seriesId);
           if (item) {
+            const targetSeason = Math.max(
+              1,
+              updates.temporada ?? item.season ?? 1,
+            );
+            const targetEpisode = Math.max(
+              1,
+              updates.episodios_vistos ?? updates.total_episodios ?? 1,
+            );
+            if (targetEpisode > 1 || targetSeason > 1) {
+              const createdEntries = await createSeriesWatchEntries(
+                item.providerExternalId,
+                await resolveSeriesEpisodes(
+                  item.providerExternalId,
+                  targetSeason,
+                  targetEpisode,
+                ),
+                updates.is_retroactive ?? false,
+              );
+              const lastEntry = createdEntries[createdEntries.length - 1]!;
+              await apiClient.delete(`/watchlist/${seriesId}`);
+              return {
+                id: lastEntry.id,
+                user_id: "",
+                titulo: item.title,
+                capa_url: item.posterPath ?? null,
+                status: updates.status,
+                source_movie_id: item.providerExternalId,
+                temporada: lastEntry.season ?? targetSeason,
+                total_episodios: updates.total_episodios ?? 0,
+                episodios_vistos: updates.episodios_vistos ?? 0,
+                plataforma_slug: updates.plataforma_slug ?? null,
+                avaliacao: updates.avaliacao ?? null,
+                rating: null,
+                review: null,
+                streaming_data: null,
+                created_at: lastEntry.createdAt,
+                is_retroactive: updates.is_retroactive,
+              } as SeriesEntry;
+            }
             await apiClient.delete(`/watchlist/${seriesId}`);
-            const res = await apiClient.post<{ id: string; type: string; points: number; providerExternalId: string; season?: number | null; episode?: number | null; createdAt: string }>('/watch-entries', {
-              type: 'series',
+            const res = await apiClient.post<{
+              id: string;
+              type: string;
+              points: number;
+              providerExternalId: string;
+              season?: number | null;
+              episode?: number | null;
+              createdAt: string;
+            }>("/watch-entries", {
+              type: "series",
               providerExternalId: item.providerExternalId,
               season: updates.temporada,
               episode: updates.episodios_vistos,
@@ -1071,7 +1537,7 @@ export async function updateSeries(
             });
             return {
               id: res.data.id,
-              user_id: '',
+              user_id: "",
               titulo: item.title,
               capa_url: item.posterPath ?? null,
               status: updates.status,
@@ -1098,17 +1564,40 @@ export async function updateSeries(
         // Get current series data to determine previous episode
         let previousEpisode = 0;
         let previousSeason = updates.temporada ?? 1;
+        const existingEpisodeKeys = new Set<string>();
 
         try {
-          const weRes = await apiClient.get<{ id: string; type: string; providerExternalId: string; season?: number | null; episode?: number | null; createdAt: string }[]>('/watch-entries');
+          const weRes = await apiClient.get<
+            {
+              id: string;
+              type: string;
+              providerExternalId: string;
+              season?: number | null;
+              episode?: number | null;
+              createdAt: string;
+            }[]
+          >("/watch-entries");
           const seriesEntries = weRes.data
-            .filter((e) => e.type === 'series' && e.providerExternalId === providerExternalId)
-            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            .filter(
+              (e) =>
+                e.type === "series" &&
+                e.providerExternalId === providerExternalId,
+            )
+            .sort(
+              (a, b) =>
+                new Date(b.createdAt).getTime() -
+                new Date(a.createdAt).getTime(),
+            );
 
           if (seriesEntries.length > 0) {
             const lastEntry = seriesEntries[0];
             previousEpisode = lastEntry.episode ?? 0;
             previousSeason = lastEntry.season ?? 1;
+          }
+          for (const entry of seriesEntries) {
+            if (entry.season != null && entry.episode != null) {
+              existingEpisodeKeys.add(`${entry.season}:${entry.episode}`);
+            }
           }
         } catch {
           // If we can't get previous data, just mark the single episode
@@ -1129,23 +1618,33 @@ export async function updateSeries(
         } else if (currentSeason > previousSeason) {
           // Different season: need to fetch TMDB data to know how many episodes each season has
           try {
-            const tmdbDetails = await getTvDetailsWithCache(Number(providerExternalId));
+            const tmdbDetails = await getTvDetailsWithCache(
+              Number(providerExternalId),
+            );
             if (tmdbDetails && tmdbDetails.seasons) {
               const regularSeasons = tmdbDetails.seasons
                 .filter((s) => s.season_number > 0)
                 .sort((a, b) => a.season_number - b.season_number);
 
               // Complete previous season
-              const prevSeasonData = regularSeasons.find((s) => s.season_number === previousSeason);
+              const prevSeasonData = regularSeasons.find(
+                (s) => s.season_number === previousSeason,
+              );
               if (prevSeasonData) {
-                for (let ep = previousEpisode + 1; ep <= prevSeasonData.episode_count; ep++) {
+                for (
+                  let ep = previousEpisode + 1;
+                  ep <= prevSeasonData.episode_count;
+                  ep++
+                ) {
                   episodes.push({ season: previousSeason, episode: ep });
                 }
               }
 
               // Complete all intermediate seasons
               for (let s = previousSeason + 1; s < currentSeason; s++) {
-                const seasonData = regularSeasons.find((season) => season.season_number === s);
+                const seasonData = regularSeasons.find(
+                  (season) => season.season_number === s,
+                );
                 if (seasonData) {
                   for (let ep = 1; ep <= seasonData.episode_count; ep++) {
                     episodes.push({ season: s, episode: ep });
@@ -1171,8 +1670,12 @@ export async function updateSeries(
         }
 
         // Remove duplicates and episodes already watched
-        const uniqueEpisodes = episodes.filter((ep, index, self) =>
-          index === self.findIndex((e) => e.season === ep.season && e.episode === ep.episode)
+        const uniqueEpisodes = episodes.filter(
+          (ep, index, self) =>
+            index ===
+              self.findIndex(
+                (e) => e.season === ep.season && e.episode === ep.episode,
+              ) && !existingEpisodeKeys.has(`${ep.season}:${ep.episode}`),
         );
 
         if (uniqueEpisodes.length === 0) {
@@ -1183,11 +1686,18 @@ export async function updateSeries(
         // Use batch endpoint if multiple episodes, single endpoint otherwise
         if (uniqueEpisodes.length > 1) {
           const res = await apiClient.post<{
-            entries: Array<{ id: string; type: string; points: number; season: number; episode: number; createdAt: string }>;
+            entries: Array<{
+              id: string;
+              type: string;
+              points: number;
+              season: number;
+              episode: number;
+              createdAt: string;
+            }>;
             totalPoints: number;
             providerExternalId: string;
-          }>('/watch-entries/batch', {
-            type: 'series',
+          }>("/watch-entries/batch", {
+            type: "series",
             providerExternalId,
             episodes: uniqueEpisodes,
             isRetroactive: updates.is_retroactive ?? false,
@@ -1197,10 +1707,10 @@ export async function updateSeries(
           const lastEntry = res.data.entries[res.data.entries.length - 1];
           return {
             id: lastEntry.id,
-            user_id: '',
-            titulo: itemTitle ?? '',
+            user_id: "",
+            titulo: itemTitle ?? "",
             capa_url: itemPosterPath ?? null,
-            status: updates.status ?? 'watching',
+            status: updates.status ?? "watching",
             source_movie_id: providerExternalId,
             temporada: lastEntry.season,
             total_episodios: updates.total_episodios ?? 0,
@@ -1215,8 +1725,16 @@ export async function updateSeries(
           } as SeriesEntry;
         } else {
           // Single episode: use existing endpoint
-          const res = await apiClient.post<{ id: string; type: string; points: number; providerExternalId: string; season?: number | null; episode?: number | null; createdAt: string }>('/watch-entries', {
-            type: 'series',
+          const res = await apiClient.post<{
+            id: string;
+            type: string;
+            points: number;
+            providerExternalId: string;
+            season?: number | null;
+            episode?: number | null;
+            createdAt: string;
+          }>("/watch-entries", {
+            type: "series",
             providerExternalId,
             season: uniqueEpisodes[0].season,
             episode: uniqueEpisodes[0].episode,
@@ -1224,10 +1742,10 @@ export async function updateSeries(
           });
           return {
             id: res.data.id,
-            user_id: '',
-            titulo: itemTitle ?? '',
+            user_id: "",
+            titulo: itemTitle ?? "",
             capa_url: itemPosterPath ?? null,
-            status: updates.status ?? 'watching',
+            status: updates.status ?? "watching",
             source_movie_id: providerExternalId,
             temporada: res.data.season ?? updates.temporada ?? 1,
             total_episodios: updates.total_episodios ?? 0,
@@ -1250,8 +1768,10 @@ export async function updateSeries(
   );
 }
 
-
-export async function updatePersonalMovieStreaming(movieId: string, streamingData: string) {
+export async function updatePersonalMovieStreaming(
+  movieId: string,
+  streamingData: string,
+) {
   return withFallback(
     async () => {
       // The API does not support streaming data updates on watch-entries/watchlist.
@@ -1262,7 +1782,10 @@ export async function updatePersonalMovieStreaming(movieId: string, streamingDat
   );
 }
 
-export async function updateSeriesStreaming(seriesId: string, streamingData: string) {
+export async function updateSeriesStreaming(
+  seriesId: string,
+  streamingData: string,
+) {
   return withFallback(
     async () => {
       // The API does not support streaming data updates on watch-entries/watchlist.
@@ -1276,16 +1799,16 @@ export async function updateSeriesStreaming(seriesId: string, streamingData: str
 export async function suggestMovieToUser(
   fromUserId: string,
   toUserId: string,
-  movie: Omit<PersonalMovie, 'id' | 'user_id' | 'created_at'>,
-  mediaType: 'movie' | 'tv' = 'movie',
+  movie: Omit<PersonalMovie, "id" | "user_id" | "created_at">,
+  mediaType: "movie" | "tv" = "movie",
 ) {
   return withFallback(
     async () => {
-      const type = mediaType === 'tv' ? 'series' : 'movie';
-      await apiClient.post('/recommendations', {
+      const type = mediaType === "tv" ? "series" : "movie";
+      await apiClient.post("/recommendations", {
         toUserId,
         type,
-        providerExternalId: movie.source_movie_id ?? '',
+        providerExternalId: movie.source_movie_id ?? "",
       });
     },
     () => localData.suggestMovieToUser(fromUserId, toUserId, movie, mediaType),
@@ -1302,7 +1825,14 @@ export async function rateMovie(
   return withFallback(
     async () => {
       // We need the providerExternalId for the review. Try to find the movie in watch-entries.
-      const watchEntriesRes = await apiClient.get<{ id: string; providerExternalId: string; type: string; title: string }[]>('/watch-entries');
+      const watchEntriesRes = await apiClient.get<
+        {
+          id: string;
+          providerExternalId: string;
+          type: string;
+          title: string;
+        }[]
+      >("/watch-entries");
       const entry = watchEntriesRes.data.find((e) => e.id === movieId);
       const providerExternalId = entry?.providerExternalId ?? movieId;
 
@@ -1314,7 +1844,7 @@ export async function rateMovie(
         review?: string;
       } = {
         providerExternalId,
-        type: 'movie',
+        type: "movie",
         rating: stars,
       };
 
@@ -1323,7 +1853,7 @@ export async function rateMovie(
         requestBody.review = review;
       }
 
-      await apiClient.post('/reviews', requestBody);
+      await apiClient.post("/reviews", requestBody);
     },
     () => localData.rateMovie(actorUserId, movieId, _movieTitle, stars, review),
   );
@@ -1338,7 +1868,14 @@ export async function rateSeries(
   return withFallback(
     async () => {
       // We need the providerExternalId for the review. Try to find the series in watch-entries.
-      const watchEntriesRes = await apiClient.get<{ id: string; providerExternalId: string; type: string; title: string }[]>('/watch-entries');
+      const watchEntriesRes = await apiClient.get<
+        {
+          id: string;
+          providerExternalId: string;
+          type: string;
+          title: string;
+        }[]
+      >("/watch-entries");
       const entry = watchEntriesRes.data.find((e) => e.id === seriesId);
       const providerExternalId = entry?.providerExternalId ?? seriesId;
 
@@ -1350,7 +1887,7 @@ export async function rateSeries(
         review?: string;
       } = {
         providerExternalId,
-        type: 'series',
+        type: "series",
         rating: stars,
       };
 
@@ -1359,13 +1896,16 @@ export async function rateSeries(
         requestBody.review = review;
       }
 
-      await apiClient.post('/reviews', requestBody);
+      await apiClient.post("/reviews", requestBody);
     },
     () => localData.rateSeries(actorUserId, seriesId, stars, review),
   );
 }
 
-export async function listMediaReviews(providerExternalId: string, type: 'movie' | 'series') {
+export async function listMediaReviews(
+  providerExternalId: string,
+  type: "movie" | "series",
+) {
   return withFallback(
     async () => {
       const { data } = await apiClient.get<{
@@ -1379,7 +1919,7 @@ export async function listMediaReviews(providerExternalId: string, type: 'movie'
           review: string | null;
           createdAt: string;
         }[];
-      }>('/reviews', {
+      }>("/reviews", {
         params: { providerExternalId, type },
       });
       return {
@@ -1404,17 +1944,19 @@ export async function listMediaReviews(providerExternalId: string, type: 'movie'
 export async function listUserReviews(userId: string) {
   return withFallback(
     async () => {
-      const { data } = await apiClient.get<{
-        id: string;
-        userId: string;
-        providerExternalId: string;
-        type: 'movie' | 'series';
-        rating: number;
-        review: string | null;
-        createdAt: string;
-        title: string;
-        posterPath: string | null;
-      }[]>(`/users/${userId}/reviews`);
+      const { data } = await apiClient.get<
+        {
+          id: string;
+          userId: string;
+          providerExternalId: string;
+          type: "movie" | "series";
+          rating: number;
+          review: string | null;
+          createdAt: string;
+          title: string;
+          posterPath: string | null;
+        }[]
+      >(`/users/${userId}/reviews`);
       return data;
     },
     async () => {
@@ -1435,7 +1977,10 @@ export async function deleteReview(reviewId: string) {
   );
 }
 
-export async function getMovieCineratsStats(sourceMovieId: string | null, title: string) {
+export async function getMovieCineratsStats(
+  sourceMovieId: string | null,
+  title: string,
+) {
   return withFallback(
     async () => {
       if (!sourceMovieId) {
@@ -1445,15 +1990,20 @@ export async function getMovieCineratsStats(sourceMovieId: string | null, title:
 
       // The dynamic media page needs the all-time watcher count.
       // Trending is a separate 30-day popularity metric and must not be used here.
-      const mediaStats = await listMediaReviews(sourceMovieId, 'movie');
+      const mediaStats = await listMediaReviews(sourceMovieId, "movie");
       const reviews = mediaStats.reviews;
       const watchersCount = mediaStats.watchersCount;
 
       // Calculate average rating
       const ratings = reviews.map((r) => Number(r.rating)).filter((r) => r > 0);
-      const averageRating = ratings.length > 0
-        ? Number((ratings.reduce((sum, r) => sum + r, 0) / ratings.length).toFixed(1))
-        : 0;
+      const averageRating =
+        ratings.length > 0
+          ? Number(
+              (ratings.reduce((sum, r) => sum + r, 0) / ratings.length).toFixed(
+                1,
+              ),
+            )
+          : 0;
 
       return {
         watchersCount,
@@ -1471,7 +2021,10 @@ export async function getMovieCineratsStats(sourceMovieId: string | null, title:
   );
 }
 
-export async function getSeriesCineratsStats(sourceMovieId: string | null, title: string) {
+export async function getSeriesCineratsStats(
+  sourceMovieId: string | null,
+  title: string,
+) {
   return withFallback(
     async () => {
       if (!sourceMovieId) {
@@ -1481,14 +2034,19 @@ export async function getSeriesCineratsStats(sourceMovieId: string | null, title
 
       // Use the all-time watcher count returned by the media stats endpoint.
       // The trending metric is intentionally not used on the dynamic page.
-      const mediaStats = await listMediaReviews(sourceMovieId, 'series');
+      const mediaStats = await listMediaReviews(sourceMovieId, "series");
       const reviews = mediaStats.reviews;
 
       // Calculate stats
       const ratings = reviews.map((r) => Number(r.rating)).filter((r) => r > 0);
-      const averageRating = ratings.length > 0
-        ? Number((ratings.reduce((sum, r) => sum + r, 0) / ratings.length).toFixed(1))
-        : 0;
+      const averageRating =
+        ratings.length > 0
+          ? Number(
+              (ratings.reduce((sum, r) => sum + r, 0) / ratings.length).toFixed(
+                1,
+              ),
+            )
+          : 0;
 
       return {
         watchersCount: mediaStats.watchersCount,
@@ -1528,7 +2086,12 @@ export async function getCineMatchSuggestion(
 ): Promise<CineMatchSuggestion | null> {
   return withFallback(
     async () => {
-      const res = await apiClient.get<{ providerExternalId: string; title: string; posterPath: string | null; type: string } | null>('/cinematch', {
+      const res = await apiClient.get<{
+        providerExternalId: string;
+        title: string;
+        posterPath: string | null;
+        type: string;
+      } | null>("/cinematch", {
         params: { friendId: friendUserId, mode },
       });
 
@@ -1538,29 +2101,54 @@ export async function getCineMatchSuggestion(
         titulo: res.data.title,
         capa_url: res.data.posterPath,
         origem: mode,
-        reason: mode === 'geral'
-          ? 'Watchlist em comum encontrada para os dois.'
-          : 'Oscar pendente para os dois usuarios.',
+        reason:
+          mode === "geral"
+            ? "Watchlist em comum encontrada para os dois."
+            : "Oscar pendente para os dois usuarios.",
       };
     },
     () => localData.getCineMatchSuggestion(currentUserId, friendUserId, mode),
   );
 }
 
-export function getSeriesStatus(episodiosVistos: number, totalEpisodios: number): SeriesStatus {
-  if (episodiosVistos <= 0) return 'watchlist';
-  return totalEpisodios > 0 && episodiosVistos >= totalEpisodios ? 'watched' : 'watching';
+export function getSeriesStatus(
+  episodiosVistos: number,
+  totalEpisodios: number,
+): SeriesStatus {
+  if (episodiosVistos <= 0) return "watchlist";
+  return totalEpisodios > 0 && episodiosVistos >= totalEpisodios
+    ? "watched"
+    : "watching";
 }
 
 export async function getTrendingMovies(): Promise<TrendingMovie[]> {
   return withFallback(
     async () => {
-      const res = await apiClient.get<{ title: string; posterPath: string | null; providerExternalId: string; type?: string; mediaType?: string; userCount: number; userIds: string[]; lastWatchedAt: string }[]>('/watch-entries/trending');
+      const res = await apiClient.get<
+        {
+          title: string;
+          posterPath: string | null;
+          providerExternalId: string;
+          type?: string;
+          mediaType?: string;
+          userCount: number;
+          userIds: string[];
+          lastWatchedAt: string;
+        }[]
+      >("/watch-entries/trending");
       return res.data.map((e) => ({
         title: e.title,
         coverUrl: e.posterPath,
         tmdbId: e.providerExternalId,
-        mediaType: e.mediaType === 'tv' || e.mediaType === 'series' || e.type === 'tv' || e.type === 'series' ? 'tv' as const : e.mediaType === 'movie' || e.type === 'movie' ? 'movie' as const : undefined,
+        mediaType:
+          e.mediaType === "tv" ||
+          e.mediaType === "series" ||
+          e.type === "tv" ||
+          e.type === "series"
+            ? ("tv" as const)
+            : e.mediaType === "movie" || e.type === "movie"
+              ? ("movie" as const)
+              : undefined,
         userCount: e.userCount,
         userIds: e.userIds,
         lastWatchedAt: e.lastWatchedAt,
@@ -1571,28 +2159,39 @@ export async function getTrendingMovies(): Promise<TrendingMovie[]> {
 }
 
 const categoryToApi: Record<string, string> = {
-  melhor_filme: 'best_picture',
-  melhor_ator: 'best_actor',
-  melhor_atriz: 'best_actress',
-  melhor_internacional: 'best_international_film',
-  melhor_roteiro: 'best_screenplay',
+  melhor_filme: "best_picture",
+  melhor_ator: "best_actor",
+  melhor_atriz: "best_actress",
+  melhor_internacional: "best_international_film",
+  melhor_roteiro: "best_screenplay",
 };
 
 const categoryFromApi: Record<string, string> = Object.fromEntries(
   Object.entries(categoryToApi).map(([k, v]) => [v, k]),
 );
 
-export async function getOscarPredictionsForUser(userId: string): Promise<UserOscarPrediction[]> {
+export async function getOscarPredictionsForUser(
+  userId: string,
+): Promise<UserOscarPrediction[]> {
   return withFallback(
     async () => {
-      const res = await apiClient.get<{ id: string; category: string; providerExternalId: string; name: string; imagePath: string | null; createdAt: string }[]>(`/users/${userId}/oscar-predictions`);
+      const res = await apiClient.get<
+        {
+          id: string;
+          category: string;
+          providerExternalId: string;
+          name: string;
+          imagePath: string | null;
+          createdAt: string;
+        }[]
+      >(`/users/${userId}/oscar-predictions`);
       return res.data.map((p) => ({
         id: p.id,
         user_id: userId,
         category: categoryFromApi[p.category] ?? p.category,
         tmdb_id: p.providerExternalId,
         title: p.name,
-        poster_path: p.imagePath ?? '',
+        poster_path: p.imagePath ?? "",
         created_at: p.createdAt,
       }));
     },
@@ -1605,11 +2204,18 @@ export async function saveOscarPrediction(
   category: string,
   tmdbId: string,
   title: string,
-  posterPath: string
+  posterPath: string,
 ): Promise<UserOscarPrediction> {
   return withFallback(
     async () => {
-      const res = await apiClient.put<{ id: string; category: string; providerExternalId: string; name: string; imagePath: string | null; createdAt: string }>('/oscar-predictions', {
+      const res = await apiClient.put<{
+        id: string;
+        category: string;
+        providerExternalId: string;
+        name: string;
+        imagePath: string | null;
+        createdAt: string;
+      }>("/oscar-predictions", {
         category: categoryToApi[category] ?? category,
         providerExternalId: tmdbId,
         name: title,
@@ -1621,23 +2227,48 @@ export async function saveOscarPrediction(
         category: categoryFromApi[res.data.category] ?? res.data.category,
         tmdb_id: res.data.providerExternalId,
         title: res.data.name,
-        poster_path: res.data.imagePath ?? '',
+        poster_path: res.data.imagePath ?? "",
         created_at: res.data.createdAt,
       };
     },
-    () => localData.saveOscarPrediction(userId, category, tmdbId, title, posterPath),
+    () =>
+      localData.saveOscarPrediction(
+        userId,
+        category,
+        tmdbId,
+        title,
+        posterPath,
+      ),
   );
 }
 
 export async function getAnticipatedMovies(): Promise<AnticipatedMovie[]> {
   return withFallback(
     async () => {
-      const res = await apiClient.get<{ title: string; posterPath: string | null; providerExternalId: string; type?: string; mediaType?: string; userCount?: number; userIds?: string[] }[]>('/watchlist/anticipated');
+      const res = await apiClient.get<
+        {
+          title: string;
+          posterPath: string | null;
+          providerExternalId: string;
+          type?: string;
+          mediaType?: string;
+          userCount?: number;
+          userIds?: string[];
+        }[]
+      >("/watchlist/anticipated");
       return res.data.map((e) => ({
         title: e.title,
         coverUrl: e.posterPath,
         tmdbId: e.providerExternalId,
-        mediaType: e.mediaType === 'tv' || e.mediaType === 'series' || e.type === 'tv' || e.type === 'series' ? 'tv' as const : e.mediaType === 'movie' || e.type === 'movie' ? 'movie' as const : undefined,
+        mediaType:
+          e.mediaType === "tv" ||
+          e.mediaType === "series" ||
+          e.type === "tv" ||
+          e.type === "series"
+            ? ("tv" as const)
+            : e.mediaType === "movie" || e.type === "movie"
+              ? ("movie" as const)
+              : undefined,
         userCount: e.userCount ?? e.userIds?.length ?? 0,
         userIds: e.userIds ?? [],
       }));
@@ -1652,7 +2283,8 @@ export interface DataImport {
   id: string;
   userId?: string;
   platform: string;
-  status: 'pending' | 'importing_movies' | 'importing_series' | 'done' | 'failed';
+  status:
+    "pending" | "importing_movies" | "importing_series" | "done" | "failed";
   lastStatus?: string | null;
   errorMessage?: string | null;
   createdAt: string;
@@ -1674,46 +2306,61 @@ export interface ImportError {
 
 export async function uploadTvTimeImport(file: File): Promise<DataImport> {
   const formData = new FormData();
-  formData.append('file', file);
-  formData.append('platform', 'tv_time');
+  formData.append("file", file);
+  formData.append("platform", "tv_time");
 
-  const response = await apiClient.post<DataImport>('/users/data-imports', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
+  const response = await apiClient.post<DataImport>(
+    "/users/data-imports",
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
     },
-  });
+  );
 
   // API returns data in camelCase
   return response.data;
 }
 
 export async function listUserImports(): Promise<DataImport[]> {
-  const response = await apiClient.get<DataImport[]>('/users/data-imports');
+  const response = await apiClient.get<DataImport[]>("/users/data-imports");
   // API returns data in camelCase
   return response.data;
 }
 
-export async function getImportStatusById(importId: string): Promise<DataImport> {
-  const response = await apiClient.get<DataImport>(`/users/data-imports/${importId}`);
+export async function getImportStatusById(
+  importId: string,
+): Promise<DataImport> {
+  const response = await apiClient.get<DataImport>(
+    `/users/data-imports/${importId}`,
+  );
   // API returns data in camelCase
   return response.data;
 }
 
-export async function getImportErrors(importId: string): Promise<ImportError[]> {
-  const response = await apiClient.get<ImportError[]>(`/users/data-imports/${importId}/errors`);
+export async function getImportErrors(
+  importId: string,
+): Promise<ImportError[]> {
+  const response = await apiClient.get<ImportError[]>(
+    `/users/data-imports/${importId}/errors`,
+  );
   // API returns data in camelCase
   return response.data;
 }
 
 export async function downloadImportErrorsCSV(importId: string): Promise<void> {
-  const response = await apiClient.get(`/users/data-imports/${importId}/errors/export`, {
-    responseType: 'blob',
-  });
+  const response = await apiClient.get(
+    `/users/data-imports/${importId}/errors/export`,
+    {
+      responseType: "blob",
+    },
+  );
 
   // Create download link
-  const blob = new Blob([response.data], { type: 'text/csv; charset=utf-8' });
+  const blob = new Blob([response.data], { type: "text/csv; charset=utf-8" });
   const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
+  const link = document.createElement("a");
   link.href = url;
   link.download = `erros-importacao-${importId}.csv`;
   document.body.appendChild(link);
@@ -1721,4 +2368,3 @@ export async function downloadImportErrorsCSV(importId: string): Promise<void> {
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
-

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
+import type { ElementType } from 'react';
 import { useOscarPredictions } from '../../hooks/useOscarPredictions';
-import { searchMovies, searchPeople } from '../../lib/tmdb';
+import { searchMovies, searchPeople, type TMDBMovie, type TMDBPerson } from '../../lib/tmdb';
 import { Loader2, Search, RotateCcw, Film, User, Globe, FileText, Trophy } from 'lucide-react';
 import type { UserOscarPrediction } from '../../types/app';
 
@@ -14,8 +15,10 @@ interface CategoryConfig {
   name: string;
   type: 'movie' | 'person';
   placeholder: string;
-  icon: any;
+  icon: ElementType;
 }
+
+type PredictionSearchResult = TMDBMovie | TMDBPerson;
 
 const CATEGORIES: CategoryConfig[] = [
   { id: 'melhor_filme', name: 'Melhor Filme', type: 'movie', placeholder: 'Pesquisar filme...', icon: Film },
@@ -107,7 +110,7 @@ interface CategoryCardProps {
 
 function CategoryCard({ config, prediction, canEdit, onSelect, isGlobalPending }: CategoryCardProps) {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<PredictionSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [isChanging, setIsChanging] = useState(false);
   const [selectingId, setSelectingId] = useState<string | null>(null);
@@ -151,14 +154,14 @@ function CategoryCard({ config, prediction, canEdit, onSelect, isGlobalPending }
     setSelectingId(null);
   }, [prediction]);
 
-  const handleSelect = async (item: any) => {
+  const handleSelect = async (item: PredictionSearchResult) => {
     if (isGlobalPending || selectingId) return;
 
     const idStr = String(item.id);
     setSelectingId(idStr);
     
-    const title = item.title || item.name;
-    const poster = item.poster_path || item.profile_path || '';
+    const title = 'title' in item ? item.title : item.name;
+    const poster = 'poster_path' in item ? item.poster_path || '' : item.profile_path || '';
     
     await onSelect(config.id, idStr, title, poster);
     setIsChanging(false);
@@ -240,8 +243,8 @@ function CategoryCard({ config, prediction, canEdit, onSelect, isGlobalPending }
                       {results.map((item) => {
                         const idStr = String(item.id);
                         const isThisSelecting = selectingId === idStr;
-                        const itemTitle = item.title || item.name;
-                        const itemImage = item.poster_path || item.profile_path;
+                        const itemTitle = 'title' in item ? item.title : item.name;
+                        const itemImage = 'poster_path' in item ? item.poster_path : item.profile_path;
 
                         return (
                           <button

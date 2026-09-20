@@ -13,6 +13,16 @@ export interface ChangelogLinkItem {
 
 export const CHANGELOGS: ChangelogEntry[] = [
   {
+    date: '2026-09-16',
+    title: 'Nova Home Page e melhorias gerais',
+    items: [
+      'Nova Home Page.',
+      'Modificações estéticas importantes.',
+      'Correção de bugs apontados pela comunidade.',
+      'Correção de pontuação.',
+    ],
+  },
+  {
     date: '2026-08-17',
     title: 'Sistema de pontos',
     items: [

@@ -264,7 +264,7 @@ export default function HomeScreen({ userId, movies, series, favoriteGenre: favo
       </div>
 
       <Collection title="Tendências da semana" subtitle="O que está movimentando o catálogo agora." icon={<Flame size={19} />} items={weeklyQuery.data || []} isLoading={weeklyQuery.isLoading} emptyMessage="Não foi possível carregar as tendências agora." carousel limit={10} />
-      <Collection title={watchedSeed ? `Porque você assistiu ${watchedSeed.title}` : 'Porque você assistiu'} subtitle="Relacionados ao seu último título marcado como visto." icon={<Sparkles size={19} />} items={relatedQuery.data || []} isLoading={relatedQuery.isLoading} emptyMessage={watchedSeed ? 'Não encontramos recomendações que atendam aos critérios agora.' : 'Marque um filme ou série como visto para receber recomendações personalizadas.'} carousel />
+      <Collection title={watchedSeed ? `Porque você assistiu "${watchedSeed.title}"` : 'Porque você assistiu'} subtitle="Relacionados ao seu último título marcado como visto." icon={<Sparkles size={19} />} items={relatedQuery.data || []} isLoading={relatedQuery.isLoading} emptyMessage={watchedSeed ? 'Não encontramos recomendações que atendam aos critérios agora.' : 'Marque um filme ou série como visto para receber recomendações personalizadas.'} carousel />
       <Collection
         title="Baseado no seu gênero favorito"
         subtitle={favoriteGenre ? `Sugestões de ${favoriteGenre.label}.` : 'Escolha um gênero para personalizar esta seleção.'}

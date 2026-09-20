@@ -23,6 +23,49 @@ interface SharedItem {
   created_at: string;
 }
 
+const CAPTURE_TIMEOUT_MS = 20_000;
+
+function waitForRenderedImages(element: HTMLElement) {
+  const images = Array.from(element.querySelectorAll('img'));
+
+  return Promise.all(
+    images.map((image) => {
+      if (image.complete) return Promise.resolve();
+
+      return new Promise<void>((resolve) => {
+        const finish = () => {
+          image.removeEventListener('load', finish);
+          image.removeEventListener('error', finish);
+          window.clearTimeout(timeout);
+          resolve();
+        };
+        const timeout = window.setTimeout(finish, 8_000);
+        image.addEventListener('load', finish, { once: true });
+        image.addEventListener('error', finish, { once: true });
+      });
+    }),
+  );
+}
+
+function withTimeout<T>(promise: Promise<T>, message: string) {
+  return new Promise<T>((resolve, reject) => {
+    const timeout = window.setTimeout(
+      () => reject(new Error(message)),
+      CAPTURE_TIMEOUT_MS,
+    );
+    promise.then(
+      (value) => {
+        window.clearTimeout(timeout);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timeout);
+        reject(error);
+      },
+    );
+  });
+}
+
 export default function ShareReviewModal({
   currentUserId,
   currentDisplayName,
@@ -70,11 +113,13 @@ export default function ShareReviewModal({
   const [mediaFilter, setMediaFilter] = useState<'all' | 'movie' | 'series'>('all');
   const [titleFilter, setTitleFilter] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingAlternate, setIsGeneratingAlternate] = useState(false);
   const [generatedImages, setGeneratedImages] = useState<string[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   const postRefPhoto = useRef<HTMLDivElement>(null);
   const postRefDark = useRef<HTMLDivElement>(null);
+  const previewTouchStartX = useRef<number | null>(null);
 
   const filteredItems = ratedItems.filter((item) => {
     const matchesType = mediaFilter === 'all' || item.type === mediaFilter;
@@ -108,35 +153,95 @@ export default function ShareReviewModal({
         setGeneratedImages([]);
         setCurrentImageIndex(0);
         setIsGenerating(false);
+        setIsGeneratingAlternate(false);
       }, 300);
     }
   };
 
+  const renderPost = async (
+    element: HTMLDivElement,
+    backgroundColor: string,
+  ) => {
+    await waitForRenderedImages(element);
+
+    const canvas = await withTimeout(
+      html2canvas(element, {
+        scale: 1,
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor,
+        imageTimeout: 10_000,
+        logging: false,
+        onclone: (clonedDocument) => {
+          clonedDocument.querySelectorAll('img[loading="lazy"]').forEach((image) => {
+            image.setAttribute('loading', 'eager');
+          });
+        },
+        ignoreElements: (elementToIgnore) =>
+          elementToIgnore instanceof HTMLImageElement &&
+          elementToIgnore.loading === 'lazy',
+      }),
+      'A geração demorou mais que o esperado. Tente novamente.',
+    );
+    const dataUrl = canvas.toDataURL('image/png');
+    canvas.width = 0;
+    canvas.height = 0;
+    return dataUrl;
+  };
+
   const generateImage = async () => {
-    if (!postRefPhoto.current || !postRefDark.current || !selectedItem) return;
+    if (!postRefPhoto.current || !selectedItem) return;
     setIsGenerating(true);
     setGeneratedImages([]);
     setCurrentImageIndex(0);
 
     try {
-      // Wait briefly for the proxy image to load in the hidden div
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      const opts = { scale: 2, useCORS: true, backgroundColor: '#0f0f0f' };
-
-      const canvasPhoto = await html2canvas(postRefPhoto.current, opts);
-      const dataUrlPhoto = canvasPhoto.toDataURL('image/png');
-
-      const canvasDark = await html2canvas(postRefDark.current, { ...opts, backgroundColor: '#0a0f1e' });
-      const dataUrlDark = canvasDark.toDataURL('image/png');
-
-      setGeneratedImages([dataUrlPhoto, dataUrlDark]);
+      const dataUrlPhoto = await renderPost(postRefPhoto.current, '#0f0f0f');
+      setGeneratedImages([dataUrlPhoto]);
     } catch (error) {
       console.error('Falha ao gerar imagem', error);
       alert('Houve um erro ao gerar a imagem: ' + (error instanceof Error ? error.message : String(error)));
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const generateAlternateImage = async () => {
+    if (!postRefDark.current || !selectedItem || generatedImages.length > 1) return;
+    setIsGeneratingAlternate(true);
+
+    try {
+      const dataUrlDark = await renderPost(postRefDark.current, '#0a0f1e');
+      setGeneratedImages((images) => [...images, dataUrlDark]);
+      setCurrentImageIndex(1);
+    } catch (error) {
+      console.error('Falha ao gerar a versão sem fundo', error);
+      alert('Não foi possível gerar a versão sem fundo. Sua primeira imagem continua disponível.');
+    } finally {
+      setIsGeneratingAlternate(false);
+    }
+  };
+
+  const showPreviousImage = () =>
+    setCurrentImageIndex((index) =>
+      index === 0 ? generatedImages.length - 1 : index - 1,
+    );
+
+  const showNextImage = () =>
+    setCurrentImageIndex((index) =>
+      index === generatedImages.length - 1 ? 0 : index + 1,
+    );
+
+  const handlePreviewTouchEnd = (event: React.TouchEvent<HTMLDivElement>) => {
+    const startX = previewTouchStartX.current;
+    const endX = event.changedTouches[0]?.clientX;
+    previewTouchStartX.current = null;
+    if (startX === null || endX === undefined || generatedImages.length < 2) return;
+
+    const distance = endX - startX;
+    if (Math.abs(distance) < 40) return;
+    if (distance > 0) showPreviousImage();
+    else showNextImage();
   };
 
   const handleDownload = () => {
@@ -305,10 +410,10 @@ export default function ShareReviewModal({
             <div className="flex min-h-0 flex-col items-center gap-3 overflow-y-auto pr-1 sm:gap-4">
               <p className="shrink-0 text-xs uppercase tracking-[0.14em] text-brand-text-muted">Preview da Imagem</p>
               
-              <div className="grid w-full min-w-0 grid-cols-[2.5rem_minmax(0,1fr)_2.5rem] items-center justify-items-center gap-2 sm:gap-3">
+              <div className="grid w-full min-w-0 grid-cols-[4.5rem_minmax(0,1fr)_4.5rem] items-center justify-items-center gap-2 sm:gap-3">
                 {generatedImages.length > 1 ? (
                   <button
-                    onClick={() => setCurrentImageIndex((prev) => (prev === 0 ? generatedImages.length - 1 : prev - 1))}
+                    onClick={showPreviousImage}
                     className="flex h-10 w-10 items-center justify-center rounded-full border border-[#222] bg-[#151515] p-3 text-white transition hover:border-brand-gold/40 hover:text-brand-gold active:scale-95"
                     title="Versão anterior"
                     aria-label="Versão anterior"
@@ -317,20 +422,35 @@ export default function ShareReviewModal({
                   </button>
                 ) : <div aria-hidden="true" />}
                 
-                <div className="relative aspect-[9/16] w-full max-w-[270px] overflow-hidden rounded-lg border border-brand-gold/30 bg-black shadow-2xl">
+                <div
+                  className="relative aspect-[9/16] w-full max-w-[270px] touch-pan-y overflow-hidden rounded-lg border border-brand-gold/30 bg-black shadow-2xl"
+                  onTouchStart={(event) => {
+                    previewTouchStartX.current = event.touches[0]?.clientX ?? null;
+                  }}
+                  onTouchEnd={handlePreviewTouchEnd}
+                >
                   <img src={generatedImages[currentImageIndex]} alt="Preview" className="absolute inset-0 h-full w-full object-cover" />
                 </div>
 
                 {generatedImages.length > 1 ? (
                   <button
-                    onClick={() => setCurrentImageIndex((prev) => (prev === generatedImages.length - 1 ? 0 : prev + 1))}
+                    onClick={showNextImage}
                     className="flex h-10 w-10 items-center justify-center rounded-full border border-[#222] bg-[#151515] p-3 text-white transition hover:border-brand-gold/40 hover:text-brand-gold active:scale-95"
                     title="Próxima versão"
                     aria-label="Próxima versão"
                   >
                     &#8594;
                   </button>
-                ) : <div aria-hidden="true" />}
+                ) : (
+                  <button
+                    type="button"
+                    onClick={generateAlternateImage}
+                    disabled={isGeneratingAlternate}
+                    className="min-w-0 rounded-xl border border-[#333] px-2 py-3 text-[9px] font-semibold uppercase tracking-[0.1em] text-brand-text transition hover:border-brand-gold/40 hover:text-brand-gold disabled:opacity-50 sm:px-3 sm:text-[10px]"
+                  >
+                    {isGeneratingAlternate ? 'Gerando...' : 'Sem BG'}
+                  </button>
+                )}
               </div>
 
               <div className="flex w-full shrink-0 items-center justify-center gap-2">

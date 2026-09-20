@@ -1124,11 +1124,13 @@ export async function resetUserMcoinsForMonth(userId: string, currentMonth: stri
   const index = users.findIndex((u) => u.id === userId);
   if (index >= 0) {
     const dbAvatarId = users[index].avatar_id || '';
-    let parsed: any = {};
+    let parsed: { last_reset_month?: string } = {};
     if (dbAvatarId.startsWith('{')) {
       try {
-        parsed = JSON.parse(dbAvatarId);
-      } catch {}
+        parsed = JSON.parse(dbAvatarId) as { last_reset_month?: string };
+      } catch {
+        parsed = {};
+      }
     }
 
     if (parsed.last_reset_month === currentMonth) {
@@ -1173,7 +1175,7 @@ export async function getMovieCineratsStats(sourceMovieId: string | null, title:
 
 export async function getSeriesCineratsStats(title: string) {
   const docs = readSeries().filter((s) => titleKey(s.titulo) === titleKey(title));
-  const watchedDocs = docs.filter((s) => s.status === 'watched' || s.status === 'concluido' as any);
+  const watchedDocs = docs.filter((s) => s.status === 'watched' || String(s.status) === 'concluido');
   const ratings = docs.map((s) => Number(s.rating ?? s.avaliacao)).filter((r) => !isNaN(r) && r > 0);
   const avg = ratings.length > 0 ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length : 0;
   const reviews = docs

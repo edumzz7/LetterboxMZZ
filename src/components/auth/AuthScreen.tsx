@@ -9,6 +9,7 @@ interface AuthScreenProps {
   error: string | null;
   isPending: boolean;
   onForgotPassword?: () => void;
+  initialMode?: Mode;
 }
 
 export default function AuthScreen({
@@ -17,8 +18,9 @@ export default function AuthScreen({
   error,
   isPending,
   onForgotPassword,
+  initialMode = 'login',
 }: AuthScreenProps) {
-  const [mode, setMode] = useState<Mode>('login');
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

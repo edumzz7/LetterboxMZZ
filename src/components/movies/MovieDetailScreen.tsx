@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Loader2, Film, Eye, EyeOff, Plus, Trash2, Edit3, Star, ArrowLeft, Video } from 'lucide-react';
+import { Loader2, Film, Eye, EyeOff, Plus, Trash2, Edit3, Star, ArrowLeft, Video, Lock } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { usePersonalMovies } from '../../hooks/usePersonalMovies';
 import { useSocialActions } from '../../hooks/useSocialActions';
@@ -17,7 +17,7 @@ import WatchedTimingDialog from './WatchedTimingDialog';
 
 interface MovieDetailScreenProps {
   id: string;
-  currentUserId: string;
+  currentUserId: string | null;
 }
 
 export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScreenProps) {
@@ -31,6 +31,7 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
   };
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [isWatchedTimingOpen, setIsWatchedTimingOpen] = useState(false);
+  const isGuest = !currentUserId;
 
   // 1. Fetch TMDB Movie Details
   const movieQuery = useQuery({
@@ -88,7 +89,7 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
   const credits = creditsQuery.data;
   const providers = providersQuery.data || [];
   const cineratsStats = cineratsQuery.data;
-  const userMovies = moviesQuery.data || [];
+  const userMovies = useMemo(() => moviesQuery.data || [], [moviesQuery.data]);
   const users = usersQuery.data || [];
 
   // Find if current user has this movie in their list
@@ -102,9 +103,9 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
   }, [userMovies, movie]);
 
   const releaseYear = movie?.release_date ? movie.release_date.split('-')[0] : null;
-  const director = credits?.crew?.find((c: any) => c.job === 'Director');
+  const director = credits?.crew?.find((member: { job?: string }) => member.job === 'Director');
   const cast = credits?.cast?.slice(0, 6) || [];
-  const genres = movie?.genres?.map((g: any) => g.name).join(', ') || '';
+  const genres = movie?.genres?.map((genre: { name: string }) => genre.name).join(', ') || '';
 
   const isPending =
     addMovieMutation.isPending ||
@@ -113,7 +114,7 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
     rateMutation.isPending;
 
   const handleToggleWatchlist = async () => {
-    if (!movie) return;
+    if (isGuest || !movie) return;
     if (userMovieDoc) {
       if (userMovieDoc.status === 'watchlist') {
         // Remove from list entirely if they click Watchlist again
@@ -142,7 +143,7 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
   };
 
   const handleConfirmWatched = async (isRetroactive: boolean) => {
-    if (!movie) return;
+    if (isGuest || !movie) return;
     if (userMovieDoc) {
       await updateStatusMutation.mutateAsync({
         id: userMovieDoc.id,
@@ -167,7 +168,7 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
   };
 
   const handleToggleWatched = async () => {
-    if (!movie) return;
+    if (isGuest || !movie) return;
     if (userMovieDoc?.status === 'watched') {
       // If watched, change to watchlist immediately.
       await updateStatusMutation.mutateAsync({ id: userMovieDoc.id, status: 'watchlist' });
@@ -179,9 +180,9 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
   };
 
   const handleSaveRatingAndReview = async (stars: number, review: string) => {
-    if (!userMovieDoc || !movie) return;
+    if (isGuest || !userMovieDoc || !movie) return;
     await rateMutation.mutateAsync({
-      actorUserId: currentUserId,
+      actorUserId: currentUserId!,
       movieId: userMovieDoc.id,
       movieTitle: movie.title,
       stars,
@@ -262,30 +263,32 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
           <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
             <button
               onClick={handleToggleWatchlist}
-              disabled={isPending}
+              disabled={isPending || isGuest}
+              title={isGuest ? 'Entre para usar a watchlist' : undefined}
               className={clsx(
-                'flex items-center gap-2 py-3 px-6 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all active:scale-95 border disabled:opacity-50',
+                'flex items-center gap-2 py-3 px-6 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all active:scale-95 border disabled:opacity-50 disabled:cursor-not-allowed',
                 userMovieDoc?.status === 'watchlist'
                   ? 'bg-brand-gold text-brand-bg border-brand-gold font-bold'
                   : 'bg-black/45 border-[#222] text-brand-text hover:border-brand-gold/35 hover:text-brand-gold'
               )}
             >
-              {userMovieDoc?.status === 'watchlist' ? <Trash2 size={14} /> : <Plus size={14} />}
-              {userMovieDoc?.status === 'watchlist' ? 'Na Watchlist' : 'Watchlist'}
+              {isGuest ? <Lock size={14} /> : userMovieDoc?.status === 'watchlist' ? <Trash2 size={14} /> : <Plus size={14} />}
+              {isGuest ? 'Watchlist' : userMovieDoc?.status === 'watchlist' ? 'Na Watchlist' : 'Watchlist'}
             </button>
 
             <button
               onClick={handleToggleWatched}
-              disabled={isPending}
+              disabled={isPending || isGuest}
+              title={isGuest ? 'Entre para marcar como visto' : undefined}
               className={clsx(
-                'flex items-center gap-2 py-3 px-6 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all active:scale-95 border disabled:opacity-50',
+                'flex items-center gap-2 py-3 px-6 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all active:scale-95 border disabled:opacity-50 disabled:cursor-not-allowed',
                 userMovieDoc?.status === 'watched'
                   ? 'bg-green-600 border-green-600 text-white font-bold'
                   : 'bg-black/45 border-[#222] text-brand-text-muted hover:border-brand-gold/35 hover:text-brand-gold'
               )}
             >
-              {userMovieDoc?.status === 'watched' ? <EyeOff size={14} /> : <Eye size={14} />}
-              {userMovieDoc?.status === 'watched' ? 'Visto' : 'Marcar visto'}
+              {isGuest ? <Lock size={14} /> : userMovieDoc?.status === 'watched' ? <EyeOff size={14} /> : <Eye size={14} />}
+              {isGuest ? 'Marcar visto' : userMovieDoc?.status === 'watched' ? 'Visto' : 'Marcar visto'}
             </button>
 
             {userMovieDoc?.status === 'watched' && (
@@ -379,7 +382,7 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
                 <div>
                   <span className="font-semibold text-brand-text-muted uppercase text-xs tracking-wider block mb-3">Elenco principal:</span>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    {cast.map((actor: any) => (
+                    {cast.map((actor: { id: number; name: string; profile_path: string | null; character?: string }) => (
                       <button key={actor.id} type="button" onClick={() => setLocation(`/actor/${actor.id}`)} className="flex min-w-0 cursor-pointer items-center gap-2 text-left transition hover:text-brand-gold">
                         {actor.profile_path ? (
                           <img

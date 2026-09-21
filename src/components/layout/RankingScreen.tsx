@@ -64,13 +64,13 @@ const SECRET_META = {
 const HEX_CLIP_PATH = 'polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0 50%)';
 
 const MCOIN_RULES = [
-  ['Assistir a uma mídia', '1 MC a cada 10 min'],
-  ['Limite diário de consumo', '24 MC'],
+  ['Assistir a uma mídia', '5 MC a cada 10 min'],
+  ['Limite diário de consumo', '120 MC (240 min)'],
   ['Assistir a uma mídia indicada', '+1 MC de bônus'],
   ['Bônus para quem indicou após a mídia ser assistida', '+3 MC'],
   ['Indicar um filme ou série', '+5 MC'],
-  ['Avaliar uma mídia dentro de 72h', '+2 MC'],
-  ['Escrever uma resenha dentro de 72h', '+2 MC'],
+  ['Avaliar uma mídia dentro de 72h', '+10 MC'],
+  ['Escrever uma resenha dentro de 72h', '+10 MC'],
   ['Adicionar à watchlist ou reagir', '0 MC'],
 ];
 
@@ -268,7 +268,15 @@ export default function RankingScreen({ user, users, movies, series, currentUser
         <div className="pointer-events-none absolute -right-8 -top-12 h-40 w-40 rounded-full border border-brand-gold/10" />
 
         <div className="relative flex flex-col gap-7">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+          <button
+            type="button"
+            onClick={() => window.history.back()}
+            className="inline-flex w-fit items-center gap-1.5 text-[10px] uppercase tracking-[0.16em] text-brand-text-muted transition hover:text-brand-gold"
+          >
+            <Icons.ArrowLeft size={13} />
+            Voltar
+          </button>
+          <div className="mt-1 flex flex-col gap-5 sm:flex-row sm:items-center">
             <AvatarDisplay avatarId={user.avatar_id} className="h-24 w-24 rounded-full border-[3px] border-brand-gold shadow-[0_0_28px_rgba(212,175,55,0.2)]" emojiClassName="text-5xl" />
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-gold">Seu espaço de conquistas</p>

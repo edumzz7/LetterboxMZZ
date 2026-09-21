@@ -68,7 +68,9 @@ function App() {
   const [matchSerie, serieParams] = useRoute('/serie/:id');
   const [matchActor, actorParams] = useRoute('/actor/:id');
   const [matchDirector, directorParams] = useRoute('/director/:id');
-  const [matchImportTvTime] = useRoute('/import-tvtime');
+  const [matchLegacyImport] = useRoute('/import-tvtime');
+  const [matchImports] = useRoute('/imports');
+  const matchImportTvTime = matchLegacyImport || matchImports;
   const [matchChangelogs] = useRoute('/changelogs');
   const [matchFaq] = useRoute('/faq');
   const [matchRequestPasswordReset] = useRoute('/conta/esqueci-senha');

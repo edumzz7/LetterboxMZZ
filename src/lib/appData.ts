@@ -1646,17 +1646,19 @@ export async function getAnticipatedMovies(): Promise<AnticipatedMovie[]> {
   );
 }
 
-// Data Import (Tv Time) API
+// Data import API
+export type DataImportPlatform = 'tv_time' | 'letterboxd';
 // API returns data in camelCase format
 export interface DataImport {
   id: string;
   userId?: string;
-  platform: string;
+  platform: DataImportPlatform;
+  errorCount?: number;
   status: 'pending' | 'importing_movies' | 'importing_series' | 'done' | 'failed';
   lastStatus?: string | null;
   errorMessage?: string | null;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
   finishedAt?: string | null;
 }
 
@@ -1672,19 +1674,18 @@ export interface ImportError {
   episodeNumber?: number;
 }
 
-export async function uploadTvTimeImport(file: File): Promise<DataImport> {
+export async function uploadDataImport(file: File, platform: DataImportPlatform): Promise<Pick<DataImport, 'id' | 'status'>> {
   const formData = new FormData();
-  formData.append('file', file);
-  formData.append('platform', 'tv_time');
-
-  const response = await apiClient.post<DataImport>('/users/data-imports', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
-
-  // API returns data in camelCase
+  // Keep the File selected by the browser. Reconstructing it with `new File()`
+  // is unnecessary and fails in some mobile WebViews and older browsers.
+  formData.append('file', file, file.name);
+  formData.append('platform', platform);
+  const response = await apiClient.post<Pick<DataImport, 'id' | 'status'>>('/users/data-imports', formData);
   return response.data;
+}
+
+export async function uploadTvTimeImport(file: File): Promise<DataImport> {
+  return { ...await uploadDataImport(file, 'tv_time'), platform: 'tv_time' };
 }
 
 export async function listUserImports(): Promise<DataImport[]> {
@@ -1721,4 +1722,3 @@ export async function downloadImportErrorsCSV(importId: string): Promise<void> {
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
-

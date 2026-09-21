@@ -119,10 +119,10 @@ export default function UserDropdownMenu({
             </DropdownMenu.Item>
 
             <DropdownMenu.Item
-              onSelect={() => setTimeout(() => setLocation('/import-tvtime'), 50)}
+              onSelect={() => setTimeout(() => setLocation('/imports'), 50)}
               className="flex items-center gap-2 px-2 py-2 outline-none cursor-pointer rounded hover:bg-brand-gold/10 hover:text-brand-gold transition"
             >
-              <Upload size={16} /> Importar Tv Time
+              <Upload size={16} /> Importar dados
             </DropdownMenu.Item>
 
             {isAdmin && (

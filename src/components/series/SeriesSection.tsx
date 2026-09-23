@@ -10,7 +10,7 @@ import SeriesCard from "./SeriesCard";
 interface SeriesSectionProps {
   userId: string;
   canEdit: boolean;
-  currentUserId: string;
+  currentUserId?: string;
   publicReadOnly?: boolean;
 }
 
@@ -139,7 +139,7 @@ export default function SeriesSection({
                 onDelete={(seriesId) => deleteSeriesMutation.mutate(seriesId)}
                 onRate={(seriesId, stars, review) =>
                   rateSeriesMutation.mutateAsync({
-                    actorUserId: currentUserId,
+                    actorUserId: currentUserId || '',
                     seriesId,
                     stars,
                     review,
@@ -181,7 +181,7 @@ export default function SeriesSection({
                 onDelete={(seriesId) => deleteSeriesMutation.mutate(seriesId)}
                 onRate={(seriesId, stars, review) =>
                   rateSeriesMutation.mutateAsync({
-                    actorUserId: currentUserId,
+                    actorUserId: currentUserId || '',
                     seriesId,
                     stars,
                     review,

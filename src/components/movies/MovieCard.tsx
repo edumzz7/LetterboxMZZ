@@ -84,7 +84,12 @@ export default function MovieCard({
   const imageSrc = generateImagePath(movie.titulo, movie.capa_url);
   const isWatched = movie.status === 'watched';
   const isFriendCard = Boolean(currentUserId) && movie.user_id !== currentUserId;
-  const canRate = !isFriendCard && isWatched && Boolean(onRate);
+  const canRate = canEdit
+    && Boolean(currentUserId)
+    && movie.user_id === currentUserId
+    && !isFriendCard
+    && isWatched
+    && Boolean(onRate);
   const suggestionBadge = useMemo(() => {
     return (movie.source_movie_id ?? '').includes('|rec:');
   }, [movie]);
@@ -152,7 +157,7 @@ export default function MovieCard({
   };
 
   const handleRate = async (stars: number, review?: string | null) => {
-    if (!onRate) return;
+    if (!canRate || !onRate) return;
     const previousRating = localRating;
     setRatingError(null);
     setLocalRating(stars);

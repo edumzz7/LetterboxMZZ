@@ -9,6 +9,7 @@ export interface TMDBMovie {
     release_date: string;
     poster_path: string | null;
     vote_average?: number;
+    vote_count?: number;
     original_language?: string;
 }
 
@@ -329,6 +330,107 @@ export function getWeeklyTrendingMedia() {
     return getHomeCatalog('trending/all/week?language=pt-BR');
 }
 
+function formatLocalDate(date: Date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+export function isReleaseDateUpcoming(value?: string | null) {
+    if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+
+    const today = formatLocalDate(new Date());
+    return value >= today;
+}
+
+export function isReleaseDateOnOrBeforeToday(value?: string | null) {
+    if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+
+    const today = formatLocalDate(new Date());
+    return value <= today;
+}
+
+async function getUpcomingCatalog(
+    type: 'movie' | 'tv',
+    startDate: string,
+    endDate: string,
+): Promise<TMDBHomeMedia[]> {
+    if (!TMDB_API_KEY) return [];
+
+    const params = new URLSearchParams({
+        api_key: TMDB_API_KEY,
+        language: 'pt-BR',
+        include_adult: 'false',
+        sort_by: 'popularity.desc',
+        page: '1',
+    });
+
+    if (type === 'movie') {
+        params.set('region', 'BR');
+        params.set('with_release_type', '2|3');
+        params.set('release_date.gte', startDate);
+        params.set('release_date.lte', endDate);
+    } else {
+        params.set('include_null_first_air_dates', 'false');
+        params.set('first_air_date.gte', startDate);
+        params.set('first_air_date.lte', endDate);
+    }
+
+    try {
+        const unique = new Map<number, TMDBHomeMedia>();
+        let page = 1;
+        let totalPages = 1;
+
+        while (page <= Math.min(totalPages, 5) && unique.size < 5) {
+            params.set('page', String(page));
+            const response = await fetch(`${TMDB_BASE_URL}/discover/${type}?${params.toString()}`);
+            if (!response.ok) break;
+
+            const data = await response.json();
+            totalPages = Math.max(1, Number(data?.total_pages) || 1);
+            const results = (data?.results || []) as TMDBRecommendationItem[];
+
+            for (const item of results) {
+                const releaseDate = type === 'movie' ? item.release_date : item.first_air_date;
+                const title = item.title || item.name;
+                if (!item.id || !title || !item.poster_path || item.adult || !releaseDate) continue;
+
+                unique.set(item.id, { ...item, media_type: type });
+            }
+
+            page += 1;
+        }
+
+        return Array.from(unique.values())
+            .sort((a, b) => Number(b.popularity || 0) - Number(a.popularity || 0)
+                || Number(b.vote_count || 0) - Number(a.vote_count || 0))
+            .slice(0, 5);
+    } catch (error) {
+        console.error(`Error fetching upcoming TMDB ${type}:`, error);
+        return [];
+    }
+}
+
+export async function getUpcomingMedia(): Promise<{
+    movies: TMDBHomeMedia[];
+    series: TMDBHomeMedia[];
+}> {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 60);
+    const startDate = formatLocalDate(start);
+    const endDate = formatLocalDate(end);
+
+    const [movies, series] = await Promise.all([
+        getUpcomingCatalog('movie', startDate, endDate),
+        getUpcomingCatalog('tv', startDate, endDate),
+    ]);
+
+    return { movies, series };
+}
+
 function readCachedHomeCatalog(cacheKey: string): TMDBHomeMedia[] | null {
     try {
         const raw = localStorage.getItem(cacheKey);
@@ -562,13 +664,16 @@ export async function getMovieDetails(movieId: string | number) {
     }
 }
 
-async function getDetailsWithOverviewFallback(path: string) {
+async function getDetailsWithOverviewFallback(path: string, appendToResponse?: string) {
     if (!TMDB_API_KEY || !path) return null;
 
     for (const language of ['pt-BR', 'en-US']) {
         try {
+            const appendParam = appendToResponse
+                ? `&append_to_response=${encodeURIComponent(appendToResponse)}`
+                : '';
             const response = await fetch(
-                `${TMDB_BASE_URL}/${path}?api_key=${TMDB_API_KEY}&language=${language}`
+                `${TMDB_BASE_URL}/${path}?api_key=${TMDB_API_KEY}&language=${language}${appendParam}`
             );
             if (!response.ok) continue;
 
@@ -583,7 +688,7 @@ async function getDetailsWithOverviewFallback(path: string) {
 }
 
 export function getMovieDetailsWithFallback(movieId: string | number) {
-    return getDetailsWithOverviewFallback(`movie/${movieId}`);
+    return getDetailsWithOverviewFallback(`movie/${movieId}`, 'release_dates');
 }
 
 function selectYouTubeTrailer(videos: TMDBVideoResult[]): TMDBTrailer | null {

@@ -13,6 +13,19 @@ export interface ChangelogLinkItem {
 
 export const CHANGELOGS: ChangelogEntry[] = [
   {
+    date: '2026-09-23',
+    title: 'Importações, estreias e melhorias gerais',
+    items: [
+      'Adição da importação do Letterboxd para trazer histórico, watchlist, notas e resenhas para o CineRats.',
+      'Criação da seção “Chegando em Breve”, com filmes e séries previstos para os próximos 60 dias e acesso às páginas dedicadas.',
+      'Início da construção de “Meus artistas favoritos”, com a apresentação da futura área para acompanhar artistas.',
+      'Ajustes de autorização na Home.',
+      'Correção da apresentação das insígnias e conquistas nos perfis.',
+      'Correções de enquadramento e rolagem horizontal no dashboard de usuários.',
+      'Correções de bugs apontados pela comunidade.',
+    ],
+  },
+  {
     date: '2026-09-16',
     title: 'Nova Home Page e melhorias gerais',
     items: [

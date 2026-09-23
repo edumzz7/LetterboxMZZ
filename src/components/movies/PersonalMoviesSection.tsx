@@ -11,7 +11,7 @@ import MovieCard from "./MovieCard";
 interface PersonalMoviesSectionProps {
   userId: string;
   canEdit: boolean;
-  currentUserId: string;
+  currentUserId?: string;
   publicReadOnly?: boolean;
 }
 
@@ -173,7 +173,7 @@ export default function PersonalMoviesSection({
                 }
                 onRate={async (selectedMovie, stars, review) =>
                   rateMutation.mutateAsync({
-                    actorUserId: currentUserId,
+                    actorUserId: currentUserId || '',
                     movieId: selectedMovie.id,
                     movieTitle: selectedMovie.titulo,
                     stars,
@@ -231,7 +231,7 @@ export default function PersonalMoviesSection({
                   }
                   onRate={async (selectedMovie, stars, review) => {
                     await rateMutation.mutateAsync({
-                      actorUserId: currentUserId,
+                      actorUserId: currentUserId || '',
                       movieId: selectedMovie.id,
                       movieTitle: selectedMovie.titulo,
                       stars,

@@ -4,7 +4,7 @@ import { Loader2, Tv, Eye, Plus, Trash2, Edit3, Star, ArrowLeft, Play, Video, Lo
 import { useLocation } from 'wouter';
 import { useSeries } from '../../hooks/useSeries';
 import { useUsers } from '../../hooks/useUsers';
-import { getTvDetailsRawWithFallback, getTvCredits, getTvSimilarWithFallback, getTvWatchProviders, getTvSeasonEpisodes, getTvYouTubeTrailer, type TMDBTvSeasonMeta } from '../../lib/tmdb';
+import { getTvDetailsRawWithFallback, getTvCredits, getTvSimilarWithFallback, getTvWatchProviders, getTvSeasonEpisodes, getTvYouTubeTrailer, isReleaseDateUpcoming, type TMDBTvSeasonMeta } from '../../lib/tmdb';
 import { getSeriesCineratsStats } from '../../lib/appData';
 import StarRatingInput from '../ui/StarRatingInput';
 import ReviewModal from '../ui/ReviewModal';
@@ -112,6 +112,9 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
       (s) => s.titulo.toLowerCase().trim() === series.name.toLowerCase().trim()
     );
   }, [userSeriesList, series]);
+  const canEditUserReview = Boolean(
+    currentUserId && userSeriesDoc && userSeriesDoc.user_id === currentUserId,
+  );
 
   // Sync selected season with user's progress
   useEffect(() => {
@@ -121,6 +124,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
   }, [userSeriesDoc]);
 
   const startYear = series?.first_air_date ? series.first_air_date.split('-')[0] : null;
+  const isUpcoming = isReleaseDateUpcoming(series?.first_air_date);
   const creators: Array<{ id: number; name: string }> = series?.created_by || [];
   const cast = credits?.cast?.slice(0, 6) || [];
   const genres = series?.genres?.map((genre: { name: string }) => genre.name).join(', ') || '';
@@ -147,7 +151,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
     rateSeriesMutation.isPending;
 
   const handleAddSeries = async (status: 'watchlist' | 'watching' | 'watched', isRetroactive = false) => {
-    if (isGuest || !series) return;
+    if (isGuest || !series || (isUpcoming && status !== 'watchlist')) return;
     const totalEpsOfSeason = activeSeasonMeta?.episode_count || 1;
     const targetSeason = status === 'watched'
       ? (lastSeasonMeta?.season_number || selectedSeason)
@@ -229,7 +233,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
   };
 
   const handleConfirmWatched = async (isRetroactive: boolean) => {
-    if (isGuest || !series) return;
+    if (isGuest || !series || isUpcoming) return;
 
     if (pendingSeriesCompletion && userSeriesDoc) {
       await saveSeriesProgress(
@@ -288,7 +292,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
   };
 
   const handleSaveRatingAndReview = async (stars: number, review: string) => {
-    if (isGuest || !userSeriesDoc) return;
+    if (!canEditUserReview || !userSeriesDoc) return;
     await rateSeriesMutation.mutateAsync({
       actorUserId: currentUserId!,
       seriesId: userSeriesDoc.id,
@@ -386,7 +390,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
               {isGuest ? 'Watchlist' : userSeriesDoc?.status === 'watchlist' ? 'Na Watchlist' : 'Watchlist'}
             </button>
 
-            {!userSeriesDoc && (
+            {!isUpcoming && !userSeriesDoc && (
               <>
                 <button
                   onClick={() => handleAddSeries('watching')}
@@ -400,7 +404,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
               </>
             )}
 
-            {userSeriesDoc?.status !== 'watched' && (
+            {!isUpcoming && userSeriesDoc?.status !== 'watched' && (
               <button
                 onClick={() => setIsWatchedTimingOpen(true)}
                 disabled={isPending || isGuest}
@@ -412,7 +416,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
               </button>
             )}
 
-            {userSeriesDoc && (
+            {canEditUserReview && userSeriesDoc && (
               <button
                 onClick={() => setIsReviewOpen(true)}
                 className="flex items-center gap-2 py-3 px-6 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all active:scale-95 border bg-black/45 border-[#222] text-brand-gold-alt hover:border-brand-gold hover:text-brand-gold"
@@ -424,7 +428,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
           </div>
 
           {/* Interactive Rating Input if watched */}
-          {userSeriesDoc?.status === 'watched' && (
+          {canEditUserReview && userSeriesDoc?.status === 'watched' && (
             <div className="flex items-center justify-center md:justify-start gap-4 p-4 rounded-2xl bg-black/20 border border-[#151515] w-fit">
               <span className="text-xs uppercase tracking-wider text-brand-text-muted font-light">Sua avaliação:</span>
               <StarRatingInput
@@ -717,7 +721,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
       </div>
 
       {/* Review Modal for editing review */}
-      {userSeriesDoc && (
+      {canEditUserReview && userSeriesDoc && (
         <ReviewModal
           isOpen={isReviewOpen}
           onOpenChange={setIsReviewOpen}

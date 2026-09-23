@@ -5,7 +5,7 @@ import { useLocation } from 'wouter';
 import { usePersonalMovies } from '../../hooks/usePersonalMovies';
 import { useSocialActions } from '../../hooks/useSocialActions';
 import { useUsers } from '../../hooks/useUsers';
-import { getMovieDetailsWithFallback, getMovieCredits, getMovieSimilarWithFallback, getMovieWatchProviders, getMovieYouTubeTrailer } from '../../lib/tmdb';
+import { getMovieDetailsWithFallback, getMovieCredits, getMovieSimilarWithFallback, getMovieWatchProviders, getMovieYouTubeTrailer, isReleaseDateOnOrBeforeToday } from '../../lib/tmdb';
 import { getMovieCineratsStats } from '../../lib/appData';
 import StarRatingInput from '../ui/StarRatingInput';
 import ReviewModal from '../ui/ReviewModal';
@@ -101,8 +101,19 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
         m.titulo.toLowerCase().trim() === movie.title.toLowerCase().trim()
     );
   }, [userMovies, movie]);
+  const canEditUserReview = Boolean(
+    currentUserId && userMovieDoc && userMovieDoc.user_id === currentUserId,
+  );
 
   const releaseYear = movie?.release_date ? movie.release_date.split('-')[0] : null;
+  const releaseDateEntries = movie?.release_dates?.results as Array<{
+    release_dates?: Array<{ release_date?: string }>;
+  }> | undefined;
+  const hasBeenReleasedAnywhere = releaseDateEntries
+    ? releaseDateEntries.some((country) =>
+      (country.release_dates || []).some((release) => isReleaseDateOnOrBeforeToday(release.release_date)))
+    : isReleaseDateOnOrBeforeToday(movie?.release_date);
+  const canMarkWatched = hasBeenReleasedAnywhere || Number(movie?.vote_count || 0) >= 10;
   const director = credits?.crew?.find((member: { job?: string }) => member.job === 'Director');
   const cast = credits?.cast?.slice(0, 6) || [];
   const genres = movie?.genres?.map((genre: { name: string }) => genre.name).join(', ') || '';
@@ -143,7 +154,7 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
   };
 
   const handleConfirmWatched = async (isRetroactive: boolean) => {
-    if (isGuest || !movie) return;
+    if (isGuest || !movie || !canMarkWatched) return;
     if (userMovieDoc) {
       await updateStatusMutation.mutateAsync({
         id: userMovieDoc.id,
@@ -168,7 +179,7 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
   };
 
   const handleToggleWatched = async () => {
-    if (isGuest || !movie) return;
+    if (isGuest || !movie || !canMarkWatched) return;
     if (userMovieDoc?.status === 'watched') {
       // If watched, change to watchlist immediately.
       await updateStatusMutation.mutateAsync({ id: userMovieDoc.id, status: 'watchlist' });
@@ -180,7 +191,7 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
   };
 
   const handleSaveRatingAndReview = async (stars: number, review: string) => {
-    if (isGuest || !userMovieDoc || !movie) return;
+    if (!canEditUserReview || !userMovieDoc || !movie) return;
     await rateMutation.mutateAsync({
       actorUserId: currentUserId!,
       movieId: userMovieDoc.id,
@@ -276,22 +287,24 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
               {isGuest ? 'Watchlist' : userMovieDoc?.status === 'watchlist' ? 'Na Watchlist' : 'Watchlist'}
             </button>
 
-            <button
-              onClick={handleToggleWatched}
-              disabled={isPending || isGuest}
-              title={isGuest ? 'Entre para marcar como visto' : undefined}
-              className={clsx(
-                'flex items-center gap-2 py-3 px-6 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all active:scale-95 border disabled:opacity-50 disabled:cursor-not-allowed',
-                userMovieDoc?.status === 'watched'
-                  ? 'bg-green-600 border-green-600 text-white font-bold'
-                  : 'bg-black/45 border-[#222] text-brand-text-muted hover:border-brand-gold/35 hover:text-brand-gold'
-              )}
-            >
-              {isGuest ? <Lock size={14} /> : userMovieDoc?.status === 'watched' ? <EyeOff size={14} /> : <Eye size={14} />}
-              {isGuest ? 'Marcar visto' : userMovieDoc?.status === 'watched' ? 'Visto' : 'Marcar visto'}
-            </button>
+            {canMarkWatched && (
+              <button
+                onClick={handleToggleWatched}
+                disabled={isPending || isGuest}
+                title={isGuest ? 'Entre para marcar como visto' : undefined}
+                className={clsx(
+                  'flex items-center gap-2 py-3 px-6 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all active:scale-95 border disabled:opacity-50 disabled:cursor-not-allowed',
+                  userMovieDoc?.status === 'watched'
+                    ? 'bg-green-600 border-green-600 text-white font-bold'
+                    : 'bg-black/45 border-[#222] text-brand-text-muted hover:border-brand-gold/35 hover:text-brand-gold'
+                )}
+              >
+                {isGuest ? <Lock size={14} /> : userMovieDoc?.status === 'watched' ? <EyeOff size={14} /> : <Eye size={14} />}
+                {isGuest ? 'Marcar visto' : userMovieDoc?.status === 'watched' ? 'Visto' : 'Marcar visto'}
+              </button>
+            )}
 
-            {userMovieDoc?.status === 'watched' && (
+            {canEditUserReview && userMovieDoc?.status === 'watched' && (
               <button
                 onClick={() => setIsReviewOpen(true)}
                 className="flex items-center gap-2 py-3 px-6 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all active:scale-95 border bg-black/45 border-[#222] text-brand-gold-alt hover:border-brand-gold hover:text-brand-gold"
@@ -303,7 +316,7 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
           </div>
 
           {/* Interactive Rating Input if watched */}
-          {userMovieDoc?.status === 'watched' && (
+          {canEditUserReview && userMovieDoc?.status === 'watched' && (
             <div className="flex items-center justify-center md:justify-start gap-4 p-4 rounded-2xl bg-black/20 border border-[#151515] w-fit">
               <span className="text-xs uppercase tracking-wider text-brand-text-muted font-light">Sua avaliação:</span>
               <StarRatingInput
@@ -498,7 +511,7 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
       </div>
 
       {/* Review Modal for editing review */}
-      {userMovieDoc && (
+      {canEditUserReview && userMovieDoc && (
         <ReviewModal
           isOpen={isReviewOpen}
           onOpenChange={setIsReviewOpen}

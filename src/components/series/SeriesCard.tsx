@@ -22,7 +22,7 @@ import StarRatingInput from '../ui/StarRatingInput';
 interface SeriesCardProps {
   series: Series;
   canEdit: boolean;
-  currentUserId: string;
+  currentUserId?: string;
   onSaveProgress: (payload: {
     id: string;
     episodios_vistos?: number;
@@ -332,11 +332,6 @@ export default function SeriesCard({
       setProvidersLoading(false);
     }
   };
-
-  const derivedEpisodeCount = Math.min(
-    Math.max(parseInt(localEps, 10) || 0, 0),
-    Math.max(parseInt(localTotalEps, 10) || 0, 0),
-  );
 
   const handleRate = async (stars: number, review?: string | null) => {
     const previousRating = localRating;
@@ -666,15 +661,6 @@ export default function SeriesCard({
                     readOnly
                     className="w-full bg-[#0a0f1e] border border-[#222] text-brand-text p-2 rounded text-right cursor-not-allowed opacity-80"
                   />
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <label className="text-xs text-brand-text uppercase tracking-widest shrink-0 w-20">
-                    Eps Vistos na Temp.
-                  </label>
-                  <div className="w-full bg-[#0a0f1e] border border-[#222] text-brand-text p-2 rounded text-right opacity-80">
-                    {derivedEpisodeCount}
-                  </div>
                 </div>
 
                 <div className="flex items-center gap-4">

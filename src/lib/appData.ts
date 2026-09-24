@@ -1941,6 +1941,24 @@ export async function listMediaReviews(
   );
 }
 
+export interface RecentPublicReview {
+  id: string;
+  providerExternalId: string;
+  type: "movie" | "series";
+  title: string;
+  rating: number;
+  review: string;
+  createdAt: string;
+  username: string;
+  displayName: string | null;
+  avatarPath: string | null;
+}
+
+export async function listRecentPublicReviews() {
+  const { data } = await apiClient.get<RecentPublicReview[]>("/reviews/recent");
+  return data;
+}
+
 export async function listUserReviews(userId: string) {
   return withFallback(
     async () => {

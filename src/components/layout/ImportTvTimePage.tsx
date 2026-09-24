@@ -83,7 +83,13 @@ export default function ImportTvTimePage({ currentUserId, embedded = false }: Pr
         </fieldset>
         <div className="space-y-2 text-sm text-brand-text-muted">
           {platform === 'letterboxd' ? <>
-            <p>Envie o ZIP exportado pelo Letterboxd. Serão importados histórico, watchlist, notas e resenhas.</p>
+            <p>
+              Você pode exportar seus dados do Letterboxd clicando{' '}
+              <a href="https://letterboxd.com/settings/data/" target="_blank" rel="noreferrer" className="text-brand-gold underline decoration-brand-gold/50 underline-offset-2 transition hover:text-brand-text">
+                aqui
+              </a>:
+            </p>
+            <p>Depois, envie o ZIP exportado pelo Letterboxd. Serão importados histórico, watchlist, notas e resenhas.</p>
             <ul className="list-disc space-y-1 pl-5">
               <li>Séries assistidas serão consideradas completas até a data do registro: todos os episódios lançados até esse dia, sem especiais.</li>
               <li>Usamos a nota atual e a resenha mais recente por obra. Avaliações que já estão no CineRats serão mantidas.</li>

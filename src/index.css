@@ -13,6 +13,36 @@
 }
 
 @layer base {
+  :where(
+    button:not(:disabled),
+    a[href]:not([aria-disabled="true"]),
+    [role="button"]:not([aria-disabled="true"]),
+    [role="link"]:not([aria-disabled="true"]),
+    [role="menuitem"]:not([aria-disabled="true"]),
+    summary,
+    select:enabled,
+    input[type="button"]:enabled,
+    input[type="submit"]:enabled,
+    input[type="reset"]:enabled,
+    input[type="checkbox"]:enabled,
+    input[type="radio"]:enabled,
+    label[for]
+  ) {
+    cursor: pointer;
+  }
+
+  :where(
+    button:disabled,
+    a[aria-disabled="true"],
+    [role="button"][aria-disabled="true"],
+    [role="link"][aria-disabled="true"],
+    [role="menuitem"][aria-disabled="true"],
+    select:disabled,
+    input:disabled
+  ) {
+    cursor: not-allowed;
+  }
+
   body {
     background-color: var(--color-brand-bg);
     color: var(--color-brand-text);

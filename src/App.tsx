@@ -741,7 +741,7 @@ function App() {
                       onSelect={() => setLocation("/conquistas")}
                       className="flex cursor-pointer items-center gap-2 rounded px-2 py-2 outline-none transition hover:bg-brand-gold/10 hover:text-brand-gold focus:bg-brand-gold/10 focus:text-brand-gold"
                     >
-                      <Award size={16} /> Desempenho e Conquistas
+                      <Award size={16} /> Pontuação e Conquistas
                     </DropdownMenu.Item>
                     <DropdownMenu.Item
                       onSelect={() => setLocation("/changelogs")}

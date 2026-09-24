@@ -1,5 +1,5 @@
 import type React from 'react';
-import { createElement, useEffect, useMemo } from 'react';
+import { createElement, useEffect, useMemo, useState } from 'react';
 import * as Icons from 'lucide-react';
 import clsx from 'clsx';
 import { useQuery } from '@tanstack/react-query';
@@ -180,6 +180,7 @@ function AchievementCard({
 }
 
 export default function RankingScreen({ user, users, movies, series, currentUserId, isLoading = false }: RankingScreenProps) {
+  const [isPointsSectionVisible, setIsPointsSectionVisible] = useState(false);
   const { predictionsQuery } = useOscarPredictions(currentUserId);
   const achievementIdsQuery = useQuery({
     queryKey: ['user_achievement_ids', currentUserId],
@@ -252,6 +253,21 @@ export default function RankingScreen({ user, users, movies, series, currentUser
     return () => window.cancelAnimationFrame(frame);
   }, [loading]);
 
+  useEffect(() => {
+    if (loading) return;
+
+    const target = document.getElementById('pontuacao');
+    if (!target) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsPointsSectionVisible(entry.isIntersecting),
+      { threshold: 0.15 },
+    );
+    observer.observe(target);
+
+    return () => observer.disconnect();
+  }, [loading]);
+
   if (loading) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center gap-3 text-brand-gold">
@@ -263,6 +279,18 @@ export default function RankingScreen({ user, users, movies, series, currentUser
 
   return (
     <div className="space-y-8">
+      {!isPointsSectionVisible && (
+        <button
+          type="button"
+          aria-label="Ver detalhes da pontuação no fim da página"
+          onClick={() => document.getElementById('pontuacao')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+          className="fixed bottom-5 right-4 z-40 inline-flex items-center gap-2 rounded-full border border-brand-gold/40 bg-[#080c14]/95 px-4 py-3 text-xs font-semibold text-brand-gold shadow-lg shadow-black/40 backdrop-blur transition hover:border-brand-gold hover:bg-brand-gold/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold sm:bottom-7 sm:right-7"
+        >
+          <Icons.Coins size={16} />
+          <span>Ver pontuação</span>
+          <Icons.ArrowDown size={14} />
+        </button>
+      )}
       <section className="relative overflow-hidden rounded-3xl border border-brand-gold/20 bg-[#080c14] p-6 sm:p-8 lg:p-10">
         <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full border border-brand-gold/10" />
         <div className="pointer-events-none absolute -right-8 -top-12 h-40 w-40 rounded-full border border-brand-gold/10" />

@@ -58,11 +58,11 @@ const FAQ_SECTIONS: FaqSection[] = [
         question: 'Como funcionam os MCoins e quais ações geram pontos?',
         answer: (
           <>
-            O detalhamento da pontuação está disponível no final da página de <Link href="/conquistas" className="text-brand-gold underline decoration-brand-gold/50 underline-offset-2 transition hover:text-brand-text">Conquistas</Link>. Vale mencionar que as métricas de pontuação estão passando por uma reformulação, visando deixar o processo mais justo, dando menos ênfase à finalização de temporadas inteiras e valorizando mais o tempo de tela, independentemente da posição do episódio.
+            O detalhamento da pontuação está disponível no final da página de <Link href="/conquistas" className="text-brand-gold underline decoration-brand-gold/50 underline-offset-2 transition hover:text-brand-text">Conquistas</Link>. A pontuação busca valorizar interações que agreguem à comunidade, como indicar um filme, avaliar uma mídia e escrever uma resenha.
           </>
         ),
         keywords: 'mcoins pontos moedas ranking ações',
-        searchText: 'detalhamento pontuação Conquistas métricas reformulação justo finalização temporadas tempo tela episódio',
+        searchText: 'detalhamento pontuação Conquistas interações comunidade indicar filme avaliar mídia escrever resenha',
       },
       {
         question: 'Qual é a diferença entre marcar uma mídia como vista recentemente ou há mais tempo?',

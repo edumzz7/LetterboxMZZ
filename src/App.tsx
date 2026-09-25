@@ -1,19 +1,23 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
   Award,
   BookOpen,
   CircleHelp,
   Film,
   History,
+  House,
   Loader2,
   Menu,
   Shuffle,
+  Tv,
+  UserRound,
   Users,
+  X,
 } from "lucide-react";
-import AppHeader from "./components/layout/Header";
+import type { LucideIcon } from "lucide-react";
+import AppHeader, { APP_NAVIGATION_TABS, type AppTab } from "./components/layout/Header";
 import DashboardTab from "./components/layout/DashboardTab";
 import UserSidebar, {
   RECOMMENDATIONS_STORAGE_KEY_PREFIX,
@@ -30,6 +34,7 @@ import PersonDetailScreen from "./components/people/PersonDetailScreen";
 import HomeScreen from "./components/home/HomeScreen";
 import UserDropdownMenu from "./components/layout/UserDropdownMenu";
 import UserEventBell from "./components/layout/UserEventBell";
+import ActivitiesScreen from "./components/layout/ActivitiesScreen";
 import ImportTvTimePage from "./components/layout/ImportTvTimePage";
 import { useAvatarMutation, useUsers } from "./hooks/useUsers";
 import { useFavorites } from "./hooks/useFavorites";
@@ -38,17 +43,20 @@ import { useSeries } from "./hooks/useSeries";
 import RankingScreen from "./components/layout/RankingScreen";
 import GlobalSearch from "./components/layout/GlobalSearch";
 import ProfileSummary from "./components/layout/ProfileSummary";
+import AvatarDisplay from "./components/layout/AvatarDisplay";
 import ProfilePageSkeleton from "./components/layout/ProfilePageSkeleton";
 import ChangelogsScreen from "./components/layout/ChangelogsScreen";
 import FaqScreen from "./components/layout/FaqScreen";
 import LatestUpdatesSection from "./components/layout/LatestUpdatesSection";
+import SmartStickySidebar from "./components/layout/SmartStickySidebar";
+import ReviewsScreen from "./components/layout/ReviewsScreen";
 import PublicHeader from "./components/public/PublicHeader";
 import PublicFooter from "./components/public/PublicFooter";
 import PublicHome from "./components/public/PublicHome";
 import CatalogPage from "./components/public/CatalogPage";
 import ProposalPage from "./components/public/ProposalPage";
 import PublicDashboardLite from "./components/public/PublicDashboardLite";
-import { HEADER_MENU_OPEN_EVENT, notifyHeaderMenuOpen } from "./lib/headerMenu";
+import { notifyHeaderMenuOpen } from "./lib/headerMenu";
 import {
   changePassword,
   adminResetPassword,
@@ -68,6 +76,16 @@ const SESSION_KEY = "letterboxmzz_session_v1";
 const ADMIN_USERNAME = import.meta.env.VITE_OSCAR_ADMIN_USERNAME as
   string | undefined;
 
+const PROFILE_NAV_ICONS: Record<AppTab, LucideIcon> = {
+  home: House,
+  movies: Film,
+  series: Tv,
+  reviews: Users,
+  oscars: Award,
+  dashboard: UserRound,
+  personal: UserRound,
+};
+
 function readStoredSession(): SessionUser | null {
   if (typeof window === "undefined") return null;
 
@@ -81,7 +99,7 @@ function readStoredSession(): SessionUser | null {
 
 function App() {
   const [activeTab, setActiveTab] = useState<
-    "home" | "dashboard" | "oscars" | "movies" | "series" | "personal"
+    "home" | "dashboard" | "oscars" | "movies" | "series" | "reviews" | "personal"
   >("home");
   const storedSession = readStoredSession();
   const [session, setSession] = useState<SessionUser | null>(storedSession);
@@ -96,6 +114,7 @@ function App() {
   const matchImportTvTime = matchLegacyImport || matchImports;
   const [matchChangelogs] = useRoute("/changelogs");
   const [matchFaq] = useRoute("/faq");
+  const [matchActivities] = useRoute("/atividades");
   const [matchRequestPasswordReset] = useRoute("/conta/esqueci-senha");
   const [matchMovies] = useRoute("/movies");
   const [matchMoviesPage, moviesPageParams] = useRoute("/movies/page/:page");
@@ -114,7 +133,10 @@ function App() {
   const [passwordResetSuccess, setPasswordResetSuccess] = useState(false);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const [deleteProfilePending, setDeleteProfilePending] = useState(false);
-  const [infoMenuOpen, setInfoMenuOpen] = useState(false);
+  const [isMobileLayout, setIsMobileLayout] = useState(
+    () => typeof window !== "undefined" && window.innerWidth < 1024,
+  );
+  const [isNavigationDrawerOpen, setIsNavigationDrawerOpen] = useState(false);
   // If we have a stored session, skip the loading screen entirely
   const [isBootstrapping, setIsBootstrapping] = useState(!storedSession);
 
@@ -160,14 +182,15 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const handleOtherHeaderMenu = (event: Event) => {
-      if ((event as CustomEvent<string>).detail !== "info") {
-        setInfoMenuOpen(false);
-      }
+    const mediaQuery = window.matchMedia("(max-width: 1023px)");
+    const updateLayout = () => {
+      setIsMobileLayout(mediaQuery.matches);
+      if (!mediaQuery.matches) setIsNavigationDrawerOpen(false);
     };
-    window.addEventListener(HEADER_MENU_OPEN_EVENT, handleOtherHeaderMenu);
-    return () =>
-      window.removeEventListener(HEADER_MENU_OPEN_EVENT, handleOtherHeaderMenu);
+
+    updateLayout();
+    mediaQuery.addEventListener("change", updateLayout);
+    return () => mediaQuery.removeEventListener("change", updateLayout);
   }, []);
 
   // Fix Radix UI overlay lock issues globally when Dialogs or Menus close
@@ -218,7 +241,7 @@ function App() {
   const isAchievementsRoute =
     urlUsername === "conquistas" || urlUsername === "ranking";
   const viewedUser =
-    matchChangelogs || matchFaq || isAchievementsRoute
+    matchChangelogs || matchFaq || matchActivities || isAchievementsRoute
       ? null
       : urlUsername
         ? users.find((user) => user.username === urlUsername) ||
@@ -234,12 +257,23 @@ function App() {
   const { seriesQuery: userSeriesQuery } = useSeries(selectedUserId);
   const personalMovies = personalMoviesQuery.data || [];
   const userSeries = userSeriesQuery.data || [];
-  const achievementsLoading =
-    personalMoviesQuery.isLoading ||
-    userSeriesQuery.isLoading ||
-    usersQuery.isLoading;
-  const isOwnDashboard = Boolean(session?.id && viewedUser?.id === session.id);
-  const canAccessOscars = Boolean(viewedUser);
+  const navigationUser = viewedUser ?? currentRankedUser;
+  const isOwnDashboard = Boolean(
+    session?.id && navigationUser?.id === session.id,
+  );
+  const canAccessOscars = Boolean(navigationUser);
+  const isPersonRoute = Boolean(matchActor || matchDirector);
+  const isProfileRoute = Boolean(
+    viewedUser &&
+    !matchMovie &&
+    !matchSerie &&
+    !isPersonRoute &&
+    !matchImportTvTime &&
+    !matchChangelogs &&
+    !matchFaq &&
+    !matchActivities &&
+    !isAchievementsRoute,
+  );
 
   useEffect(() => {
     if (urlUsername === "ranking") setLocation("/conquistas");
@@ -673,21 +707,9 @@ function App() {
       setLocation(`/${user.username}`);
     }
   };
-  const isPersonRoute = Boolean(matchActor || matchDirector);
-  const isProfileRoute = Boolean(
-    viewedUser &&
-    !matchMovie &&
-    !matchSerie &&
-    !isPersonRoute &&
-    !matchImportTvTime &&
-    !matchChangelogs &&
-    !matchFaq &&
-    !isAchievementsRoute,
-  );
-
   return (
-    <div className="min-h-screen overflow-x-hidden bg-brand-bg text-brand-text">
-      <div className="mx-auto flex w-full max-w-[1700px] flex-col gap-6 px-3 pb-4 pt-0 sm:px-6 lg:px-8 lg:pb-6 lg:pt-0">
+    <div className="min-h-screen overflow-x-clip bg-brand-bg text-brand-text">
+      <div className="mx-auto flex w-full max-w-[1700px] flex-col gap-6 px-3 pb-24 pt-0 sm:px-6 lg:px-8 lg:pb-6 lg:pt-0">
         <AppHeader
           activeTab={activeTab}
           onTabChange={setActiveTab}
@@ -697,137 +719,63 @@ function App() {
             setLocation("/");
           }}
           searchSlot={<GlobalSearch users={users} onSelectUser={selectUser} />}
-          hideTabs={
-            isAchievementsRoute ||
-            Boolean(matchMovie) ||
-            Boolean(matchSerie) ||
-            isPersonRoute ||
-            Boolean(matchImportTvTime) ||
-            Boolean(matchChangelogs) ||
-            Boolean(matchFaq)
-          }
-          onBack={
-            matchMovie ||
-            matchSerie ||
-            isPersonRoute ||
-            matchImportTvTime ||
-            matchFaq
-              ? () => setLocation(`/${authenticatedSession.username}`)
-              : undefined
-          }
+          hideTabs
           rightSlot={
-            <>
-              <DropdownMenu.Root
-                open={infoMenuOpen}
-                onOpenChange={(open) => {
-                  if (open) notifyHeaderMenuOpen("info");
-                  setInfoMenuOpen(open);
-                }}
-              >
-                <DropdownMenu.Trigger
-                  aria-label="Abrir menu principal"
-                  title="Menu principal"
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-full text-white outline-none transition hover:bg-white/5 hover:text-brand-gold focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0"
-                >
-                  <Menu size={20} />
-                </DropdownMenu.Trigger>
-                <DropdownMenu.Portal>
-                  <DropdownMenu.Content
-                    className="z-50 min-w-[200px] rounded-md border border-[#151b28] bg-[#06080d] p-1 text-sm text-brand-text shadow-xl"
-                    sideOffset={8}
-                    align="end"
-                  >
-                    <DropdownMenu.Item
-                      onSelect={() => setLocation("/conquistas")}
-                      className="flex cursor-pointer items-center gap-2 rounded px-2 py-2 outline-none transition hover:bg-brand-gold/10 hover:text-brand-gold focus:bg-brand-gold/10 focus:text-brand-gold"
-                    >
-                      <Award size={16} /> Pontuação e Conquistas
-                    </DropdownMenu.Item>
-                    <DropdownMenu.Item
-                      onSelect={() => setLocation("/changelogs")}
-                      className="flex cursor-pointer items-center gap-2 rounded px-2 py-2 outline-none transition hover:bg-brand-gold/10 hover:text-brand-gold focus:bg-brand-gold/10 focus:text-brand-gold"
-                    >
-                      <History size={16} /> Changelogs
-                    </DropdownMenu.Item>
-                    <DropdownMenu.Item
-                      onSelect={() => setLocation("/faq")}
-                      className="flex cursor-pointer items-center gap-2 rounded px-2 py-2 outline-none transition hover:bg-brand-gold/10 hover:text-brand-gold focus:bg-brand-gold/10 focus:text-brand-gold"
-                    >
-                      <CircleHelp size={16} /> F.A.Q.
-                    </DropdownMenu.Item>
-                    <DropdownMenu.Item
-                      disabled
-                      className="flex items-center gap-2 rounded px-2 py-2 text-brand-text-muted/70 outline-none"
-                    >
-                      <BookOpen size={16} /> Blog CineRats{" "}
-                      <span className="text-xs text-brand-gold-alt">
-                        (em breve)
-                      </span>
-                    </DropdownMenu.Item>
-                    <DropdownMenu.Item
-                      disabled
-                      className="flex items-center gap-2 rounded px-2 py-2 text-brand-text-muted/70 outline-none"
-                    >
-                      <Users size={16} /> Grupos{" "}
-                      <span className="text-xs text-brand-gold-alt">
-                        (em breve)
-                      </span>
-                    </DropdownMenu.Item>
-                  </DropdownMenu.Content>
-                </DropdownMenu.Portal>
-              </DropdownMenu.Root>
-              <UserDropdownMenu
-                session={authenticatedSession}
-                currentRankedUser={currentRankedUser}
-                users={users}
-                favoriteUserIds={
-                  favorites?.map((favorite) => favorite.favoriteUserId) || []
-                }
-                onLogout={handleLogout}
-                avatarMutationPending={avatarMutation.isPending}
-                adminUsername={ADMIN_USERNAME}
-                onChangePassword={handleChangePassword}
-                onAdminReset={handleAdminReset}
-                onSaveAvatar={async (avatarId, displayName) => {
-                  await avatarMutation.mutateAsync({
-                    userId: authenticatedSession.id,
-                    avatarId,
-                  });
-                  if (displayName !== currentRankedUser?.display_name) {
-                    await updateUserProfile(authenticatedSession.id, {
-                      display_name: displayName,
-                    });
-                    await refetchUsers();
+            !isMobileLayout && (
+              <>
+                <UserDropdownMenu
+                  session={authenticatedSession}
+                  currentRankedUser={currentRankedUser}
+                  users={users}
+                  favoriteUserIds={
+                    favorites?.map((favorite) => favorite.favoriteUserId) || []
                   }
-                }}
-                onOpenPreferences={() => {
-                  setActiveTab("dashboard");
-                  setLocation(`/${authenticatedSession.username}`);
-                }}
-                onDeleteProfile={handleDeleteProfile}
-                deleteProfilePending={deleteProfilePending}
-              />
-              <UserEventBell
-                currentUserId={authenticatedSession.id}
-                viewedUserId={viewedUser?.id ?? authenticatedSession.id}
-                isOwnDashboard={isOwnDashboard}
-                friendIds={
-                  favorites?.map((favorite) => favorite.favoriteUserId) || []
-                }
-              />
-              <button
-                type="button"
-                aria-label="Abrir CineMatch"
-                title="CineMatch"
-                onClick={() => {
-                  notifyHeaderMenuOpen("cineMatch");
-                  window.dispatchEvent(new Event("open-cinematch"));
-                }}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-full text-white transition hover:bg-white/5 hover:text-brand-gold"
-              >
-                <Shuffle size={20} />
-              </button>
-            </>
+                  onLogout={handleLogout}
+                  avatarMutationPending={avatarMutation.isPending}
+                  adminUsername={ADMIN_USERNAME}
+                  onChangePassword={handleChangePassword}
+                  onAdminReset={handleAdminReset}
+                  onSaveAvatar={async (avatarId, displayName) => {
+                    await avatarMutation.mutateAsync({
+                      userId: authenticatedSession.id,
+                      avatarId,
+                    });
+                    if (displayName !== currentRankedUser?.display_name) {
+                      await updateUserProfile(authenticatedSession.id, {
+                        display_name: displayName,
+                      });
+                      await refetchUsers();
+                    }
+                  }}
+                  onOpenPreferences={() => {
+                    setActiveTab("dashboard");
+                    setLocation(`/${authenticatedSession.username}`);
+                  }}
+                  onDeleteProfile={handleDeleteProfile}
+                  deleteProfilePending={deleteProfilePending}
+                />
+                <UserEventBell
+                  currentUserId={authenticatedSession.id}
+                  viewedUserId={viewedUser?.id ?? authenticatedSession.id}
+                  isOwnDashboard={isOwnDashboard}
+                  friendIds={
+                    favorites?.map((favorite) => favorite.favoriteUserId) || []
+                  }
+                />
+                <button
+                  type="button"
+                  aria-label="Abrir CineMatch"
+                  title="CineMatch"
+                  onClick={() => {
+                    notifyHeaderMenuOpen("cineMatch");
+                    window.dispatchEvent(new Event("open-cinematch"));
+                  }}
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-full text-white transition hover:bg-white/5 hover:text-brand-gold"
+                >
+                  <Shuffle size={20} />
+                </button>
+              </>
+            )
           }
         />
 
@@ -837,24 +785,76 @@ function App() {
           <div
             className={
               isProfileRoute
-                ? "grid grid-cols-1 gap-6 xl:grid-cols-[260px_minmax(0,1fr)_260px]"
+                ? "grid grid-cols-1 gap-6 lg:grid-cols-[260px_minmax(0,1fr)_260px]"
                 : "min-w-0"
             }
           >
             {isProfileRoute && viewedUser && (
-              <aside className="contents xl:flex xl:flex-col xl:gap-5">
-                <div className="order-3 xl:order-none">
-                  <ProfileSummary
-                    user={viewedUser}
-                    users={users}
-                    currentUserId={authenticatedSession.id}
-                    movies={personalMovies}
-                    series={userSeries}
-                    isLoading={achievementsLoading}
-                    onSelectUser={selectUser}
-                  />
-                </div>
-                <div className="order-3 xl:order-none">
+              <aside className="contents lg:block lg:self-stretch">
+                <SmartStickySidebar topGap={136} bottomGap={16} className="order-3 flex flex-col gap-5 lg:w-[260px]">
+                  <div className="hidden lg:block">
+                    <ProfileSummary
+                      user={viewedUser}
+                      currentUserId={authenticatedSession.id}
+                      onSelectUser={selectUser}
+                    />
+                  </div>
+                  <nav aria-label="Navegação do perfil" className="hidden flex-col rounded-2xl border border-[#151b28] bg-[#06080d] p-2 lg:flex">
+                    {APP_NAVIGATION_TABS.filter((tab) => {
+                      if (tab.id === "home") return isOwnDashboard;
+                      if (tab.id === "oscars") return canAccessOscars;
+                      return true;
+                    }).map((tab) => {
+                      const Icon = PROFILE_NAV_ICONS[tab.id];
+                      return (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          onClick={() => setActiveTab(tab.id)}
+                          aria-current={activeTab === tab.id ? "page" : undefined}
+                          className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.14em] transition ${activeTab === tab.id ? "bg-brand-gold/12 text-brand-gold" : "text-brand-text-muted hover:bg-white/5 hover:text-brand-text"}`}
+                        >
+                          <Icon size={16} strokeWidth={1.8} />
+                          <span>{tab.label}</span>
+                        </button>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={() => setLocation("/conquistas")}
+                      className="mt-1 flex items-center gap-3 border-t border-white/10 px-3 pt-3 pb-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-text-muted transition hover:bg-white/5 hover:text-brand-text"
+                    >
+                      <Award size={16} strokeWidth={1.8} />
+                      <span>Minhas Conquistas</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLocation("/changelogs")}
+                      className="flex items-center gap-3 px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-text-muted transition hover:bg-white/5 hover:text-brand-text"
+                    >
+                      <History size={16} strokeWidth={1.8} />
+                      <span>Changelogs</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLocation("/faq")}
+                      className="flex items-center gap-3 px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-text-muted transition hover:bg-white/5 hover:text-brand-text"
+                    >
+                      <CircleHelp size={16} strokeWidth={1.8} />
+                      <span>F.A.Q.</span>
+                    </button>
+                    <div className="mt-1 border-t border-white/10 pt-1">
+                      <span className="flex items-center gap-3 px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-text-muted/70">
+                        <BookOpen size={16} strokeWidth={1.8} />
+                        <span>Blog CineRats (em breve)</span>
+                      </span>
+                      <span className="flex items-center gap-3 px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-text-muted/70">
+                        <Users size={16} strokeWidth={1.8} />
+                        <span>Grupos (em breve)</span>
+                      </span>
+                    </div>
+                  </nav>
+                  <div>
                   <UserSidebar
                     users={users}
                     currentUserId={authenticatedSession.id}
@@ -864,14 +864,36 @@ function App() {
                     onClose={() => undefined}
                     section="discover"
                   />
-                </div>
+                  </div>
+                  <div className="hidden rounded-2xl border border-[#151b28] bg-[#06080d] px-4 py-4 text-xs text-brand-text-muted lg:block">
+                  <p className="flex items-center gap-2">
+                    <Film size={14} className="text-brand-gold-alt" />
+                    CineRats • edumzz
+                  </p>
+                  <a
+                    href="mailto:contato@cinerats.com"
+                    className="mt-2 block transition hover:text-brand-gold"
+                  >
+                    contato@cinerats.com
+                  </a>
+                  </div>
+                </SmartStickySidebar>
               </aside>
             )}
 
             <main
-              className={`order-2 min-w-0 rounded-3xl border border-[#151b28] bg-[#06080d] p-4 xl:order-none sm:p-7 lg:p-9 ${matchMovie || matchSerie || isPersonRoute ? "overflow-hidden" : ""}`}
+              className={`order-2 min-w-0 rounded-3xl border border-[#151b28] bg-[#06080d] p-4 lg:order-none sm:p-7 lg:p-9 ${matchMovie || matchSerie || isPersonRoute ? "overflow-hidden" : ""}`}
             >
-              {matchFaq ? (
+              {matchActivities ? (
+                <ActivitiesScreen
+                  currentUserId={authenticatedSession.id}
+                  viewedUserId={viewedUser?.id ?? authenticatedSession.id}
+                  isOwnDashboard={isOwnDashboard}
+                  friendIds={
+                    favorites?.map((favorite) => favorite.favoriteUserId) || []
+                  }
+                />
+              ) : matchFaq ? (
                 <FaqScreen />
               ) : matchChangelogs ? (
                 <ChangelogsScreen />
@@ -943,6 +965,8 @@ function App() {
                         canEdit={isOwnDashboard}
                         currentUserId={session.id}
                       />
+                    ) : activeTab === "reviews" ? (
+                      <ReviewsScreen />
                     ) : (
                       <>
                         <PersonalMoviesSection
@@ -963,38 +987,231 @@ function App() {
             </main>
 
             {isProfileRoute && viewedUser && (
-              <aside className="order-4 flex flex-col gap-5 xl:order-none">
-                <LatestUpdatesSection />
-                <UserSidebar
-                  users={users}
-                  currentUserId={session.id}
-                  selectedUserId={selectedUserId || session.id}
-                  onSelectUser={selectUser}
-                  isOpen={false}
-                  onClose={() => undefined}
-                  section="ranking"
-                />
+              <aside className="order-4 min-w-0 lg:self-stretch">
+                <SmartStickySidebar topGap={136} bottomGap={16} className="flex flex-col gap-5">
+                  <LatestUpdatesSection />
+                  <UserSidebar
+                    users={users}
+                    currentUserId={session.id}
+                    selectedUserId={selectedUserId || session.id}
+                    onSelectUser={selectUser}
+                    isOpen={false}
+                    onClose={() => undefined}
+                    section="ranking"
+                  />
+                </SmartStickySidebar>
               </aside>
             )}
           </div>
         )}
 
-        <footer className="border-t border-[#151b28] py-5 text-center text-xs text-brand-text-muted">
-          <div className="flex flex-col items-center justify-center gap-2 sm:flex-row sm:gap-4">
-            <p className="flex items-center gap-2">
-              <Film size={14} className="text-brand-gold-alt" />
-              CineRats • edumzz
-            </p>
-            <span className="hidden text-brand-text-muted/40 sm:inline">•</span>
-            <a
-              href="mailto:contato@cinerats.com"
-              className="transition hover:text-brand-gold"
-            >
-              contato@cinerats.com
-            </a>
-          </div>
+        <footer className="rounded-2xl border border-[#151b28] bg-[#06080d] px-4 py-4 text-center text-xs text-brand-text-muted lg:hidden">
+          <p className="flex items-center justify-center gap-2">
+            <Film size={14} className="text-brand-gold-alt" />
+            CineRats • edumzz
+          </p>
+          <a
+            href="mailto:contato@cinerats.com"
+            className="mt-2 inline-block transition hover:text-brand-gold"
+          >
+            contato@cinerats.com
+          </a>
         </footer>
+
       </div>
+      {isMobileLayout && isNavigationDrawerOpen && (
+        <div className="fixed inset-0 z-[60]">
+          <button
+            type="button"
+            aria-label="Fechar navegação"
+            className="absolute inset-0 bg-black/65 backdrop-blur-sm"
+            onClick={() => setIsNavigationDrawerOpen(false)}
+          />
+          <aside
+            aria-label="Navegação principal"
+            role="dialog"
+            aria-modal="true"
+            className="relative flex h-full w-[min(26rem,calc(100vw-1rem))] flex-col overflow-y-auto overscroll-contain border-r border-[#151b28] bg-[#06080d] px-3 py-4 shadow-[20px_0_60px_rgba(0,0,0,0.4)]"
+          >
+            <div className="mb-4 flex items-center justify-between px-2">
+              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-gold">Navegação</span>
+              <button
+                type="button"
+                aria-label="Fechar navegação"
+                onClick={() => setIsNavigationDrawerOpen(false)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full text-brand-text-muted transition hover:bg-white/5 hover:text-brand-text"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            {currentRankedUser && (
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("dashboard");
+                  setLocation(`/${authenticatedSession.username}`);
+                  setIsNavigationDrawerOpen(false);
+                }}
+                className="mb-4 flex items-center gap-3 rounded-2xl border border-[#151b28] bg-white/[0.03] p-3 text-left transition hover:bg-white/[0.06]"
+              >
+                <AvatarDisplay
+                  avatarId={currentRankedUser.avatar_id}
+                  className="h-14 w-14 border-2 border-brand-gold"
+                  emojiClassName="text-2xl"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-brand-text">
+                    {currentRankedUser.display_name || authenticatedSession.username}
+                  </span>
+                  <span className="mt-0.5 block truncate text-xs text-brand-text-muted">
+                    @{authenticatedSession.username}
+                  </span>
+                  <span className="mt-1.5 inline-block text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-gold">
+                    {currentRankedUser.mcoins} MC
+                  </span>
+                </span>
+              </button>
+            )}
+            <nav className="flex flex-col gap-1">
+              {APP_NAVIGATION_TABS.filter((tab) => {
+                if (tab.id === "home") return isOwnDashboard;
+                if (tab.id === "oscars") return canAccessOscars;
+                return true;
+              }).map((tab) => {
+                const Icon = PROFILE_NAV_ICONS[tab.id];
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveTab(tab.id);
+                      setLocation(`/${authenticatedSession.username}`);
+                      setIsNavigationDrawerOpen(false);
+                    }}
+                    aria-current={activeTab === tab.id ? "page" : undefined}
+                    className={`flex items-center gap-3 rounded-xl px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.14em] transition ${activeTab === tab.id ? "bg-brand-gold/12 text-brand-gold" : "text-brand-text-muted hover:bg-white/5 hover:text-brand-text"}`}
+                  >
+                    <Icon size={17} strokeWidth={1.8} />
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => {
+                  setLocation("/conquistas");
+                  setIsNavigationDrawerOpen(false);
+                }}
+                className="mt-2 flex items-center gap-3 border-t border-white/10 px-3 pt-4 pb-3 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-text-muted transition hover:bg-white/5 hover:text-brand-text"
+              >
+                <Award size={17} strokeWidth={1.8} />
+                <span>Minhas Conquistas</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setLocation("/changelogs");
+                  setIsNavigationDrawerOpen(false);
+                }}
+                className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-text-muted transition hover:bg-white/5 hover:text-brand-text"
+              >
+                <History size={17} strokeWidth={1.8} />
+                <span>Changelogs</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setLocation("/faq");
+                  setIsNavigationDrawerOpen(false);
+                }}
+                className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-text-muted transition hover:bg-white/5 hover:text-brand-text"
+              >
+                <CircleHelp size={17} strokeWidth={1.8} />
+                <span>F.A.Q.</span>
+              </button>
+              <div className="mt-2 border-t border-white/10 pt-2">
+                <span className="flex items-center gap-3 px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-text-muted/70">
+                  <BookOpen size={17} strokeWidth={1.8} />
+                  <span>Blog CineRats (em breve)</span>
+                </span>
+                <span className="flex items-center gap-3 px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-text-muted/70">
+                  <Users size={17} strokeWidth={1.8} />
+                  <span>Grupos (em breve)</span>
+                </span>
+              </div>
+            </nav>
+          </aside>
+        </div>
+      )}
+      {isMobileLayout && (
+        <nav
+          aria-label="Ações rápidas"
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-[#151b28] bg-[#06080d]/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_36px_rgba(0,0,0,0.25)] backdrop-blur"
+        >
+          <div className="mx-auto flex max-w-md items-center justify-around">
+            <button
+              type="button"
+              onClick={() => setIsNavigationDrawerOpen(true)}
+              aria-label="Abrir navegação"
+              title="Navegação"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full text-white transition hover:bg-white/5 hover:text-brand-gold"
+            >
+              <Menu size={20} />
+            </button>
+            <UserDropdownMenu
+              session={authenticatedSession}
+              currentRankedUser={currentRankedUser}
+              users={users}
+              favoriteUserIds={
+                favorites?.map((favorite) => favorite.favoriteUserId) || []
+              }
+              onLogout={handleLogout}
+              avatarMutationPending={avatarMutation.isPending}
+              adminUsername={ADMIN_USERNAME}
+              onChangePassword={handleChangePassword}
+              onAdminReset={handleAdminReset}
+              onSaveAvatar={async (avatarId, displayName) => {
+                await avatarMutation.mutateAsync({
+                  userId: authenticatedSession.id,
+                  avatarId,
+                });
+                if (displayName !== currentRankedUser?.display_name) {
+                  await updateUserProfile(authenticatedSession.id, {
+                    display_name: displayName,
+                  });
+                  await refetchUsers();
+                }
+              }}
+              onOpenPreferences={() => {
+                setActiveTab("dashboard");
+                setLocation(`/${authenticatedSession.username}`);
+              }}
+              onDeleteProfile={handleDeleteProfile}
+              deleteProfilePending={deleteProfilePending}
+            />
+            <UserEventBell
+              currentUserId={authenticatedSession.id}
+              viewedUserId={viewedUser?.id ?? authenticatedSession.id}
+              isOwnDashboard={isOwnDashboard}
+              friendIds={
+                favorites?.map((favorite) => favorite.favoriteUserId) || []
+              }
+            />
+            <button
+              type="button"
+              aria-label="Abrir CineMatch"
+              title="CineMatch"
+              onClick={() => {
+                notifyHeaderMenuOpen("cineMatch");
+                window.dispatchEvent(new Event("open-cinematch"));
+              }}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full text-white transition hover:bg-white/5 hover:text-brand-gold"
+            >
+              <Shuffle size={20} />
+            </button>
+          </div>
+        </nav>
+      )}
     </div>
   );
 

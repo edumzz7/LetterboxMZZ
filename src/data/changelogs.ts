@@ -13,6 +13,28 @@ export interface ChangelogLinkItem {
 
 export const CHANGELOGS: ChangelogEntry[] = [
   {
+    date: '2026-09-25',
+    title: 'Navegação mobile e atividades',
+    items: [
+      'Nova barra fixa no mobile com acesso à navegação, configurações, notificações e CineMatch.',
+      'O menu mobile agora abre em um drawer lateral mais amplo, com rolagem interna e informações do perfil.',
+      'Criação da página de Atividades: no mobile, o sino abre uma lista completa das novidades da comunidade e dos amigos.',
+      'Header mobile reorganizado, com o logo centralizado e a barra de busca em uma linha própria.',
+      'O rodapé com o crédito CineRats e o contato agora aparece ao final da página no mobile.',
+      'A tela Comunidade passou a exibir diretamente todas as resenhas, sem o seletor entre “Todos” e “Amigos”.',
+      'Ajustes na navegação desktop, com resumo de perfil e atalhos mantidos na lateral e ações restauradas no cabeçalho.',
+    ],
+  },
+  {
+    date: '2026-09-24',
+    title: 'Comunidade e resenhas',
+    items: [
+      'Criação da aba Comunidade, um feed para acompanhar as resenhas publicadas pela comunidade CineRats.',
+      'Novo visual de publicações, com autor, texto da resenha e acesso direto à obra avaliada.',
+      'Carregamento contínuo de resenhas: mais publicações aparecem automaticamente conforme a navegação avança.',
+    ],
+  },
+  {
     date: '2026-09-23',
     title: 'Importações, estreias e melhorias gerais',
     items: [

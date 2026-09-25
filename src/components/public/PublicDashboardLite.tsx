@@ -11,9 +11,10 @@ import AvatarDisplay from "../layout/AvatarDisplay";
 import { AchievementBadge } from "../ui/UserAchievements";
 import PersonalMoviesSection from "../movies/PersonalMoviesSection";
 import SeriesSection from "../series/SeriesSection";
+import ReviewsScreen from "../layout/ReviewsScreen";
 
 type PublicTab =
-  "home" | "dashboard" | "oscars" | "movies" | "series" | "personal";
+  "home" | "dashboard" | "oscars" | "movies" | "series" | "reviews" | "personal";
 
 function LockedPanel({ title }: { title: string }) {
   const [, setLocation] = useLocation();
@@ -142,6 +143,8 @@ export default function PublicDashboardLite({ user }: { user: RankedUser }) {
                 canEdit={false}
                 publicReadOnly
               />
+            ) : activeTab === "reviews" ? (
+              <ReviewsScreen />
             ) : activeTab === "dashboard" ? (
               <LockedPanel title="Painel pessoal" />
             ) : (

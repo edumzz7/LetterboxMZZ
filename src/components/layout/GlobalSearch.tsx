@@ -14,6 +14,7 @@ interface GlobalSearchProps {
   users: RankedUser[];
   onSelectUser: (id: string) => void;
   mobileOpen?: boolean;
+  mobileAlwaysExpanded?: boolean;
   onMobileOpenChange?: (open: boolean) => void;
   mobileBorderless?: boolean;
 }
@@ -22,6 +23,7 @@ export default function GlobalSearch({
   users,
   onSelectUser,
   mobileOpen = false,
+  mobileAlwaysExpanded = false,
   onMobileOpenChange,
   mobileBorderless = true,
 }: GlobalSearchProps) {
@@ -32,6 +34,7 @@ export default function GlobalSearch({
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const [, setLocation] = useLocation();
+  const isMobileExpanded = mobileOpen || mobileAlwaysExpanded;
 
   useEffect(() => {
     const normalizedQuery = query.trim();
@@ -87,7 +90,7 @@ export default function GlobalSearch({
 
   return (
     <div
-      className={`relative z-40 w-full max-w-2xl transition-all max-md:max-w-none ${mobileOpen ? 'max-md:w-full' : 'max-md:w-12'}`}
+      className={`relative z-40 w-full max-w-2xl transition-all max-lg:max-w-none ${isMobileExpanded ? 'max-lg:w-full' : 'max-lg:w-12'}`}
     >
       <Search
         size={16}
@@ -104,7 +107,7 @@ export default function GlobalSearch({
           if (!event.target.value.trim()) setLoading(false);
         }}
         onPointerDown={() => {
-          if (!mobileOpen) onMobileOpenChange?.(true);
+          if (!isMobileExpanded) onMobileOpenChange?.(true);
         }}
         onFocus={() => {
           setFocused(true);
@@ -117,7 +120,7 @@ export default function GlobalSearch({
           }, 180)
         }
         placeholder='Pesquisar usuários, filmes, séries e pessoas'
-        className={`w-full rounded-xl border border-[#252525] bg-black py-2.5 pl-10 pr-10 text-xs text-white placeholder:text-white/45 outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/15 sm:text-sm ${mobileOpen ? 'max-md:w-full' : `max-md:w-12 max-md:cursor-pointer max-md:pr-0 max-md:text-transparent max-md:placeholder:text-transparent ${mobileBorderless ? 'max-md:border-transparent max-md:bg-transparent' : ''}`}`}
+        className={`w-full rounded-xl border border-[#252525] bg-black py-2.5 pl-10 pr-10 text-xs text-white placeholder:text-white/45 outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/15 sm:text-sm ${isMobileExpanded ? 'max-lg:w-full' : `max-lg:w-12 max-lg:cursor-pointer max-lg:pr-0 max-lg:text-transparent max-lg:placeholder:text-transparent ${mobileBorderless ? 'max-lg:border-transparent max-lg:bg-transparent' : ''}`}`}
       />
       {loading && (
         <Loader2

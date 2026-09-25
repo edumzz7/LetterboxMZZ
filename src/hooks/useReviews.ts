@@ -1,5 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { deleteReview, listMediaReviews, listUserReviews } from '../lib/appData';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { deleteReview, listMediaReviews, listPublicReviews, listUserReviews } from '../lib/appData';
 
 export function useMediaReviews(providerExternalId: string | null, type: 'movie' | 'series') {
   return useQuery({
@@ -14,6 +14,16 @@ export function useUserReviews(userId: string | null) {
     queryKey: ['reviews', 'user', userId],
     queryFn: () => listUserReviews(userId!),
     enabled: Boolean(userId),
+  });
+}
+
+export function usePublicReviews(authorIds?: string[], enabled = true) {
+  return useInfiniteQuery({
+    queryKey: ['reviews', 'public', authorIds || 'all'],
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) => listPublicReviews(pageParam, authorIds),
+    getNextPageParam: (lastPage) => lastPage.nextOffset ?? undefined,
+    enabled,
   });
 }
 

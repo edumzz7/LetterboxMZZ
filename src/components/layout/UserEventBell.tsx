@@ -124,6 +124,17 @@ export default function UserEventBell({
       <button
         type="button"
         onClick={() => {
+          if (window.matchMedia('(max-width: 1023px)').matches) {
+            if (isOwnDashboard && items.length > 0) {
+              const latest = items[0]?.created_at;
+              if (latest) {
+                writeSeenTimestamp(currentUserId, latest);
+                setSeenTimestamp(latest);
+              }
+            }
+            setLocation('/atividades');
+            return;
+          }
           if (!open) notifyHeaderMenuOpen('activity');
           setOpen((current) => {
             const next = !current;

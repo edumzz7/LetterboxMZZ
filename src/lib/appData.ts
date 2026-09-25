@@ -1984,6 +1984,50 @@ export async function listUserReviews(userId: string) {
   );
 }
 
+export type PublicReview = {
+  id: string;
+  userId: string;
+  username: string;
+  avatarPath: string | null;
+  mediaItemId: string;
+  providerExternalId: string;
+  type: "movie" | "series";
+  title: string;
+  posterPath: string | null;
+  rating: number | string | null;
+  review: string | null;
+  season: number | null;
+  episode: number | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PublicReviewsPage = {
+  items: PublicReview[];
+  nextOffset: number | null;
+};
+
+export async function listPublicReviews(
+  offset: number,
+  authorIds?: string[],
+  limit = 5,
+) {
+  return withFallback(
+    async () => {
+      const { data } = await apiClient.get<PublicReviewsPage>("/reviews", {
+        params: {
+          limit,
+          offset,
+          withReview: true,
+          ...(authorIds?.length ? { authorIds: authorIds.join(',') } : {}),
+        },
+      });
+      return data;
+    },
+    async () => ({ items: [], nextOffset: null }),
+  );
+}
+
 export async function deleteReview(reviewId: string) {
   return withFallback(
     async () => {

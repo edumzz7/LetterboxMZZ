@@ -707,10 +707,14 @@ function App() {
 
   const authenticatedSession = session;
 
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const selectUser = (id: string) => {
     const user = users.find((candidate) => candidate.id === id);
     if (user) {
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      scrollToTop();
       setLocation(`/${user.username}`);
     }
   };
@@ -823,6 +827,7 @@ function App() {
                           key={tab.id}
                           type="button"
                           onClick={() => {
+                            scrollToTop();
                             setActiveTab(tab.id);
                             setLocation(`/${authenticatedSession.username}`);
                           }}
@@ -840,7 +845,10 @@ function App() {
                     })}
                     <button
                       type="button"
-                      onClick={() => setLocation("/conquistas")}
+                      onClick={() => {
+                        scrollToTop();
+                        setLocation("/conquistas");
+                      }}
                       className="mt-1 flex items-center gap-3 border-t border-white/10 px-3 pt-3 pb-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-text-muted transition hover:bg-white/5 hover:text-brand-text"
                     >
                       <Award size={16} strokeWidth={1.8} />
@@ -848,7 +856,10 @@ function App() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setLocation("/changelogs")}
+                      onClick={() => {
+                        scrollToTop();
+                        setLocation("/changelogs");
+                      }}
                       className="flex items-center gap-3 px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-text-muted transition hover:bg-white/5 hover:text-brand-text"
                     >
                       <History size={16} strokeWidth={1.8} />
@@ -856,7 +867,10 @@ function App() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setLocation("/faq")}
+                      onClick={() => {
+                        scrollToTop();
+                        setLocation("/faq");
+                      }}
                       className="flex items-center gap-3 px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-text-muted transition hover:bg-white/5 hover:text-brand-text"
                     >
                       <CircleHelp size={16} strokeWidth={1.8} />
@@ -1116,6 +1130,7 @@ function App() {
               <button
                 type="button"
                 onClick={() => {
+                  scrollToTop();
                   setActiveTab("dashboard");
                   setLocation(`/${authenticatedSession.username}`);
                   setIsNavigationDrawerOpen(false);
@@ -1152,6 +1167,7 @@ function App() {
                     key={tab.id}
                     type="button"
                     onClick={() => {
+                      scrollToTop();
                       setActiveTab(tab.id);
                       setLocation(`/${authenticatedSession.username}`);
                       setIsNavigationDrawerOpen(false);
@@ -1167,6 +1183,7 @@ function App() {
               <button
                 type="button"
                 onClick={() => {
+                  scrollToTop();
                   setLocation("/conquistas");
                   setIsNavigationDrawerOpen(false);
                 }}
@@ -1178,6 +1195,7 @@ function App() {
               <button
                 type="button"
                 onClick={() => {
+                  scrollToTop();
                   setLocation("/changelogs");
                   setIsNavigationDrawerOpen(false);
                 }}
@@ -1189,6 +1207,7 @@ function App() {
               <button
                 type="button"
                 onClick={() => {
+                  scrollToTop();
                   setLocation("/faq");
                   setIsNavigationDrawerOpen(false);
                 }}

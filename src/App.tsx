@@ -86,6 +86,13 @@ const PROFILE_NAV_ICONS: Record<AppTab, LucideIcon> = {
   personal: UserRound,
 };
 
+const OTHER_PROFILE_TABS: Array<{ id: AppTab; label: string }> = [
+  { id: "movies", label: "Filmes" },
+  { id: "series", label: "Séries" },
+  { id: "oscars", label: "Oscar" },
+  { id: "dashboard", label: "Painel" },
+];
+
 function readStoredSession(): SessionUser | null {
   if (typeof window === "undefined") return null;
 
@@ -791,17 +798,22 @@ function App() {
           >
             {isProfileRoute && viewedUser && (
               <aside className="contents lg:block lg:self-stretch">
-                <SmartStickySidebar topGap={136} bottomGap={16} className="order-3 flex flex-col gap-5 lg:w-[260px]">
+                <SmartStickySidebar
+                  topGap={136}
+                  bottomGap={16}
+                  fixedTop={!isOwnDashboard}
+                  className="order-3 flex flex-col gap-5 lg:w-[260px]"
+                >
                   <div className="hidden lg:block">
                     <ProfileSummary
-                      user={viewedUser}
+                      user={currentRankedUser || viewedUser}
                       currentUserId={authenticatedSession.id}
                       onSelectUser={selectUser}
                     />
                   </div>
                   <nav aria-label="Navegação do perfil" className="hidden flex-col rounded-2xl border border-[#151b28] bg-[#06080d] p-2 lg:flex">
                     {APP_NAVIGATION_TABS.filter((tab) => {
-                      if (tab.id === "home") return isOwnDashboard;
+                      if (tab.id === "home") return true;
                       if (tab.id === "oscars") return canAccessOscars;
                       return true;
                     }).map((tab) => {
@@ -810,9 +822,16 @@ function App() {
                         <button
                           key={tab.id}
                           type="button"
-                          onClick={() => setActiveTab(tab.id)}
-                          aria-current={activeTab === tab.id ? "page" : undefined}
-                          className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.14em] transition ${activeTab === tab.id ? "bg-brand-gold/12 text-brand-gold" : "text-brand-text-muted hover:bg-white/5 hover:text-brand-text"}`}
+                          onClick={() => {
+                            setActiveTab(tab.id);
+                            setLocation(`/${authenticatedSession.username}`);
+                          }}
+                          aria-current={
+                            isOwnDashboard && activeTab === tab.id
+                              ? "page"
+                              : undefined
+                          }
+                          className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.14em] transition ${isOwnDashboard && activeTab === tab.id ? "bg-brand-gold/12 text-brand-gold" : "text-brand-text-muted hover:bg-white/5 hover:text-brand-text"}`}
                         >
                           <Icon size={16} strokeWidth={1.8} />
                           <span>{tab.label}</span>
@@ -858,7 +877,11 @@ function App() {
                   <UserSidebar
                     users={users}
                     currentUserId={authenticatedSession.id}
-                    selectedUserId={selectedUserId || authenticatedSession.id}
+                    selectedUserId={
+                      isOwnDashboard
+                        ? selectedUserId || authenticatedSession.id
+                        : ""
+                    }
                     onSelectUser={selectUser}
                     isOpen={false}
                     onClose={() => undefined}
@@ -884,6 +907,49 @@ function App() {
             <main
               className={`order-2 min-w-0 rounded-3xl border border-[#151b28] bg-[#06080d] p-4 lg:order-none sm:p-7 lg:p-9 ${matchMovie || matchSerie || isPersonRoute ? "overflow-hidden" : ""}`}
             >
+              {isProfileRoute && viewedUser && !isOwnDashboard && (
+                <section className="mb-7 text-center sm:mb-9">
+                  <AvatarDisplay
+                    avatarId={viewedUser.avatar_id}
+                    className="mx-auto h-20 w-20 border-[3px] border-brand-gold shadow-[0_0_32px_rgba(212,175,55,0.18)] sm:h-28 sm:w-28"
+                    emojiClassName="text-4xl sm:text-5xl"
+                  />
+                  <h1 className="mt-3 text-2xl font-light text-brand-text sm:mt-4 sm:text-3xl">
+                    {viewedUser.display_name || viewedUser.username}
+                  </h1>
+                  <p className="mt-1 text-sm text-brand-text-muted">
+                    @{viewedUser.username}
+                  </p>
+                  <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-brand-gold">
+                    {viewedUser.mcoins} MCoins
+                  </p>
+
+                  <nav
+                    aria-label="Seções do perfil"
+                    className="mt-6 border-y border-white/10 sm:mt-8"
+                  >
+                    <div className="flex justify-start overflow-x-auto sm:justify-center">
+                      {OTHER_PROFILE_TABS.map((tab) => (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          onClick={() => setActiveTab(tab.id)}
+                          aria-current={
+                            activeTab === tab.id ? "page" : undefined
+                          }
+                          className={`shrink-0 border-b-2 px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.12em] transition sm:px-5 sm:py-4 sm:text-xs sm:tracking-[0.14em] ${
+                            activeTab === tab.id
+                              ? "border-brand-gold text-brand-gold"
+                              : "border-transparent text-brand-text-muted hover:text-brand-text"
+                          }`}
+                        >
+                          {tab.label}
+                        </button>
+                      ))}
+                    </div>
+                  </nav>
+                </section>
+              )}
               {matchActivities ? (
                 <ActivitiesScreen
                   currentUserId={authenticatedSession.id}
@@ -993,7 +1059,9 @@ function App() {
                   <UserSidebar
                     users={users}
                     currentUserId={session.id}
-                    selectedUserId={selectedUserId || session.id}
+                    selectedUserId={
+                      isOwnDashboard ? selectedUserId || session.id : ""
+                    }
                     onSelectUser={selectUser}
                     isOpen={false}
                     onClose={() => undefined}

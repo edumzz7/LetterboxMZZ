@@ -5,6 +5,7 @@ interface SmartStickySidebarProps {
   topGap?: number;
   bottomGap?: number;
   className?: string;
+  fixedTop?: boolean;
 }
 
 /**
@@ -16,12 +17,18 @@ export default function SmartStickySidebar({
   topGap = 16,
   bottomGap = 16,
   className = "",
+  fixedTop = false,
 }: SmartStickySidebarProps) {
   const sidebarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const element = sidebarRef.current;
     if (!element) return;
+
+    if (fixedTop) {
+      element.style.setProperty("--smart-sticky-top", `${topGap}px`);
+      return;
+    }
 
     const desktopQuery = window.matchMedia("(min-width: 1280px)");
     let previousScrollY = window.scrollY;
@@ -78,7 +85,7 @@ export default function SmartStickySidebar({
       desktopQuery.removeEventListener("change", scheduleUpdate);
       if (animationFrame !== null) window.cancelAnimationFrame(animationFrame);
     };
-  }, [bottomGap, topGap]);
+  }, [bottomGap, fixedTop, topGap]);
 
   return (
     <div

@@ -4,7 +4,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Filter,
-  Loader2,
   Star,
   Tv,
 } from 'lucide-react';
@@ -16,6 +15,8 @@ import {
   type CatalogFilters,
   type TMDBCatalogItem,
 } from '../../lib/tmdb';
+import TmdbImage from '../ui/TmdbImage';
+import { PosterGridSkeleton } from '../ui/LoadingSkeleton';
 
 const PROVIDERS = [
   ['8', 'Netflix'],
@@ -353,10 +354,7 @@ export default function CatalogPage({ type, page }: CatalogPageProps) {
         </aside>
         <section className='min-w-0'>
           {catalogQuery.isLoading ? (
-            <div className='flex min-h-80 items-center justify-center gap-2 text-sm text-brand-text-muted'>
-              <Loader2 size={18} className='animate-spin text-brand-gold' />
-              Carregando títulos
-            </div>
+            <PosterGridSkeleton count={12} />
           ) : results.length ? (
             <div className='min-w-0'>
               <div className='space-y-4 sm:hidden'>
@@ -484,10 +482,11 @@ function MediaCard({
     >
       <div className='aspect-[2/3] overflow-hidden rounded-lg border border-[#222] bg-brand-card transition duration-300 group-hover:-translate-y-1 group-hover:border-brand-gold sm:rounded-xl'>
         {item.poster_path ? (
-          <img
+          <TmdbImage
             src={`https://image.tmdb.org/t/p/w500${item.poster_path}`}
             alt={title}
             loading='lazy'
+            sizes='(max-width: 639px) 28vw, (max-width: 1023px) 22vw, 18vw'
             className='h-full w-full object-cover transition duration-500 group-hover:scale-105'
           />
         ) : (

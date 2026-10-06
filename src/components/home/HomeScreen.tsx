@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Clapperboard, Flame, Loader2, Sparkles, Star, Tv } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clapperboard, Flame, Sparkles, Star, Tv } from 'lucide-react';
 import { useLocation } from 'wouter';
 import type { PersonalMovie, SeriesEntry } from '../../types/app';
 import {
@@ -21,6 +21,8 @@ import {
   type TMDBRecommendationItem,
 } from '../../lib/tmdb';
 import { getFavoriteGenre } from '../../lib/favoriteGenres';
+import TmdbImage from '../ui/TmdbImage';
+import { Skeleton } from '../ui/LoadingSkeleton';
 
 type MediaType = 'movie' | 'tv';
 type WatchedSeed = { id: number; title: string; type: MediaType };
@@ -51,7 +53,7 @@ function HomeCard({ item }: { item: TMDBHomeMedia }) {
       <div className="relative aspect-[2/3] rounded-xl border border-[#222] bg-black shadow-lg transition duration-300 group-hover:-translate-y-1 group-hover:border-brand-gold/70 group-hover:shadow-brand-gold/10">
         <div className="absolute inset-px overflow-hidden rounded-[11px]">
           {item.poster_path ? (
-            <img src={`https://image.tmdb.org/t/p/w500${item.poster_path}`} alt={title} loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+            <TmdbImage src={`https://image.tmdb.org/t/p/w500${item.poster_path}`} alt={title} loading="lazy" sizes="141px" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
           ) : (
             <div className="flex h-full items-center justify-center text-brand-text-muted"><Clapperboard size={24} /></div>
           )}
@@ -173,7 +175,7 @@ function Collection({ title, subtitle, icon, items, isLoading, emptyMessage, car
         </div>
       </div>
       {isLoading ? (
-        <div className="flex items-center gap-2 py-8 text-xs uppercase tracking-wider text-brand-text-muted"><Loader2 size={15} className="animate-spin text-brand-gold" /> Carregando seleção...</div>
+        <div className="flex gap-3 overflow-hidden py-2" role="status" aria-label="Carregando seleção">{Array.from({ length: carousel ? 5 : 4 }, (_, index) => <div key={index} className="w-[123px] shrink-0 sm:w-[141px]"><Skeleton className="aspect-[2/3] rounded-xl" /><Skeleton className="mt-2 h-3 w-4/5" /><Skeleton className="mt-2 h-2.5 w-2/5" /></div>)}</div>
       ) : items.length ? (
         carousel ? <MediaCarousel items={items.slice(0, limit)} /> : <div className="flex flex-wrap gap-x-4 gap-y-6">{items.slice(0, limit).map((item) => <HomeCard key={`${item.media_type}-${item.id}`} item={item} />)}</div>
       ) : (

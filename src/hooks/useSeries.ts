@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { addSeries, deleteSeries, getSeriesStatus, listSeries, rateSeries, updateSeries } from '../lib/appData';
 import type { SeriesEntry, SeriesStatus } from '../types/app';
+import { completeWatchParty, listActiveWatchParties, updateWatchPartyProgress } from '../lib/watchParties';
 
 export function useSeriesMutations(userId: string | null) {
   const queryClient = useQueryClient();
@@ -35,6 +36,16 @@ export function useSeriesMutations(userId: string | null) {
       const cached = queryClient.getQueryData<SeriesEntry[]>(['series', userId]);
       const cachedEntry = cached?.find((s) => s.id === id);
 
+      if (cachedEntry?.source_movie_id && nextStatus !== 'watchlist' && (nextStatus === 'watched' || (episodios_vistos ?? 0) > 0)) {
+        const active = await listActiveWatchParties('series', cachedEntry.source_movie_id);
+        if (active.length) {
+          await Promise.all(active.map((party) => nextStatus === 'watched'
+            ? completeWatchParty(party.id, is_retroactive ?? false)
+            : updateWatchPartyProgress(party.id, temporada ?? cachedEntry.temporada ?? 1, Math.max(1, episodios_vistos ?? 1), is_retroactive ?? false)));
+          return undefined;
+        }
+      }
+
       return updateSeries(id, {
         episodios_vistos,
         temporada,
@@ -63,12 +74,23 @@ export function useSeriesMutations(userId: string | null) {
         void queryClient.invalidateQueries({ queryKey: ['series', userId] });
       }
       void queryClient.invalidateQueries({ queryKey: ['users'] });
+      void queryClient.invalidateQueries({ queryKey: ['watchparties'] });
     },
   });
 
   const addSeriesMutation = useMutation({
-    mutationFn: (newSeries: Omit<SeriesEntry, 'id' | 'user_id' | 'created_at'>) =>
-      addSeries(userId as string, newSeries),
+    mutationFn: async (newSeries: Omit<SeriesEntry, 'id' | 'user_id' | 'created_at'>) => {
+      if (newSeries.source_movie_id && newSeries.status !== 'watchlist') {
+        const active = await listActiveWatchParties('series', newSeries.source_movie_id);
+        if (active.length) {
+          await Promise.all(active.map((party) => newSeries.status === 'watched'
+            ? completeWatchParty(party.id, newSeries.is_retroactive ?? false)
+            : updateWatchPartyProgress(party.id, newSeries.temporada || 1, Math.max(1, newSeries.episodios_vistos || 1), newSeries.is_retroactive ?? false)));
+          return undefined;
+        }
+      }
+      return addSeries(userId as string, newSeries);
+    },
     onSuccess: (data) => {
       if (data) {
         queryClient.setQueryData(['series', userId], (old: SeriesEntry[] = []) => [data, ...old]);
@@ -76,6 +98,7 @@ export function useSeriesMutations(userId: string | null) {
         void queryClient.invalidateQueries({ queryKey: ['series', userId] });
       }
       void queryClient.invalidateQueries({ queryKey: ['users'] });
+      void queryClient.invalidateQueries({ queryKey: ['watchparties'] });
     },
   });
 
@@ -130,6 +153,7 @@ export function useSeriesQuery(userId: string | null) {
     enabled: Boolean(userId),
     staleTime: 1000 * 60 * 2, // 2 minutos - reduz requisições mantendo dados frescos
     refetchOnWindowFocus: true, // Atualiza ao voltar para a aba
+    refetchInterval: 30000,
   });
 }
 

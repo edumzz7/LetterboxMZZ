@@ -146,9 +146,8 @@ export default function UserAchievements({
 
   if (isLoading || isPredictionsLoading || achievementsLoading || activitiesLoading) {
     return (
-      <div className="flex items-center gap-1.5 opacity-50 py-1">
-        <Icons.Loader2 size={12} className="animate-spin text-brand-gold" />
-        <span className="text-[9px] uppercase tracking-wider text-brand-text-muted">Calculando conquistas...</span>
+      <div role="status" aria-label="Carregando conquistas" className="flex flex-wrap gap-2 py-1">
+        {[0, 1, 2, 3].map((item) => <span key={item} className="h-8 w-8 animate-pulse rounded-full border border-[#222a3a] bg-[#151b28]" />)}
       </div>
     );
   }

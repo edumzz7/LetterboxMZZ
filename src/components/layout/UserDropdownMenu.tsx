@@ -5,7 +5,6 @@ import { KeyRound, LogOut, Plus, Shield, Settings, Upload, Image as ImageIcon, U
 import type { SessionUser, RankedUser } from '../../types/app';
 import ProfileAvatarModal from './ProfileAvatarModal';
 import SuggestMovieModal from './SuggestMovieModal';
-import CineMatchModal from './CineMatchModal';
 import ChangePasswordModal from './ChangePasswordModal';
 import AdminPanel from './AdminPanel';
 import ShareReviewModal from './ShareReviewModal';
@@ -31,7 +30,6 @@ export default function UserDropdownMenu({
   session,
   currentRankedUser,
   users,
-  favoriteUserIds,
   onLogout,
   avatarMutationPending,
   onSaveAvatar,
@@ -44,15 +42,9 @@ export default function UserDropdownMenu({
 }: UserDropdownMenuProps) {
   const [, setLocation] = useLocation();
   const [activeModal, setActiveModal] = useState<
-    'avatar' | 'suggest' | 'cineMatch' | 'changePassword' | 'adminPanel' | 'shareReview' | null
+    'avatar' | 'suggest' | 'changePassword' | 'adminPanel' | 'shareReview' | null
   >(null);
   const [menuOpen, setMenuOpen] = useState(false);
-
-  useEffect(() => {
-    const handleOpenCineMatch = () => setActiveModal('cineMatch');
-    window.addEventListener('open-cinematch', handleOpenCineMatch);
-    return () => window.removeEventListener('open-cinematch', handleOpenCineMatch);
-  }, []);
 
   useEffect(() => {
     const handleOtherHeaderMenu = (event: Event) => {
@@ -182,14 +174,6 @@ export default function UserDropdownMenu({
         users={users}
         open={activeModal === 'suggest'}
         onOpenChange={(open) => setActiveModal(open ? 'suggest' : null)}
-      />
-
-      <CineMatchModal
-        currentUserId={session.id}
-        users={users}
-        favoriteUserIds={favoriteUserIds}
-        open={activeModal === 'cineMatch'}
-        onOpenChange={(open) => setActiveModal(open ? 'cineMatch' : null)}
       />
 
       {isAdmin && (

@@ -5,14 +5,14 @@ import {
   ChevronRight,
   Clapperboard,
   Flame,
-  Loader2,
   Star,
   Trophy,
   Tv,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import type { PersonalMovie, SeriesEntry, SessionUser } from "../../types/app";
-import homeHero from "../../assets/public/cinerats-home-hero.png";
+import homeHero from "../../assets/public/cinerats-home-hero.webp";
+import homeHeroMobile from "../../assets/public/cinerats-home-hero-mobile.webp";
 import { listPublicRanking, listRecentPublicReviews } from "../../lib/appData";
 import { getReviewReaction } from "../../lib/reviewReactions";
 import {
@@ -23,6 +23,8 @@ import {
 } from "../../lib/tmdb";
 import AvatarDisplay from "../layout/AvatarDisplay";
 import HomeScreen from "../home/HomeScreen";
+import TmdbImage from "../ui/TmdbImage";
+import { Skeleton } from "../ui/LoadingSkeleton";
 
 function MediaRow({
   title,
@@ -76,10 +78,7 @@ function MediaRow({
         </h2>
       </div>
       {loading ? (
-        <div className="flex h-48 items-center gap-2 text-xs text-brand-text-muted">
-          <Loader2 size={16} className="animate-spin text-brand-gold" />
-          Carregando seleção
-        </div>
+        <div role="status" aria-label="Carregando seleção" className="flex gap-4 overflow-hidden">{Array.from({ length: 5 }, (_, index) => <div key={index} className="w-[166px] shrink-0"><Skeleton className="aspect-[2/3] rounded-xl" /><Skeleton className="mt-2 h-3 w-4/5" /><Skeleton className="mt-2 h-2.5 w-2/5" /></div>)}</div>
       ) : (
         <div className="relative">
           <div
@@ -104,10 +103,11 @@ function MediaRow({
                 >
                   <div className="aspect-[2/3] overflow-hidden rounded-xl border border-[#222] bg-brand-card transition duration-300 group-hover:-translate-y-1 group-hover:border-brand-gold">
                     {item.poster_path ? (
-                      <img
+                      <TmdbImage
                         src={`https://image.tmdb.org/t/p/w500${item.poster_path}`}
                         alt={name}
                         loading="lazy"
+                        sizes="166px"
                         className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                       />
                     ) : (
@@ -198,11 +198,15 @@ export default function PublicHome({
   return (
     <main className="mx-auto w-full max-w-[1700px] space-y-12 overflow-x-hidden px-3 py-7 sm:px-6 lg:px-8 lg:py-10">
       <section className="relative left-1/2 min-h-[360px] w-screen -translate-x-1/2 overflow-hidden bg-[#06080d] sm:min-h-[430px]">
-        <img
-          src={homeHero}
-          alt="Mascote do CineRats assistindo a um filme"
-          className="absolute inset-0 h-full w-full origin-[68%_32%] scale-[1.8] object-cover object-[68%_25%] sm:origin-center sm:scale-100 sm:object-[center_25%]"
-        />
+        <picture>
+          <source media="(max-width: 639px)" srcSet={homeHeroMobile} />
+          <img
+            src={homeHero}
+            alt="Mascote do CineRats assistindo a um filme"
+            fetchPriority="high"
+            className="absolute inset-0 h-full w-full origin-[68%_32%] scale-[1.8] object-cover object-[68%_25%] sm:origin-center sm:scale-100 sm:object-[center_25%]"
+          />
+        </picture>
         <div className="absolute inset-0 bg-gradient-to-r from-[#05080f] via-[#071326]/94 via-[52%] to-[#071326]/10" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#05080f]/40 via-transparent to-[#05080f]/20" />
         <div className="absolute inset-0 [background:linear-gradient(to_right,#06080d_0%,transparent_15%,transparent_85%,#06080d_100%)]" />

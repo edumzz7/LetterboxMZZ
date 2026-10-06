@@ -1,11 +1,11 @@
 import { useState } from "react";
 import clsx from "clsx";
-import { Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
 import { useSeries } from "../../hooks/useSeries";
 import type { SeriesStatus } from "../../types/app";
 import AddSeriesDialog from "./AddSeriesDialog";
 import SeriesCard from "./SeriesCard";
+import { PosterGridSkeleton } from "../ui/LoadingSkeleton";
 
 interface SeriesSectionProps {
   userId: string;
@@ -94,9 +94,7 @@ export default function SeriesSection({
       </div>
 
       {seriesQuery.isLoading ? (
-        <div className="flex justify-center items-center py-20 text-brand-gold-alt opacity-50">
-          <Loader2 className="animate-spin" size={32} />
-        </div>
+        <PosterGridSkeleton count={8} />
       ) : isPublicLocked ? (
         <div className="rounded-2xl border border-brand-gold/25 bg-brand-gold/[0.04] px-6 py-12 text-center text-sm text-brand-text-muted">
           Para visualização completa,{" "}

@@ -10,6 +10,7 @@ import AvatarDisplay from './AvatarDisplay';
 import { useFavorites } from '../../hooks/useFavorites';
 import { usePersonalMovieMutations } from '../../hooks/usePersonalMovies';
 import { useSeriesMutations } from '../../hooks/useSeries';
+import { Skeleton } from '../ui/LoadingSkeleton';
 import {
   getMovieDetailsWithFallback,
   getTvDetailsRawWithFallback,
@@ -552,10 +553,7 @@ export default function UserSidebar({
               </div>
 
               {upcomingQuery.isLoading ? (
-                <div className="flex items-center justify-center py-4 text-xs text-brand-text-muted gap-2">
-                  <Loader2 size={12} className="animate-spin text-brand-gold" />
-                  Buscando estreias no TMDB...
-                </div>
+                <div role="status" aria-label="Carregando próximas estreias" className="space-y-2 py-2">{[0, 1, 2].map((item) => <div key={item} className="flex items-center gap-3 rounded-xl border border-white/5 p-2"><Skeleton className="h-12 w-9 shrink-0 rounded" /><div className="flex-1 space-y-2"><Skeleton className="h-2.5 w-3/4" /><Skeleton className="h-2 w-1/2" /></div><Skeleton className="h-4 w-4 rounded-full" /></div>)}</div>
               ) : upcomingQuery.isError ? (
                 <div className="text-[10px] text-red-400 font-light text-center py-2">
                   Não foi possível carregar as próximas estreias.

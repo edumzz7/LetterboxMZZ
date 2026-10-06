@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { X, Loader2 } from 'lucide-react';
+import { X } from 'lucide-react';
+import { Skeleton } from './LoadingSkeleton';
 import { getMovieDetailsWithFallback, getTvDetailsRawWithFallback } from '../../lib/tmdb';
 
 interface SynopsisModalProps {
@@ -82,9 +83,7 @@ export default function SynopsisModal({
 
           <div className="flex-1 overflow-y-auto pr-2">
             {isLoading ? (
-              <div className="flex justify-center items-center py-10">
-                <Loader2 className="animate-spin text-brand-gold" size={24} />
-              </div>
+              <div role="status" aria-label="Carregando sinopse" className="space-y-2 py-3"><Skeleton className="h-3 w-full" /><Skeleton className="h-3 w-full" /><Skeleton className="h-3 w-4/5" /><Skeleton className="h-3 w-2/3" /></div>
             ) : error ? (
               <p className="text-sm text-red-400">{error}</p>
             ) : (

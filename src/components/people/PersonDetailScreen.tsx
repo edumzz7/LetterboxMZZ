@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, CalendarDays, Clapperboard, Film, Loader2, MapPin, Tv, UserRound } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Clapperboard, Film, MapPin, Tv, UserRound } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { getPersonDetailsWithCredits, type TMDBCombinedCredit } from '../../lib/tmdb';
+import TmdbImage from '../ui/TmdbImage';
+import { DetailPageSkeleton } from '../ui/LoadingSkeleton';
 
 type PersonPageMode = 'actor' | 'director';
 
@@ -75,7 +77,7 @@ export default function PersonDetailScreen({ id, mode }: PersonDetailScreenProps
   }, [mode, person]);
 
   if (personQuery.isLoading) {
-    return <div className="flex min-h-[420px] items-center justify-center text-brand-gold"><Loader2 className="animate-spin" size={30} /></div>;
+    return <DetailPageSkeleton title="Carregando artista" />;
   }
 
   if (!person || !isValidId) {
@@ -106,7 +108,7 @@ export default function PersonDetailScreen({ id, mode }: PersonDetailScreenProps
   return (
     <div className="flex-1 min-w-0 animate-in fade-in duration-500">
       <div className="relative -mx-4 sm:-mx-7 lg:-mx-9 -mt-4 sm:-mt-7 lg:-mt-9 h-44 sm:h-52 lg:h-56 overflow-hidden rounded-t-3xl bg-[#090d16]">
-        {heroPhotoUrl && <><img src={heroPhotoUrl} alt="" className="h-full w-full object-cover object-top opacity-40 blur-[1px] scale-110" /><div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" /></>}
+        {heroPhotoUrl && <><TmdbImage src={heroPhotoUrl} alt="" sizes="100vw" loading="eager" className="h-full w-full object-cover object-top opacity-40 blur-[1px] scale-110" /><div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" /></>}
         <button type="button" onClick={handleBack} className="absolute left-6 top-6 z-10 flex cursor-pointer items-center gap-2 rounded-xl border border-white/10 bg-black/60 px-4 py-2 text-xs uppercase tracking-widest text-brand-text backdrop-blur-md transition-all hover:border-brand-gold/30 hover:text-brand-gold">
           <ArrowLeft size={14} /> Painel
         </button>
@@ -114,7 +116,7 @@ export default function PersonDetailScreen({ id, mode }: PersonDetailScreenProps
 
       <div className="relative z-10 flex flex-col items-center gap-6 px-0 sm:px-4 -mt-16 sm:-mt-20 lg:-mt-24 md:items-start md:flex-row">
         <div className="mx-auto flex h-56 w-44 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#222] bg-[#050811] shadow-2xl shadow-black/80 md:mx-0 sm:h-64 sm:w-48">
-          {photoUrl ? <img src={photoUrl} alt={person.name} className="h-full w-full object-cover" /> : <UserRound className="text-[#333]" size={42} />}
+          {photoUrl ? <TmdbImage src={photoUrl} alt={person.name} sizes="192px" className="h-full w-full object-cover" /> : <UserRound className="text-[#333]" size={42} />}
         </div>
 
         <div className="flex w-full min-w-0 flex-1 flex-col items-center gap-5 text-center md:items-start md:pt-8 md:text-left">
@@ -148,7 +150,7 @@ export default function PersonDetailScreen({ id, mode }: PersonDetailScreenProps
                   const year = getCreditDate(credit)?.slice(0, 4);
                   const isMovie = credit.media_type === 'movie';
                   return <button key={`${credit.media_type}-${credit.id}`} type="button" onClick={() => setLocation(isMovie ? `/filme/${credit.id}` : `/serie/${credit.id}`)} className="group cursor-pointer overflow-hidden rounded-2xl border border-[#151515] bg-black/20 text-left transition hover:-translate-y-1 hover:border-brand-gold/40">
-                    <div className="aspect-[2/3] bg-[#0a0f1e]">{credit.poster_path ? <img src={`https://image.tmdb.org/t/p/w342${credit.poster_path}`} alt={title} className="h-full w-full object-cover transition duration-300 group-hover:scale-105" /> : <div className="flex h-full items-center justify-center">{isMovie ? <Film size={24} className="text-[#333]" /> : <Tv size={24} className="text-[#333]" />}</div>}</div>
+                    <div className="aspect-[2/3] bg-[#0a0f1e]">{credit.poster_path ? <TmdbImage src={`https://image.tmdb.org/t/p/w342${credit.poster_path}`} alt={title} sizes="(max-width: 639px) 36vw, 140px" className="h-full w-full object-cover transition duration-300 group-hover:scale-105" /> : <div className="flex h-full items-center justify-center">{isMovie ? <Film size={24} className="text-[#333]" /> : <Tv size={24} className="text-[#333]" />}</div>}</div>
                     <div className="space-y-1.5 p-3"><p className="truncate text-xs font-medium text-brand-text">{title}</p><p className="text-[10px] uppercase tracking-wider text-brand-text-muted">{isMovie ? 'Filme' : 'Série'}{year ? ` • ${year}` : ''}</p>{(credit.character || credit.job) && <p className="truncate text-[10px] text-brand-gold-alt">{credit.character || credit.job}</p>}</div>
                   </button>;
                 })}

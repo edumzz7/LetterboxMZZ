@@ -70,6 +70,24 @@ function fallbackAvatar(userId: string) {
   return AVATAR_IDS[index];
 }
 
+function normalizeAvatarPath(avatarPath: string | null | undefined, userId: string, displayName: string | null | undefined) {
+  let avatarId = avatarPath || fallbackAvatar(userId);
+  let normalizedDisplayName = displayName ?? undefined;
+
+  // Older profiles stored the avatar id and display name together in avatar_path.
+  if (avatarId.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(avatarId) as { avatarId?: string; displayName?: string | null };
+      avatarId = parsed.avatarId || fallbackAvatar(userId);
+      normalizedDisplayName = parsed.displayName ?? normalizedDisplayName;
+    } catch {
+      avatarId = fallbackAvatar(userId);
+    }
+  }
+
+  return { avatarId, displayName: normalizedDisplayName };
+}
+
 type SeriesEpisodeRef = {
   season: number;
   episode: number;
@@ -396,7 +414,10 @@ export interface PublicRankingEntry {
 
 export async function listPublicRanking() {
   const response = await apiClient.get<PublicRankingEntry[]>("/users/ranking");
-  return response.data;
+  return response.data.map((user) => {
+    const normalized = normalizeAvatarPath(user.avatarPath, user.id, user.displayName);
+    return { ...user, avatarPath: normalized.avatarId, displayName: normalized.displayName ?? null };
+  });
 }
 
 export async function listRankedUsers() {
@@ -424,20 +445,11 @@ export async function listRankedUsers() {
       return apiResponse.data.map((apiUser) => {
         const prefs = apiUser.preferences;
 
-        // Parse avatarPath if it's a JSON string
-        let avatarId = prefs?.avatarPath ?? fallbackAvatar(apiUser.id);
-        let displayName = prefs?.displayName ?? undefined;
-
-        if (avatarId && avatarId.startsWith("{")) {
-          try {
-            const parsed = JSON.parse(avatarId);
-            avatarId = parsed.avatarId ?? fallbackAvatar(apiUser.id);
-            displayName = parsed.displayName ?? displayName;
-          } catch {
-            // If parsing fails, use fallback
-            avatarId = fallbackAvatar(apiUser.id);
-          }
-        }
+        const { avatarId, displayName } = normalizeAvatarPath(
+          prefs?.avatarPath,
+          apiUser.id,
+          prefs?.displayName,
+        );
 
         return {
           id: apiUser.id,

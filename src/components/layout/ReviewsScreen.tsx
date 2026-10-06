@@ -3,6 +3,8 @@ import { Clapperboard, Loader2, Star, Tv } from 'lucide-react';
 import { useLocation } from 'wouter';
 import AvatarDisplay from './AvatarDisplay';
 import { usePublicReviews } from '../../hooks/useReviews';
+import { ListSkeleton, Skeleton } from '../ui/LoadingSkeleton';
+import TmdbImage from '../ui/TmdbImage';
 
 function formatDate(value: string) {
   const date = new Date(value);
@@ -43,11 +45,7 @@ export default function ReviewsScreen() {
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-72 items-center justify-center gap-3 text-sm text-brand-text-muted">
-        <Loader2 className="animate-spin text-brand-gold" size={20} /> Carregando resenhas...
-      </div>
-    );
+    return <ListSkeleton count={6}><div className="flex gap-4 border-b border-white/10 pb-5"><Skeleton className="h-8 w-40" /><Skeleton className="h-8 w-24" /></div></ListSkeleton>;
   }
 
   if (isError) {
@@ -100,7 +98,7 @@ export default function ReviewsScreen() {
                   >
                     <div className="h-24 w-[4.25rem] shrink-0 bg-[#151515] text-brand-text-muted sm:h-28 sm:w-20">
                       {review.posterPath ? (
-                        <img src={review.posterPath} alt={`Pôster de ${review.title}`} className="h-full w-full object-cover" loading="lazy" />
+                        <TmdbImage src={review.posterPath} alt={`Pôster de ${review.title}`} sizes="(max-width: 639px) 68px, 80px" className="h-full w-full object-cover" loading="lazy" />
                       ) : (
                         <span className="flex h-full items-center justify-center"><Clapperboard size={20} /></span>
                       )}

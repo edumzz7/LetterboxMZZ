@@ -4,6 +4,7 @@ import { useOscarPredictions } from '../../hooks/useOscarPredictions';
 import { searchMovies, searchPeople, type TMDBMovie, type TMDBPerson } from '../../lib/tmdb';
 import { Loader2, Search, RotateCcw, Film, User, Globe, FileText, Trophy } from 'lucide-react';
 import type { UserOscarPrediction } from '../../types/app';
+import { Skeleton } from '../ui/LoadingSkeleton';
 
 interface OscarPredictionsSectionProps {
   userId: string;
@@ -76,8 +77,8 @@ export default function OscarPredictionsSection({ userId, canEdit }: OscarPredic
       </div>
 
       {predictionsQuery.isLoading ? (
-        <div className="flex justify-center items-center py-20 text-brand-gold opacity-50">
-          <Loader2 className="animate-spin" size={32} />
+        <div role="status" aria-label="Carregando palpites do Oscar" className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {CATEGORIES.map((category) => <div key={category.id} className="rounded-2xl border border-[#151b28] bg-[#06080d] p-5"><Skeleton className="h-3 w-1/2" /><Skeleton className="mt-5 aspect-[2/3] rounded-xl" /><Skeleton className="mt-4 h-3 w-3/4" /><Skeleton className="mt-2 h-3 w-1/2" /></div>)}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

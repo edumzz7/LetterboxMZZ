@@ -9,6 +9,8 @@ import { updateUserProfile } from '../../lib/appData';
 import { FAVORITE_GENRES, getFavoriteGenre } from '../../lib/favoriteGenres';
 import type { RankedUser } from '../../types/app';
 import PreferenceSearchInput, { type PreferenceSearchItem } from './PreferenceSearchInput';
+import { useUsers } from '../../hooks/useUsers';
+import WatchPartyHistory from './WatchPartyHistory';
 
 interface DashboardTabProps {
   user: RankedUser;
@@ -28,6 +30,7 @@ function formatDate(dateStr?: string) {
 export default function DashboardTab({ user, isOwnDashboard }: DashboardTabProps) {
   const [, setLocation] = useLocation();
   const reviewsQuery = useUserReviews(user.id);
+  const usersQuery = useUsers(Boolean(isOwnDashboard));
   const queryClient = useQueryClient();
   const [isEditingPreferences, setIsEditingPreferences] = useState(false);
   const [isSavingPreferences, setIsSavingPreferences] = useState(false);
@@ -260,6 +263,8 @@ export default function DashboardTab({ user, isOwnDashboard }: DashboardTabProps
 
       {/* Seção de Resenhas */}
       </>}
+
+      {isOwnDashboard && <div className="col-span-1 md:col-span-2 lg:col-span-3 mt-6"><WatchPartyHistory currentUserId={user.id} users={usersQuery.data || []} compact /></div>}
 
       <div className="col-span-1 md:col-span-2 lg:col-span-3 mt-6 flex flex-col gap-6">
         <h2 className="text-sm font-semibold tracking-[0.25em] uppercase text-brand-gold">

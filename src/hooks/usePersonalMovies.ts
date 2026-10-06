@@ -6,13 +6,22 @@ import {
   updatePersonalMovie,
 } from '../lib/appData';
 import type { PersonalMovie, MovieStatus } from '../types/app';
+import { completeWatchParty, listActiveWatchParties } from '../lib/watchParties';
 
 export function usePersonalMovieMutations(userId: string | null) {
   const queryClient = useQueryClient();
 
   const addMovieMutation = useMutation({
-    mutationFn: (movie: Omit<PersonalMovie, 'id' | 'user_id' | 'created_at'>) =>
-      addPersonalMovie(userId as string, movie),
+    mutationFn: async (movie: Omit<PersonalMovie, 'id' | 'user_id' | 'created_at'>) => {
+      if (movie.status === 'watched' && movie.source_movie_id) {
+        const active = await listActiveWatchParties('movie', movie.source_movie_id);
+        if (active.length) {
+          await Promise.all(active.map((party) => completeWatchParty(party.id, movie.is_retroactive ?? false)));
+          return undefined;
+        }
+      }
+      return addPersonalMovie(userId as string, movie);
+    },
     onSuccess: (data, variables) => {
       if (data) {
         queryClient.setQueryData(['personal-movies', userId], (old: PersonalMovie[] = []) => [data, ...old]);
@@ -22,6 +31,7 @@ export function usePersonalMovieMutations(userId: string | null) {
       if (variables.status === 'watched' && !variables.is_retroactive) {
         void queryClient.invalidateQueries({ queryKey: ['users'] });
       }
+      void queryClient.invalidateQueries({ queryKey: ['watchparties'] });
     },
   });
 
@@ -40,8 +50,18 @@ export function usePersonalMovieMutations(userId: string | null) {
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: ({ id, status, is_retroactive }: { id: string; status: MovieStatus; is_retroactive?: boolean }) =>
-      updatePersonalMovie(id, { status, is_retroactive }, userId),
+    mutationFn: async ({ id, status, is_retroactive }: { id: string; status: MovieStatus; is_retroactive?: boolean }) => {
+      const cached = queryClient.getQueryData<PersonalMovie[]>(['personal-movies', userId]);
+      const movie = cached?.find((item) => item.id === id);
+      if (status === 'watched' && movie?.source_movie_id) {
+        const active = await listActiveWatchParties('movie', movie.source_movie_id);
+        if (active.length) {
+          await Promise.all(active.map((party) => completeWatchParty(party.id, is_retroactive ?? false)));
+          return undefined;
+        }
+      }
+      return updatePersonalMovie(id, { status, is_retroactive }, userId);
+    },
     onSuccess: (data, variables) => {
       if (data) {
         queryClient.setQueryData(['personal-movies', userId], (old: PersonalMovie[] = []) =>
@@ -60,6 +80,7 @@ export function usePersonalMovieMutations(userId: string | null) {
       if (variables.status === 'watched') {
         void queryClient.invalidateQueries({ queryKey: ['users'] });
       }
+      void queryClient.invalidateQueries({ queryKey: ['watchparties'] });
     },
   });
 
@@ -87,6 +108,7 @@ export function usePersonalMoviesQuery(userId: string | null) {
     enabled: Boolean(userId),
     staleTime: 1000 * 60 * 2, // 2 minutos - reduz requisições mantendo dados frescos
     refetchOnWindowFocus: true, // Atualiza ao voltar para a aba
+    refetchInterval: 30000,
   });
 }
 

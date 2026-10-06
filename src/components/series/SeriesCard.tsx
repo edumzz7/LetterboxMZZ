@@ -7,6 +7,7 @@ import ReviewModal from '../ui/ReviewModal';
 import SynopsisModal from '../ui/SynopsisModal';
 import clsx from 'clsx';
 import { generateImagePath } from '../../lib/imageUtils';
+import TmdbImage from '../ui/TmdbImage';
 import type { Series } from '../../hooks/useSeries';
 import {
   getTvDetails,
@@ -370,14 +371,14 @@ export default function SeriesCard({
                 isFriendCard && 'cursor-pointer',
               )}
             >
-              <img
+              <TmdbImage
                 src={imageSrc}
                 alt={series.titulo}
                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                 loading="lazy"
+                sizes="(max-width: 767px) 80px, 20vw"
                 onError={(event) => {
-                  (event.target as HTMLImageElement).style.display = 'none';
-                  (event.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                  event.currentTarget.parentElement?.nextElementSibling?.classList.remove('hidden');
                 }}
               />
               <div className="hidden absolute inset-0 w-full h-full flex flex-col items-center justify-center p-4 text-center bg-brand-card">

@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
-import { Bell, Loader2 } from 'lucide-react';
+import { Bell } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useUserActivity } from '../../hooks/useUserActivity';
+import { ListSkeleton } from '../ui/LoadingSkeleton';
 
 interface ActivitiesScreenProps {
   currentUserId: string;
@@ -60,9 +61,7 @@ export default function ActivitiesScreen({
       </header>
 
       {activityQuery.isLoading ? (
-        <div className="flex items-center justify-center gap-2 py-14 text-xs uppercase tracking-[0.14em] text-brand-text-muted">
-          <Loader2 size={15} className="animate-spin" /> Carregando atividades...
-        </div>
+        <div className="mt-3"><ListSkeleton count={6} /></div>
       ) : activities.length === 0 ? (
         <p className="py-14 text-center text-sm text-brand-text-muted">
           Nenhuma atividade recente por enquanto.

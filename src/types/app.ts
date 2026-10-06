@@ -107,6 +107,33 @@ export interface CineMatchSuggestion {
   reason: string;
 }
 
+export type WatchPartyMediaType = 'movie' | 'series';
+
+export interface WatchParty {
+  id: string;
+  createdByUserId: string;
+  partnerUserId: string;
+  mediaType: WatchPartyMediaType;
+  providerExternalId: string;
+  title: string;
+  posterPath: string | null;
+  genreId: number | null;
+  status: 'planned' | 'completed';
+  progressSeason: number | null;
+  progressEpisode: number | null;
+  creatorPoints: number;
+  partnerPoints: number;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+export interface CreateWatchPartyInput {
+  partnerUserId: string;
+  mediaType: WatchPartyMediaType;
+  providerExternalId: string;
+  genreId: number | null;
+}
+
 export interface TrendingMovie {
   title: string;
   coverUrl: string | null;

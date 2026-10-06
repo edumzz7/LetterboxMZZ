@@ -1,12 +1,12 @@
 import { useState } from "react";
 import clsx from "clsx";
-import { Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
 import { usePersonalMovies } from "../../hooks/usePersonalMovies";
 import { useSocialActions } from "../../hooks/useSocialActions";
 import type { PersonalMovie } from "../../types/app";
 import AddMovieDialog from "./AddMovieDialog";
 import MovieCard from "./MovieCard";
+import { PosterGridSkeleton } from "../ui/LoadingSkeleton";
 
 interface PersonalMoviesSectionProps {
   userId: string;
@@ -116,9 +116,7 @@ export default function PersonalMoviesSection({
       </div>
 
       {moviesQuery.isLoading ? (
-        <div className="flex justify-center items-center py-20 text-brand-gold-alt opacity-50">
-          <Loader2 className="animate-spin" size={32} />
-        </div>
+        <PosterGridSkeleton count={8} />
       ) : isPublicLocked ? (
         <div className="rounded-2xl border border-brand-gold/25 bg-brand-gold/[0.04] px-6 py-12 text-center text-sm text-brand-text-muted">
           Para visualização completa,{" "}

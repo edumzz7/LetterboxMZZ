@@ -15,6 +15,7 @@ import {
 import { listUserAchievementIds, listUserActivity } from '../../lib/appData';
 import { getFavoriteGenreLabel } from '../../lib/favoriteGenres';
 import type { ActivityEntry, PersonalMovie, RankedUser, SeriesEntry } from '../../types/app';
+import { Skeleton } from '../ui/LoadingSkeleton';
 
 interface RankingScreenProps {
   user: RankedUser;
@@ -270,9 +271,9 @@ export default function RankingScreen({ user, users, movies, series, currentUser
 
   if (loading) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center gap-3 text-brand-gold">
-        <Icons.Loader2 size={22} className="animate-spin" />
-        <span className="text-xs uppercase tracking-[0.16em] text-brand-text-muted">Calculando seu espaço de conquistas</span>
+      <div role="status" aria-label="Carregando pontuação e conquistas" className="space-y-6 py-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{[0, 1, 2].map((item) => <div key={item} className="rounded-2xl border border-[#151b28] bg-[#06080d] p-5"><Skeleton className="h-3 w-24" /><Skeleton className="mt-4 h-7 w-36" /><Skeleton className="mt-3 h-3 w-full" /></div>)}</div>
+        <div className="rounded-2xl border border-[#151b28] bg-[#06080d] p-5"><Skeleton className="h-4 w-48" /><div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{[0, 1, 2, 3].map((item) => <Skeleton key={item} className="h-24 rounded-xl" />)}</div></div>
       </div>
     );
   }

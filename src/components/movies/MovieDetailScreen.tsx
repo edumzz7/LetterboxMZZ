@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Loader2, Film, Eye, EyeOff, Plus, Trash2, Edit3, Star, ArrowLeft, Video, Lock } from 'lucide-react';
+import { Film, Eye, EyeOff, Plus, Trash2, Edit3, Star, ArrowLeft, Video, Lock } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { usePersonalMovies } from '../../hooks/usePersonalMovies';
 import { useSocialActions } from '../../hooks/useSocialActions';
@@ -14,6 +14,8 @@ import { generateImagePath } from '../../lib/imageUtils';
 import clsx from 'clsx';
 import SimilarMediaSection from '../ui/SimilarMediaSection';
 import WatchedTimingDialog from './WatchedTimingDialog';
+import TmdbImage from '../ui/TmdbImage';
+import { DetailPageSkeleton } from '../ui/LoadingSkeleton';
 
 interface MovieDetailScreenProps {
   id: string;
@@ -203,12 +205,7 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
   };
 
   if (movieQuery.isLoading || creditsQuery.isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-32 text-brand-gold gap-4">
-        <Loader2 className="animate-spin" size={32} />
-        <span className="text-xs uppercase tracking-widest text-brand-text-muted">Carregando filme...</span>
-      </div>
-    );
+    return <DetailPageSkeleton title="Carregando filme" />;
   }
 
   if (movieQuery.isError || !movie) {
@@ -236,9 +233,11 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
       <div className="relative -mx-4 sm:-mx-7 lg:-mx-9 -mt-4 sm:-mt-7 lg:-mt-9 h-[25vh] sm:h-[35vh] md:h-[40vh] overflow-hidden rounded-t-3xl border-b border-[#151515]">
         {backdropUrl && (
           <>
-            <img
+            <TmdbImage
               src={backdropUrl}
               alt={movie.title}
+              sizes="100vw"
+              loading="eager"
               className="w-full h-full object-cover object-top opacity-30 blur-[2px] scale-105"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
@@ -256,7 +255,7 @@ export default function MovieDetailScreen({ id, currentUserId }: MovieDetailScre
       <div className="relative z-10 px-0 sm:px-4 -mt-24 sm:-mt-32 md:-mt-40 flex flex-col md:flex-row gap-8 items-start">
         {/* Left Side: Poster */}
         <div className="w-48 sm:w-56 md:w-64 aspect-[2/3] shrink-0 rounded-2xl overflow-hidden border border-[#222] bg-[#050811] shadow-2xl shadow-black/80 mx-auto md:mx-0">
-          <img src={imageSrc} alt={movie.title} className="w-full h-full object-cover" />
+          <TmdbImage src={imageSrc} alt={movie.title} sizes="(max-width: 639px) 192px, 256px" className="w-full h-full object-cover" />
         </div>
 
         {/* Right Side: Information */}

@@ -34,6 +34,7 @@ import PersonDetailScreen from "./components/people/PersonDetailScreen";
 import HomeScreen from "./components/home/HomeScreen";
 import UserDropdownMenu from "./components/layout/UserDropdownMenu";
 import UserEventBell from "./components/layout/UserEventBell";
+import CineMatchPage from "./components/layout/CineMatchPage";
 import ActivitiesScreen from "./components/layout/ActivitiesScreen";
 import ImportTvTimePage from "./components/layout/ImportTvTimePage";
 import { useAvatarMutation, useUsers } from "./hooks/useUsers";
@@ -56,7 +57,6 @@ import PublicHome from "./components/public/PublicHome";
 import CatalogPage from "./components/public/CatalogPage";
 import ProposalPage from "./components/public/ProposalPage";
 import PublicDashboardLite from "./components/public/PublicDashboardLite";
-import { notifyHeaderMenuOpen } from "./lib/headerMenu";
 import {
   changePassword,
   adminResetPassword,
@@ -122,6 +122,7 @@ function App() {
   const [matchChangelogs] = useRoute("/changelogs");
   const [matchFaq] = useRoute("/faq");
   const [matchActivities] = useRoute("/atividades");
+  const [matchCineMatch] = useRoute("/cinematch");
   const [matchRequestPasswordReset] = useRoute("/conta/esqueci-senha");
   const [matchMovies] = useRoute("/movies");
   const [matchMoviesPage, moviesPageParams] = useRoute("/movies/page/:page");
@@ -248,7 +249,7 @@ function App() {
   const isAchievementsRoute =
     urlUsername === "conquistas" || urlUsername === "ranking";
   const viewedUser =
-    matchChangelogs || matchFaq || matchActivities || isAchievementsRoute
+    matchChangelogs || matchFaq || matchActivities || matchCineMatch || isAchievementsRoute
       ? null
       : urlUsername
         ? users.find((user) => user.username === urlUsername) ||
@@ -279,6 +280,7 @@ function App() {
     !matchChangelogs &&
     !matchFaq &&
     !matchActivities &&
+    !matchCineMatch &&
     !isAchievementsRoute,
   );
 
@@ -546,6 +548,7 @@ function App() {
     matchContact ||
     matchFaq ||
     matchRegister ||
+    (!session && isPersonRoute) ||
     (!session && (matchMovie || matchSerie)) ||
     (!session && Boolean(viewedUser));
 
@@ -593,6 +596,18 @@ function App() {
               id={serieParams.id}
               currentUserId={session?.id ?? null}
             />
+          </section>
+        </main>
+      ) : matchActor ? (
+        <main className="mx-auto w-full max-w-[1700px] px-3 py-8 sm:px-6 lg:py-12">
+          <section className="overflow-hidden rounded-3xl border border-[#151b28] bg-[#06080d] p-4 sm:p-7 lg:p-9">
+            <PersonDetailScreen id={actorParams.id} mode="actor" />
+          </section>
+        </main>
+      ) : matchDirector ? (
+        <main className="mx-auto w-full max-w-[1700px] px-3 py-8 sm:px-6 lg:py-12">
+          <section className="overflow-hidden rounded-3xl border border-[#151b28] bg-[#06080d] p-4 sm:p-7 lg:p-9">
+            <PersonDetailScreen id={directorParams.id} mode="director" />
           </section>
         </main>
       ) : matchProposal ? (
@@ -778,8 +793,7 @@ function App() {
                   aria-label="Abrir CineMatch"
                   title="CineMatch"
                   onClick={() => {
-                    notifyHeaderMenuOpen("cineMatch");
-                    window.dispatchEvent(new Event("open-cinematch"));
+                    setLocation('/cinematch');
                   }}
                   className="inline-flex h-11 w-11 items-center justify-center rounded-full text-white transition hover:bg-white/5 hover:text-brand-gold"
                 >
@@ -964,7 +978,9 @@ function App() {
                   </nav>
                 </section>
               )}
-              {matchActivities ? (
+              {matchCineMatch ? (
+                <CineMatchPage currentUserId={authenticatedSession.id} users={users} />
+              ) : matchActivities ? (
                 <ActivitiesScreen
                   currentUserId={authenticatedSession.id}
                   viewedUserId={viewedUser?.id ?? authenticatedSession.id}
@@ -1102,7 +1118,10 @@ function App() {
 
       </div>
       {isMobileLayout && isNavigationDrawerOpen && (
-        <div className="fixed inset-0 z-[60]">
+        <div
+          className="fixed inset-x-0 top-0 z-[60]"
+          style={{ bottom: "calc(3.25rem + max(0.75rem, env(safe-area-inset-bottom)))" }}
+        >
           <button
             type="button"
             aria-label="Fechar navegação"
@@ -1112,7 +1131,7 @@ function App() {
           <aside
             aria-label="Navegação principal"
             role="dialog"
-            aria-modal="true"
+            aria-modal="false"
             className="relative flex h-full w-[min(26rem,calc(100vw-1rem))] flex-col overflow-y-auto overscroll-contain border-r border-[#151b28] bg-[#06080d] px-3 py-4 shadow-[20px_0_60px_rgba(0,0,0,0.4)]"
           >
             <div className="mb-4 flex items-center justify-between px-2">
@@ -1233,7 +1252,7 @@ function App() {
       {isMobileLayout && (
         <nav
           aria-label="Ações rápidas"
-          className="fixed inset-x-0 bottom-0 z-40 border-t border-[#151b28] bg-[#06080d]/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_36px_rgba(0,0,0,0.25)] backdrop-blur"
+          className="fixed inset-x-0 bottom-0 z-[70] border-t border-[#151b28] bg-[#06080d]/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_36px_rgba(0,0,0,0.25)] backdrop-blur"
         >
           <div className="mx-auto flex max-w-md items-center justify-around">
             <button
@@ -1289,8 +1308,7 @@ function App() {
               aria-label="Abrir CineMatch"
               title="CineMatch"
               onClick={() => {
-                notifyHeaderMenuOpen("cineMatch");
-                window.dispatchEvent(new Event("open-cinematch"));
+                setLocation('/cinematch');
               }}
               className="inline-flex h-11 w-11 items-center justify-center rounded-full text-white transition hover:bg-white/5 hover:text-brand-gold"
             >

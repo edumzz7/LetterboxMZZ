@@ -4,6 +4,7 @@ import { Film, Eye, EyeOff, Trash2, Loader2, Pencil, MessageSquare, MoreVertical
 import clsx from 'clsx';
 import { useLocation } from 'wouter';
 import { generateImagePath } from '../../lib/imageUtils';
+import TmdbImage from '../ui/TmdbImage';
 import {
   findMovieIdByTitle,
   getMovieWatchProviders,
@@ -217,14 +218,14 @@ export default function MovieCard({
         onClick={handleCardClick}
         className="static h-32 w-20 shrink-0 overflow-hidden rounded-md border border-[#222] bg-brand-card transition-all hover:border-brand-gold-alt hover:shadow-[0_0_15px_rgba(212,175,55,0.15)] group cursor-pointer md:relative md:h-auto md:w-full md:aspect-[2/3]"
       >
-        <img
+        <TmdbImage
           src={imageSrc}
           alt={movie.titulo}
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           loading="lazy"
+          sizes="(max-width: 767px) 80px, 20vw"
           onError={(event) => {
-            (event.target as HTMLImageElement).style.display = 'none';
-            (event.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+            event.currentTarget.parentElement?.nextElementSibling?.classList.remove('hidden');
           }}
         />
         <div className="hidden absolute inset-0 w-full h-full flex-col items-center justify-center p-4 text-center bg-brand-card">

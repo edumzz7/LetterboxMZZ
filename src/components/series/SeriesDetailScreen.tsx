@@ -153,6 +153,45 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
     deleteSeriesMutation.isPending ||
     rateSeriesMutation.isPending;
 
+  // "Acompanhar": starts the series as "watching" with the first episode of the
+  // first season marked as watched. Works from scratch or from the watchlist.
+  const handleStartWatching = async () => {
+    if (isGuest || !series || isUpcoming) return;
+    const firstSeasonNumber = regularSeasons[0]?.season_number ?? 1;
+    const firstSeasonTotal = regularSeasons[0]?.episode_count || 1;
+
+    try {
+      if (userSeriesDoc) {
+        await saveSeriesProgress({
+          id: userSeriesDoc.id,
+          temporada: firstSeasonNumber,
+          total_episodios: firstSeasonTotal,
+          episodios_vistos: 1,
+          status: 'watching',
+        });
+        return;
+      }
+
+      await addSeriesMutation.mutateAsync({
+        titulo: series.name,
+        capa_url: series.poster_path ? `https://image.tmdb.org/t/p/w500${series.poster_path}` : null,
+        status: 'watching',
+        temporada: firstSeasonNumber,
+        total_episodios: firstSeasonTotal,
+        episodios_vistos: 1,
+        plataforma_slug: 'stremio',
+        source_movie_id: String(series.id),
+        rating: null,
+        streaming_data: JSON.stringify(providers),
+        is_retroactive: false,
+      });
+      setSelectedSeason(firstSeasonNumber);
+      await cineratsQuery.refetch();
+    } catch (error) {
+      console.error('Falha ao acompanhar série', error);
+    }
+  };
+
   const handleAddSeries = async (status: 'watchlist' | 'watching' | 'watched', isRetroactive = false) => {
     if (isGuest || !series || (isUpcoming && status !== 'watchlist')) return;
     const totalEpsOfSeason = activeSeasonMeta?.episode_count || 1;
@@ -390,18 +429,16 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
               {isGuest ? 'Watchlist' : userSeriesDoc?.status === 'watchlist' ? 'Na Watchlist' : 'Watchlist'}
             </button>
 
-            {!isUpcoming && !userSeriesDoc && (
-              <>
-                <button
-                  onClick={() => handleAddSeries('watching')}
-                  disabled={isPending || isGuest}
-                  title={isGuest ? 'Entre para acompanhar esta serie' : undefined}
-                  className="flex items-center gap-2 py-3 px-6 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all active:scale-95 border bg-black/45 border-[#222] text-brand-text hover:border-brand-gold/35 hover:text-brand-gold disabled:opacity-50"
-                >
-                  {isGuest ? <Lock size={14} /> : <Play size={12} className="fill-brand-text text-brand-text" />}
-                  Acompanhar
-                </button>
-              </>
+            {!isUpcoming && (!userSeriesDoc || userSeriesDoc.status === 'watchlist') && (
+              <button
+                onClick={handleStartWatching}
+                disabled={isPending || isGuest}
+                title={isGuest ? 'Entre para acompanhar esta serie' : undefined}
+                className="flex items-center gap-2 py-3 px-6 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all active:scale-95 border bg-black/45 border-[#222] text-brand-text hover:border-brand-gold/35 hover:text-brand-gold disabled:opacity-50"
+              >
+                {isGuest ? <Lock size={14} /> : <Play size={12} className="fill-brand-text text-brand-text" />}
+                Acompanhar
+              </button>
             )}
 
             {!isUpcoming && userSeriesDoc?.status !== 'watched' && (
@@ -416,7 +453,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
               </button>
             )}
 
-            {canEditUserReview && userSeriesDoc && (
+            {canEditUserReview && userSeriesDoc?.status === 'watched' && (
               <button
                 onClick={() => setIsReviewOpen(true)}
                 className="flex items-center gap-2 py-3 px-6 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all active:scale-95 border bg-black/45 border-[#222] text-brand-gold-alt hover:border-brand-gold hover:text-brand-gold"

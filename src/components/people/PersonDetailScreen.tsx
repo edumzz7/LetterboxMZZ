@@ -4,6 +4,7 @@ import { ArrowLeft, CalendarDays, Clapperboard, Film, MapPin, Tv, UserRound } fr
 import { useLocation } from 'wouter';
 import { getPersonDetailsWithCredits, type TMDBCombinedCredit } from '../../lib/tmdb';
 import TmdbImage from '../ui/TmdbImage';
+import FavoritePersonButton from './FavoritePersonButton';
 import { DetailPageSkeleton } from '../ui/LoadingSkeleton';
 
 type PersonPageMode = 'actor' | 'director';
@@ -11,6 +12,7 @@ type PersonPageMode = 'actor' | 'director';
 interface PersonDetailScreenProps {
   id: string;
   mode: PersonPageMode;
+  currentUserId?: string | null;
 }
 
 function getCreditDate(credit: TMDBCombinedCredit) {
@@ -34,7 +36,7 @@ function getCreditTitle(credit: TMDBCombinedCredit) {
   return credit.media_type === 'movie' ? credit.title : credit.name;
 }
 
-export default function PersonDetailScreen({ id, mode }: PersonDetailScreenProps) {
+export default function PersonDetailScreen({ id, mode, currentUserId = null }: PersonDetailScreenProps) {
   const [, setLocation] = useLocation();
   const [expandedFilmographyKey, setExpandedFilmographyKey] = useState<string | null>(null);
   const [expandedBiographyKey, setExpandedBiographyKey] = useState<string | null>(null);
@@ -125,6 +127,16 @@ export default function PersonDetailScreen({ id, mode }: PersonDetailScreenProps
             <h1 className="break-words text-center text-3xl font-extralight uppercase tracking-wide text-brand-text sm:text-4xl md:text-left md:text-5xl">{person.name}</h1>
             {person.known_for_department && <p className="mt-2 text-xs uppercase tracking-widest text-brand-text-muted">{person.known_for_department}</p>}
           </div>
+
+          <FavoritePersonButton
+            currentUserId={currentUserId}
+            person={{
+              tmdbPersonId: numericId,
+              name: person.name,
+              profilePath: person.profile_path ?? null,
+              department: isActorPage ? 'Acting' : 'Directing',
+            }}
+          />
 
           <div className="mx-auto grid w-full max-w-[18rem] grid-cols-2 gap-2 text-center md:mx-0 md:max-w-3xl md:grid-cols-3 md:text-left">
             <div className="rounded-2xl border border-[#151515] bg-black/20 p-3"><CalendarDays size={14} className="mx-auto mb-2 text-brand-gold md:mx-0" /><span className="block text-[9px] uppercase tracking-widest text-brand-text-muted">Idade</span><span className="text-xs font-light text-brand-text sm:text-sm">{getAge(person.birthday, person.deathday)}</span></div>

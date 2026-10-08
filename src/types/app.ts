@@ -98,6 +98,17 @@ export interface UserFavorite {
   ownerUserId?: string;
 }
 
+export type FavoritePersonDepartment = 'Acting' | 'Directing';
+
+export interface UserFavoritePerson {
+  id: string;
+  tmdbPersonId: number;
+  name: string;
+  profilePath: string | null;
+  department: FavoritePersonDepartment;
+  createdAt: string;
+}
+
 export type CineMatchMode = 'geral' | 'oscar';
 
 export interface CineMatchSuggestion {
@@ -152,7 +163,8 @@ export interface AnticipatedMovie {
   mediaType?: 'movie' | 'tv';
   userIds: string[];
 }
-export interface UserOscarPrediction {
+
+export interface UserOscarPrediction {
   id: string;
   user_id: string;
   category: string;

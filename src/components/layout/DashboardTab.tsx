@@ -11,6 +11,7 @@ import type { RankedUser } from '../../types/app';
 import PreferenceSearchInput, { type PreferenceSearchItem } from './PreferenceSearchInput';
 import { useUsers } from '../../hooks/useUsers';
 import WatchPartyHistory from './WatchPartyHistory';
+import FavoritePeopleList from '../people/FavoritePeopleList';
 
 interface DashboardTabProps {
   user: RankedUser;
@@ -263,6 +264,19 @@ export default function DashboardTab({ user, isOwnDashboard }: DashboardTabProps
 
       {/* Seção de Resenhas */}
       </>}
+
+      <div className="col-span-1 md:col-span-2 lg:col-span-3 mt-6 flex flex-col gap-4">
+        <h2 className="text-sm font-semibold tracking-[0.25em] uppercase text-brand-gold">
+          Artistas favoritos
+        </h2>
+        <FavoritePeopleList
+          userId={user.id}
+          variant="grid"
+          emptyMessage={isOwnDashboard
+            ? 'Você ainda não favoritou nenhum artista. Use a estrela na página de um ator ou diretor.'
+            : 'Nenhum artista favoritado ainda.'}
+        />
+      </div>
 
       {isOwnDashboard && <div className="col-span-1 md:col-span-2 lg:col-span-3 mt-6"><WatchPartyHistory currentUserId={user.id} users={usersQuery.data || []} compact /></div>}
 

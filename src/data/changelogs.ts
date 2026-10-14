@@ -2,6 +2,7 @@ export interface ChangelogEntry {
   date: string;
   title: string;
   items: Array<string | ChangelogLinkItem>;
+  summaryItems?: Array<string | ChangelogLinkItem>;
 }
 
 export interface ChangelogLinkItem {
@@ -12,6 +13,21 @@ export interface ChangelogLinkItem {
 }
 
 export const CHANGELOGS: ChangelogEntry[] = [
+  {
+    date: '2026-10-14',
+    title: 'Artistas favoritos, novo CineMatch e melhorias gerais',
+    summaryItems: [
+      'Agora você pode favoritar artistas e diretores e receber notificações sobre novos projetos!',
+      'CineMatch de cara nova: encontre o que assistir juntos presencialmente, com progresso e pontuação atualizados automaticamente para ambos.',
+    ],
+    items: [
+      'Nova função para favoritar artistas e diretores diretamente na página da pessoa. Seus favoritos ficam reunidos em “Meus artistas favoritos” e também aparecem no Painel Pessoal.',
+      'Ao favoritar um artista ou diretor, você pode acompanhar seus novos projetos e receber notificações sempre que uma novidade surgir.',
+      'O CineMatch está de cara nova para ajudar quem vai assistir presencialmente com alguém e ainda não sabe o que escolher. Encontre filmes e séries para assistir juntos.',
+      'Progresso compartilhado no CineMatch: quando um dos usuários envolvidos atualiza o andamento da série ou marca o filme como visto, o sistema atualiza os registros e atribui a pontuação automaticamente para ambos.',
+      'Correção de pequenos fluxos no acompanhamento de séries e na autenticação de resenhas, além de ajustes gerais de navegação e uso.',
+    ],
+  },
   {
     date: '2026-09-25',
     title: 'Navegação mobile e atividades',

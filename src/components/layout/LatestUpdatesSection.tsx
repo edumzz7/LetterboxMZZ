@@ -16,7 +16,7 @@ export default function LatestUpdatesSection() {
         <div>
           <p className="mb-2 font-semibold text-brand-text">{formattedDate} - NEW</p>
           <ul className="list-inside list-disc space-y-1.5 pl-1 text-brand-text-muted/90">
-            {latestUpdate.items.slice(0, 3).map((item) => (
+            {(latestUpdate.summaryItems ?? latestUpdate.items.slice(0, 3)).map((item) => (
               <li key={typeof item === 'string' ? item : `${item.before}-${item.linkHref}`}>
                 {typeof item === 'string' ? item : (
                   <>

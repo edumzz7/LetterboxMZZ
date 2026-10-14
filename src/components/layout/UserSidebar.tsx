@@ -9,6 +9,7 @@ import { useLocation } from 'wouter';
 import { motion } from 'motion/react';
 import type { RankedUser } from '../../types/app';
 import AvatarDisplay from './AvatarDisplay';
+import TmdbImage from '../ui/TmdbImage';
 import { useFavorites } from '../../hooks/useFavorites';
 import { usePersonalMovieMutations } from '../../hooks/usePersonalMovies';
 import { useSeriesMutations } from '../../hooks/useSeries';
@@ -110,12 +111,14 @@ function SidebarMediaItem({
       <Dialog.Trigger asChild>
         <div className="flex flex-col gap-2 bg-black/15 border border-[#171717] hover:border-[#333] transition-all rounded-xl p-2 cursor-pointer group">
           <div className="flex items-center gap-2.5">
-            {/* Tiny Cover */}
-            <div className="w-8 aspect-[2/3] rounded-md overflow-hidden border border-[#222] shrink-0 bg-brand-card">
+            {/* Poster: 10% larger, with resolution selected for the display density. */}
+            <div className="relative w-[35.2px] aspect-[2/3] rounded-md overflow-hidden border border-[#222] shrink-0 bg-brand-card">
               {item.coverUrl ? (
-                <img
+                <TmdbImage
                   src={item.coverUrl}
                   alt={item.title}
+                  sizes="35.2px"
+                  wrapperClassName="absolute inset-0"
                   className="w-full h-full object-cover"
                 />
               ) : (
@@ -157,13 +160,15 @@ function SidebarMediaItem({
             <button
               type="button"
               onClick={handleOpenDetails}
-              className="w-24 aspect-[2/3] shrink-0 rounded overflow-hidden border border-[#222] bg-black cursor-pointer transition-colors hover:border-brand-gold focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold"
+              className="relative w-24 aspect-[2/3] shrink-0 self-start rounded overflow-hidden border border-[#222] bg-black cursor-pointer transition-colors hover:border-brand-gold focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold"
               aria-label={`Abrir página de ${item.title}`}
             >
               {item.coverUrl ? (
-                <img
+                <TmdbImage
                   src={item.coverUrl}
                   alt={item.title}
+                  sizes="96px"
+                  wrapperClassName="absolute inset-0"
                   className="w-full h-full object-cover"
                 />
               ) : (
@@ -397,7 +402,7 @@ export default function UserSidebar({
                         isSelected ? 'border-brand-gold text-brand-gold' : 'border-[#252525] text-brand-gold-alt',
                       )}
                     >
-                      <AvatarDisplay avatarId={user.avatar_id} className="w-8 h-8" emojiClassName="text-lg" />
+                      <AvatarDisplay avatarId={user.avatar_id} className="w-full h-full" emojiClassName="text-lg" />
                     </div>
                     <p className="text-sm uppercase tracking-[0.14em] text-brand-text truncate">
                       {user.display_name || user.username} {isCurrent ? '(Você)' : ''}
@@ -453,7 +458,7 @@ export default function UserSidebar({
                       selectedUserId === currentUserId ? 'border-brand-gold text-brand-gold' : 'border-[#252525] text-brand-gold-alt',
                     )}
                   >
-                    <AvatarDisplay avatarId={currentUserItem.avatar_id} className="w-8 h-8" emojiClassName="text-lg" />
+                    <AvatarDisplay avatarId={currentUserItem.avatar_id} className="w-full h-full" emojiClassName="text-lg" />
                   </div>
                   <p className="text-sm uppercase tracking-[0.14em] text-brand-text truncate">
                     {currentUserItem.display_name || currentUserItem.username} (Você)

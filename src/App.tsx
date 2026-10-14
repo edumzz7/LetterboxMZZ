@@ -1004,9 +1004,9 @@ function App() {
                   currentUserId={session.id}
                 />
               ) : matchActor ? (
-                <PersonDetailScreen id={actorParams.id} mode="actor" />
+                <PersonDetailScreen id={actorParams.id} mode="actor" currentUserId={session.id} />
               ) : matchDirector ? (
-                <PersonDetailScreen id={directorParams.id} mode="director" />
+                <PersonDetailScreen id={directorParams.id} mode="director" currentUserId={session.id} />
               ) : matchImportTvTime ? (
                 <ImportTvTimePage
                   currentUserId={session.id}

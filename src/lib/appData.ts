@@ -11,6 +11,7 @@ import type {
   SeriesEntry,
   SeriesStatus,
   UserFavorite,
+  UserFavoritePerson,
   TrendingMovie,
   UserOscarPrediction,
   AnticipatedMovie,
@@ -266,6 +267,31 @@ export async function removeFavorite(favoriteId: string): Promise<void> {
     },
     () => localData.removeFavorite(favoriteId),
   );
+}
+
+// ==========================================
+// Favorite people (atores e diretores)
+// ==========================================
+
+export async function listFavoritePeople(userId: string): Promise<UserFavoritePerson[]> {
+  const response = await apiClient.get<UserFavoritePerson[]>(
+    `/users/${userId}/favorite-people`,
+  );
+  return response.data;
+}
+
+export async function addFavoritePerson(
+  person: Pick<UserFavoritePerson, "tmdbPersonId" | "name" | "profilePath" | "department">,
+): Promise<UserFavoritePerson> {
+  const response = await apiClient.post<UserFavoritePerson>(
+    "/users/me/favorite-people",
+    person,
+  );
+  return response.data;
+}
+
+export async function removeFavoritePerson(tmdbPersonId: number): Promise<void> {
+  await apiClient.delete(`/users/me/favorite-people/${tmdbPersonId}`);
 }
 
 // ==========================================

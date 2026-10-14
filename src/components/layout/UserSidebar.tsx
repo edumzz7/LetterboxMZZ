@@ -2,6 +2,8 @@ import { useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import clsx from 'clsx';
 import { CalendarClock, ChevronDown, ChevronUp, Film, Loader2, Plus, Star, UsersRound } from 'lucide-react';
+import FavoritePeopleList from '../people/FavoritePeopleList';
+import { MAX_FAVORITE_PEOPLE, useFavoritePeople } from '../../hooks/useFavoritePeople';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { motion } from 'motion/react';
@@ -234,6 +236,7 @@ export default function UserSidebar({
   const [isSearchFocused, setIsSearchFocused] = useState(false);
 
   const { isUserFavorited, toggleFavorite } = useFavorites(currentUserId);
+  const { favorites: favoritePeople } = useFavoritePeople(currentUserId);
   const [isArtistsOpen, setIsArtistsOpen] = useState(false);
   const [isUpcomingOpen, setIsUpcomingOpen] = useState(false);
   const [upcomingTab, setUpcomingTab] = useState<'filmes' | 'series'>('filmes');
@@ -476,6 +479,11 @@ export default function UserSidebar({
               <span className="text-xs uppercase tracking-[0.2em] font-medium text-brand-text-muted group-hover:text-brand-text transition-colors">
                 Meus artistas favoritos
               </span>
+              {favoritePeople.length > 0 && (
+                <span className="rounded-full border border-brand-gold/30 bg-brand-gold/10 px-1.5 text-[10px] text-brand-gold">
+                  {favoritePeople.length}/{MAX_FAVORITE_PEOPLE}
+                </span>
+              )}
             </div>
             {isArtistsOpen ? (
               <ChevronUp size={14} className="text-brand-text-muted group-hover:text-brand-text" />
@@ -485,8 +493,12 @@ export default function UserSidebar({
           </button>
 
           {isArtistsOpen && (
-            <div className="mt-2.5 rounded-xl border border-[#171717] bg-[#0a0f1e] px-3 py-3 text-xs font-light leading-relaxed text-brand-text-muted animate-in fade-in duration-200">
-              Logo você poderá favoritar e acompanhar de perto seus artistas favoritos, aguarde!
+            <div className="mt-2.5 rounded-xl border border-[#171717] bg-[#0a0f1e] px-2 py-2 animate-in fade-in duration-200">
+              <FavoritePeopleList
+                userId={currentUserId}
+                variant="compact"
+                emptyMessage="Você ainda não favoritou nenhum artista. Use a estrela na página de um ator ou diretor."
+              />
             </div>
           )}
         </div>

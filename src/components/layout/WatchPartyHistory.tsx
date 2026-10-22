@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Film, Tv } from 'lucide-react';
 import { useLocation } from 'wouter';
@@ -16,18 +16,22 @@ export default function WatchPartyHistory({ currentUserId, users, compact = fals
   const [editingId, setEditingId] = useState<string | null>(null);
   const [season, setSeason] = useState(1);
   const [episode, setEpisode] = useState(1);
-  const [pendingId, setPendingId] = useState<string | null>(null);
+  const pendingIdsRef = useRef(new Set<string>());
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const all = parties.data || [];
   const visible = compact ? all.slice(0, 3) : all;
 
   async function update(party: WatchParty, finish: boolean) {
-    setPendingId(party.id);
+    // Lock synchronously, including repeated submissions before React renders.
+    if (pendingIdsRef.current.has(party.id)) return;
+    pendingIdsRef.current.add(party.id);
+    setPendingIds(new Set(pendingIdsRef.current));
     setError(null);
     try {
       if (finish) await completeWatchParty(party.id);
       else await updateWatchPartyProgress(party.id, season, episode);
-      setEditingId(null);
+      setEditingId((current) => current === party.id ? null : current);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['watchparties'] }),
         queryClient.invalidateQueries({ queryKey: ['series'] }),
@@ -35,7 +39,10 @@ export default function WatchPartyHistory({ currentUserId, users, compact = fals
       ]);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Não foi possível atualizar a watchparty.');
-    } finally { setPendingId(null); }
+    } finally {
+      pendingIdsRef.current.delete(party.id);
+      setPendingIds(new Set(pendingIdsRef.current));
+    }
   }
 
   return <section className="rounded-2xl border border-[#151b28] bg-[#06080d] p-4 sm:p-6">
@@ -52,6 +59,7 @@ export default function WatchPartyHistory({ currentUserId, users, compact = fals
         const partnerId = party.createdByUserId === currentUserId ? party.partnerUserId : party.createdByUserId;
         const partner = users.find((item) => item.id === partnerId);
         const Icon = party.mediaType === 'movie' ? Film : Tv;
+        const isPending = pendingIds.has(party.id);
         return <article key={party.id} className="flex gap-3 rounded-xl border border-[#202632] bg-[#0c0e13] p-3">
           {party.posterPath ? <TmdbImage src={party.posterPath} alt="" sizes="64px" wrapperClassName="h-24 w-16 shrink-0 rounded" className="h-24 w-16 shrink-0 rounded object-cover" /> : <div className="flex h-24 w-16 shrink-0 items-center justify-center rounded bg-white/5"><Icon size={22} /></div>}
           <div className="min-w-0 flex-1">
@@ -60,13 +68,13 @@ export default function WatchPartyHistory({ currentUserId, users, compact = fals
             {party.mediaType === 'series' && party.progressSeason && <p className="mt-1 text-xs text-brand-gold">Até T{party.progressSeason} E{party.progressEpisode}</p>}
             <p className="mt-1 text-[11px] text-brand-text-muted">{party.createdByUserId === currentUserId ? party.creatorPoints : party.partnerPoints} MC recebidas</p>
             {party.status !== 'completed' && <div className="mt-3 flex flex-wrap gap-2">
-              {party.mediaType === 'series' && <button type="button" onClick={() => { setEditingId(editingId === party.id ? null : party.id); setSeason(party.progressSeason || 1); setEpisode((party.progressEpisode || 0) + 1); }} className="cursor-pointer rounded border border-brand-gold/40 px-2 py-1 text-xs text-brand-gold hover:bg-brand-gold/10">Atualizar progresso</button>}
-              <button type="button" disabled={pendingId === party.id} onClick={() => void update(party, true)} className="inline-flex cursor-pointer items-center gap-1 rounded border border-white/20 px-2 py-1 text-xs hover:border-brand-gold disabled:opacity-50"><Check size={13} />Concluir</button>
+              {party.mediaType === 'series' && <button type="button" disabled={isPending} onClick={() => { setEditingId(editingId === party.id ? null : party.id); setSeason(party.progressSeason || 1); setEpisode((party.progressEpisode || 0) + 1); }} className="cursor-pointer rounded border border-brand-gold/40 px-2 py-1 text-xs text-brand-gold hover:bg-brand-gold/10">Atualizar progresso</button>}
+              <button type="button" disabled={isPending} onClick={() => void update(party, true)} className="inline-flex cursor-pointer items-center gap-1 rounded border border-white/20 px-2 py-1 text-xs hover:border-brand-gold disabled:opacity-50"><Check size={13} />Concluir</button>
             </div>}
             {editingId === party.id && <form onSubmit={(event) => { event.preventDefault(); void update(party, false); }} className="mt-3 flex flex-wrap items-end gap-2">
-              <label className="text-[11px] text-brand-text-muted">Temp.<input type="number" min={1} value={season} onChange={(event) => setSeason(Number(event.target.value))} className="mt-1 block w-14 rounded border border-white/20 bg-[#111520] p-1 text-white" /></label>
-              <label className="text-[11px] text-brand-text-muted">Último ep.<input type="number" min={1} value={episode} onChange={(event) => setEpisode(Number(event.target.value))} className="mt-1 block w-16 rounded border border-white/20 bg-[#111520] p-1 text-white" /></label>
-              <button type="submit" disabled={pendingId === party.id} className="cursor-pointer rounded bg-brand-gold px-3 py-1.5 text-xs font-semibold text-black disabled:opacity-50">Salvar</button>
+              <label className="text-[11px] text-brand-text-muted">Temp.<input type="number" disabled={isPending} min={1} value={season} onChange={(event) => setSeason(Number(event.target.value))} className="mt-1 block w-14 rounded border border-white/20 bg-[#111520] p-1 text-white" /></label>
+              <label className="text-[11px] text-brand-text-muted">Último ep.<input type="number" disabled={isPending} min={1} value={episode} onChange={(event) => setEpisode(Number(event.target.value))} className="mt-1 block w-16 rounded border border-white/20 bg-[#111520] p-1 text-white" /></label>
+              <button type="submit" disabled={isPending} className="cursor-pointer rounded bg-brand-gold px-3 py-1.5 text-xs font-semibold text-black disabled:opacity-50">Salvar</button>
             </form>}
           </div>
         </article>;

@@ -37,6 +37,8 @@ import UserEventBell from "./components/layout/UserEventBell";
 import CineMatchPage from "./components/layout/CineMatchPage";
 import ActivitiesScreen from "./components/layout/ActivitiesScreen";
 import ImportTvTimePage from "./components/layout/ImportTvTimePage";
+import GroupsPage from "./components/groups/GroupsPage";
+import GroupPage from "./components/groups/GroupPage";
 import { useAvatarMutation, useUsers } from "./hooks/useUsers";
 import { useFavorites } from "./hooks/useFavorites";
 import { usePersonalMovies } from "./hooks/usePersonalMovies";
@@ -123,6 +125,8 @@ function App() {
   const [matchFaq] = useRoute("/faq");
   const [matchActivities] = useRoute("/atividades");
   const [matchCineMatch] = useRoute("/cinematch");
+  const [matchGroups] = useRoute("/grupos");
+  const [matchGroup, groupParams] = useRoute("/grupo/:id");
   const [matchRequestPasswordReset] = useRoute("/conta/esqueci-senha");
   const [matchMovies] = useRoute("/movies");
   const [matchMoviesPage, moviesPageParams] = useRoute("/movies/page/:page");
@@ -249,7 +253,7 @@ function App() {
   const isAchievementsRoute =
     urlUsername === "conquistas" || urlUsername === "ranking";
   const viewedUser =
-    matchChangelogs || matchFaq || matchActivities || matchCineMatch || isAchievementsRoute
+    matchChangelogs || matchFaq || matchActivities || matchCineMatch || matchGroups || isAchievementsRoute
       ? null
       : urlUsername
         ? users.find((user) => user.username === urlUsername) ||
@@ -281,6 +285,8 @@ function App() {
     !matchFaq &&
     !matchActivities &&
     !matchCineMatch &&
+    !matchGroups &&
+    !matchGroup &&
     !isAchievementsRoute,
   );
 
@@ -895,10 +901,17 @@ function App() {
                         <BookOpen size={16} strokeWidth={1.8} />
                         <span>Blog CineRats (em breve)</span>
                       </span>
-                      <span className="flex items-center gap-3 px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-text-muted/70">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          scrollToTop();
+                          setLocation("/grupos");
+                        }}
+                        className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-text-muted transition hover:bg-white/5 hover:text-brand-text"
+                      >
                         <Users size={16} strokeWidth={1.8} />
-                        <span>Grupos (em breve)</span>
-                      </span>
+                        <span>Grupos</span>
+                      </button>
                     </div>
                   </nav>
                   <div>
@@ -978,7 +991,15 @@ function App() {
                   </nav>
                 </section>
               )}
-              {matchCineMatch ? (
+              {matchGroups ? (
+                <GroupsPage />
+              ) : matchGroup ? (
+                <GroupPage
+                  key={groupParams.id}
+                  groupId={groupParams.id}
+                  currentUserId={authenticatedSession.id}
+                />
+              ) : matchCineMatch ? (
                 <CineMatchPage currentUserId={authenticatedSession.id} users={users} />
               ) : matchActivities ? (
                 <ActivitiesScreen
@@ -1240,10 +1261,19 @@ function App() {
                   <BookOpen size={17} strokeWidth={1.8} />
                   <span>Blog CineRats (em breve)</span>
                 </span>
-                <span className="flex items-center gap-3 px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-text-muted/70">
+                <button
+                  type="button"
+                  onClick={() => {
+                    scrollToTop();
+                    setLocation("/grupos");
+                    setIsNavigationDrawerOpen(false);
+                  }}
+                  aria-current={matchGroups || matchGroup ? "page" : undefined}
+                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.14em] transition ${matchGroups || matchGroup ? "bg-brand-gold/12 text-brand-gold" : "text-brand-text-muted hover:bg-white/5 hover:text-brand-text"}`}
+                >
                   <Users size={17} strokeWidth={1.8} />
-                  <span>Grupos (em breve)</span>
-                </span>
+                  <span>Grupos</span>
+                </button>
               </div>
             </nav>
           </aside>

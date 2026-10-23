@@ -173,3 +173,119 @@ export interface UserOscarPrediction {
   poster_path: string;
   created_at: string;
 }
+
+export type GroupMemberRole = 'admin' | 'member';
+export type GroupViewerStatus = 'admin' | 'member' | 'invited' | 'requested' | 'none';
+
+export interface GroupProfile {
+  id: string;
+  username: string;
+  displayName: string | null;
+  avatarPath: string | null;
+}
+
+export interface GroupSummary {
+  id: string;
+  name: string;
+  description: string | null;
+  memberCount: number;
+  maxMembers: number;
+  isFull: boolean;
+  createdAt: string;
+}
+
+export interface MyGroup extends GroupSummary {
+  role: GroupMemberRole;
+  joinedAt: string;
+}
+
+export interface GroupInvite {
+  requestId: string;
+  groupId: string;
+  groupName: string;
+  link: string;
+  createdAt: string;
+}
+
+export interface MyGroupsResponse {
+  limit: number;
+  groups: MyGroup[];
+  invites: GroupInvite[];
+}
+
+export interface GroupSearchResponse {
+  items: GroupSummary[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface GroupMemberView extends GroupProfile {
+  role: GroupMemberRole;
+  joinedAt: string;
+}
+
+export interface GroupViewer {
+  status: GroupViewerStatus;
+  joinedAt?: string;
+  requestId?: string | null;
+  cooldownUntil?: string | null;
+  reachedGroupLimit?: boolean;
+  canRequest?: boolean;
+}
+
+export interface GroupDetails extends GroupSummary {
+  admin: GroupProfile | null;
+  viewer: GroupViewer;
+  members?: GroupMemberView[];
+}
+
+export interface GroupRankingItem extends GroupProfile {
+  rank: number;
+  totalPoints: number;
+  role: GroupMemberRole;
+}
+
+export interface GroupRanking {
+  groupId: string;
+  periodStart: string;
+  periodEnd: string;
+  items: GroupRankingItem[];
+}
+
+export interface GroupPendingItem {
+  id: string;
+  user: GroupProfile;
+  createdAt: string;
+}
+
+export interface GroupPendingRequests {
+  invites: GroupPendingItem[];
+  requests: GroupPendingItem[];
+}
+
+export type GroupRequestAction = 'accept' | 'decline' | 'cancel';
+
+export type SpecialNotificationType =
+  | 'group_invite'
+  | 'group_join_request'
+  | 'group_request_accepted'
+  | 'group_invite_accepted'
+  | 'group_admin_transferred';
+
+export interface SpecialNotification {
+  id: string;
+  type: SpecialNotificationType;
+  message: string;
+  link: string | null;
+  referenceId: string | null;
+  actorId: string | null;
+  metadata: { actorUsername?: string; groupName?: string };
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface SpecialNotificationsResponse {
+  items: SpecialNotification[];
+  unreadCount: number;
+}

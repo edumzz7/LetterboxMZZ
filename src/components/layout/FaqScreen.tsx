@@ -136,19 +136,29 @@ const FAQ_SECTIONS: FaqSection[] = [
     icon: Group,
     items: [
       {
-        question: 'O que serão os Grupos CineRats?',
-        answer: 'Os grupos terão o intuito de fazer com que sua disputa seja apenas com quem você desejar. Nem todo grupo precisará visar uma disputa: também viabilizaremos versões “amigáveis” para quem quiser apenas desfrutar do hobby com os amigos, mantendo-se fora dos rankings.',
+        question: 'O que são os Grupos CineRats?',
+        answer: 'Os grupos permitem que sua disputa seja apenas com quem você escolher. Cada grupo tem um ranking mensal de MCoins próprio, com as mesmas regras de pontuação do ranking geral, e a pontuação zera na virada de cada mês.',
         keywords: 'grupos disputa amigos ranking comunidade',
       },
       {
-        question: 'Os grupos terão ranking, pontuação ou desafios próprios?',
-        answer: 'Sim. A ideia é dar liberdade para que os grupos se organizem da forma que melhor desejarem, criando metas e desafios internos conforme as personalidades dos integrantes.',
-        keywords: 'ranking pontos desafios metas',
+        question: 'Como criar ou participar de um grupo?',
+        answer: 'Acesse “Grupos” no menu. Em “Meus grupos” você cria um grupo e vê os grupos de que participa; em “Outros grupos” você busca grupos pelo nome e solicita participação. O administrador também pode convidar você pelo seu @, e o convite chega pelas notificações do sino.',
+        keywords: 'criar participar entrar grupo convite solicitação',
       },
       {
-        question: 'Como criar ou participar de um grupo?',
-        answer: 'Assim que estiverem disponíveis, cada pessoa poderá criar ou buscar um grupo por meio de seções dedicadas na sua página inicial. A ideia é tornar esse acesso fácil e a navegação fluida.',
-        keywords: 'criar participar entrar grupo página inicial',
+        question: 'Existe limite de grupos ou de membros?',
+        answer: 'Sim. Cada pessoa pode participar de até 3 grupos, sendo criadora ou membro, e cada grupo comporta até 15 membros. Convites e solicitações pendentes não ocupam vaga.',
+        keywords: 'limite grupos membros vagas',
+      },
+      {
+        question: 'Minha solicitação foi recusada. Posso pedir de novo?',
+        answer: 'Sim, depois de 3 dias. Se o administrador quiser, ele pode convidar você antes desse prazo.',
+        keywords: 'solicitação recusada prazo convite',
+      },
+      {
+        question: 'O que acontece se o administrador sair do grupo?',
+        answer: 'O membro mais antigo do grupo se torna o novo administrador automaticamente. Se não restar ninguém, o grupo é excluído.',
+        keywords: 'administrador admin sair grupo',
       },
     ],
   },

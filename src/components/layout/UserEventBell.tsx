@@ -3,6 +3,8 @@ import { Bell, Loader2 } from 'lucide-react';
 import { useLocation } from 'wouter';
 import clsx from 'clsx';
 import { useUserActivity } from '../../hooks/useUserActivity';
+import { useSpecialNotifications } from '../../hooks/useSpecialNotifications';
+import SpecialNotificationsList from './SpecialNotificationsList';
 import { HEADER_MENU_OPEN_EVENT, notifyHeaderMenuOpen } from '../../lib/headerMenu';
 
 interface UserEventBellProps {
@@ -51,6 +53,7 @@ export default function UserEventBell({
     }
   }, [isOwnDashboard, currentUserId, viewedUserId, friendIds]);
   const activityQuery = useUserActivity(activityUserIds);
+  const special = useSpecialNotifications();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [, setLocation] = useLocation();
 
@@ -115,6 +118,9 @@ export default function UserEventBell({
     );
   }, [isOwnDashboard, items, seenTimestamp]);
 
+  // Special notifications belong to the logged user, so they count on any profile.
+  const badgeCount = Math.min(unseenCount + special.unreadCount, 9);
+
   const title = 'Atividade';
   const buttonLabel = 'Atividade';
   const emptyLabel = 'Nenhuma atividade recente por enquanto.';
@@ -153,9 +159,9 @@ export default function UserEventBell({
         className="relative inline-flex h-11 w-11 items-center justify-center rounded-full text-white transition hover:bg-white/5 hover:text-brand-gold"
       >
         <Bell size={20} />
-        {isOwnDashboard && unseenCount > 0 ? (
+        {badgeCount > 0 ? (
           <span className="absolute -top-2 -right-2 min-w-5 h-5 px-1 rounded-full bg-brand-gold text-[#0f172a] text-[10px] font-semibold flex items-center justify-center">
-            +{unseenCount}
+            +{badgeCount}
           </span>
         ) : null}
       </button>
@@ -168,7 +174,14 @@ export default function UserEventBell({
             onClick={() => setOpen(false)}
           />
           {/* Panel: centered on mobile, dropdown on desktop */}
-          <div className="fixed inset-x-4 top-[50%] z-[110] w-auto max-h-[80vh] -translate-y-[50%] overflow-hidden rounded-2xl border border-[#151b28] bg-[#06080d] shadow-[0_18px_60px_rgba(0,0,0,0.55)] sm:absolute sm:inset-x-auto sm:right-0 sm:top-[calc(100%+10px)] sm:w-[min(92vw,360px)] sm:max-h-none sm:translate-y-0">
+          <div className="fixed inset-x-4 top-[50%] z-[110] w-auto max-h-[80vh] -translate-y-[50%] overflow-y-auto rounded-2xl border border-[#151b28] bg-[#06080d] shadow-[0_18px_60px_rgba(0,0,0,0.55)] sm:absolute sm:inset-x-auto sm:right-0 sm:top-[calc(100%+10px)] sm:w-[min(92vw,360px)] sm:max-h-[min(80vh,640px)] sm:translate-y-0">
+            <SpecialNotificationsList
+              notifications={special.notifications}
+              unreadCount={special.unreadCount}
+              onMarkRead={special.markRead}
+              onMarkAllRead={() => special.markAllRead()}
+              onNavigate={() => setOpen(false)}
+            />
             <div className="px-4 py-3 border-b border-[#161616] text-xs uppercase tracking-[0.18em] text-brand-gold-alt">
               {title}
             </div>
@@ -182,7 +195,7 @@ export default function UserEventBell({
                 {emptyLabel}
               </div>
             ) : (
-              <ul className="max-h-[420px] overflow-y-auto">
+              <ul>
                 {items.map((item) => {
                   const isNewMember = item.message.startsWith('Novo membro!');
                   return (

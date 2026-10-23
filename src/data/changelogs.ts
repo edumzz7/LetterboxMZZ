@@ -14,6 +14,20 @@ export interface ChangelogLinkItem {
 
 export const CHANGELOGS: ChangelogEntry[] = [
   {
+    date: '2026-10-22',
+    title: 'Grupos: dispute o ranking só com seus amigos',
+    summaryItems: [
+      'Chegaram os Grupos! Crie um grupo ou encontre um para participar e dispute o ranking mensal de MCoins só entre os membros.',
+    ],
+    items: [
+      'Nova página de Grupos, com as abas “Meus grupos” e “Outros grupos”, onde é possível buscar grupos pelo nome.',
+      'Cada grupo tem seu próprio ranking mensal, com as mesmas regras de pontuação do ranking geral e zerado na virada de cada mês.',
+      'Entre em um grupo por convite do administrador ou solicitando participação. Cada pessoa pode participar de até 3 grupos, e cada grupo comporta até 15 membros.',
+      'Novas notificações no sino: convites, solicitações e aceites levam direto à página do grupo.',
+      'Se o administrador sair, o membro mais antigo assume a administração do grupo.',
+    ],
+  },
+  {
     date: '2026-10-14',
     title: 'Artistas favoritos, novo CineMatch e melhorias gerais',
     summaryItems: [

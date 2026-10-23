@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 import { Bell } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useUserActivity } from '../../hooks/useUserActivity';
+import { useSpecialNotifications } from '../../hooks/useSpecialNotifications';
+import SpecialNotificationsList from './SpecialNotificationsList';
 import { ListSkeleton } from '../ui/LoadingSkeleton';
 
 interface ActivitiesScreenProps {
@@ -35,6 +37,7 @@ export default function ActivitiesScreen({
     [currentUserId, friendIds, isOwnDashboard, viewedUserId],
   );
   const activityQuery = useUserActivity(activityUserIds);
+  const special = useSpecialNotifications();
   const activities = useMemo(() => {
     const seenBroadcasts = new Set<string>();
 
@@ -59,6 +62,14 @@ export default function ActivitiesScreen({
           Acompanhe as novidades da comunidade e de seus amigos.
         </p>
       </header>
+
+      <SpecialNotificationsList
+        notifications={special.notifications}
+        unreadCount={special.unreadCount}
+        onMarkRead={special.markRead}
+        onMarkAllRead={() => special.markAllRead()}
+        variant="page"
+      />
 
       {activityQuery.isLoading ? (
         <div className="mt-3"><ListSkeleton count={6} /></div>

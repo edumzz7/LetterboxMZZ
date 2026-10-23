@@ -71,7 +71,7 @@ function fallbackAvatar(userId: string) {
   return AVATAR_IDS[index];
 }
 
-function normalizeAvatarPath(avatarPath: string | null | undefined, userId: string, displayName: string | null | undefined) {
+export function normalizeAvatarPath(avatarPath: string | null | undefined, userId: string, displayName: string | null | undefined) {
   let avatarId = avatarPath || fallbackAvatar(userId);
   let normalizedDisplayName = displayName ?? undefined;
 

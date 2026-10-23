@@ -1,4 +1,5 @@
 import clsx from 'clsx';
+import { House } from 'lucide-react';
 import { cloneElement, isValidElement, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 
@@ -19,6 +20,8 @@ interface HeaderProps {
   canAccessOscars: boolean;
   canAccessHome: boolean;
   onGoHome: () => void;
+  /** Desktop shortcut to the logged user's dashboard (mobile uses the bottom bar). */
+  onGoDashboard?: () => void;
   searchSlot?: ReactNode;
   rightSlot?: ReactNode;
   hideTabs?: boolean;
@@ -29,7 +32,7 @@ interface HeaderProps {
   subSlot?: ReactNode;
 }
 
-const Header = ({ activeTab, onTabChange, canAccessOscars, canAccessHome, onGoHome, searchSlot, rightSlot, hideTabs, hideTabsOnDesktop, onBack }: HeaderProps) => {
+const Header = ({ activeTab, onTabChange, canAccessOscars, canAccessHome, onGoHome, onGoDashboard, searchSlot, rightSlot, hideTabs, hideTabsOnDesktop, onBack }: HeaderProps) => {
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const tabs = APP_NAVIGATION_TABS.map((tab) => ({
     ...tab,
@@ -40,9 +43,22 @@ const Header = ({ activeTab, onTabChange, canAccessOscars, canAccessHome, onGoHo
     <>
       <header className="fixed inset-x-0 top-0 z-40 w-screen overflow-visible border-b border-[#151b28] bg-[#06080d] shadow-[0_12px_36px_rgba(0,0,0,0.2)]">
       <div className="mx-auto grid w-full max-w-[1700px] grid-cols-1 items-center gap-3 border-b border-white/5 px-4 py-3 sm:px-6 lg:grid-cols-[auto_1fr_auto] lg:gap-5 lg:px-8">
-        <button type="button" onClick={onGoHome} aria-label="Ir para a página inicial" className="justify-self-center text-xl font-semibold tracking-[0.12em] uppercase text-brand-text transition hover:opacity-80 sm:text-2xl lg:justify-self-start">
-          <span className="text-brand-gold">C</span>ine<span className="text-brand-gold">R</span>ats
-        </button>
+        <div className="flex items-center gap-3 justify-self-center lg:justify-self-start">
+          <button type="button" onClick={onGoHome} aria-label="Ir para a página inicial" className="text-xl font-semibold tracking-[0.12em] uppercase text-brand-text transition hover:opacity-80 sm:text-2xl">
+            <span className="text-brand-gold">C</span>ine<span className="text-brand-gold">R</span>ats
+          </button>
+          {onGoDashboard && (
+            <button
+              type="button"
+              onClick={onGoDashboard}
+              aria-label="Ir para a minha dashboard"
+              title="Minha dashboard"
+              className="hidden h-11 w-11 items-center justify-center rounded-full text-white transition hover:bg-white/5 hover:text-brand-gold lg:inline-flex"
+            >
+              <House size={20} />
+            </button>
+          )}
+        </div>
         <div className="flex w-full min-w-0 justify-center">
           {isValidElement(searchSlot) ? cloneElement(searchSlot as ReactElement<{ mobileOpen?: boolean; mobileAlwaysExpanded?: boolean; onMobileOpenChange?: (open: boolean) => void }>, { mobileOpen: mobileSearchOpen, mobileAlwaysExpanded: true, onMobileOpenChange: setMobileSearchOpen }) : searchSlot}
         </div>

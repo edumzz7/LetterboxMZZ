@@ -3,10 +3,12 @@ import { Check, Loader2, Send, X } from 'lucide-react';
 import AvatarDisplay from '../layout/AvatarDisplay';
 import { useGroupActions, useGroupPendingRequests } from '../../hooks/useGroups';
 import type { GroupPendingItem } from '../../types/app';
+import InviteUserInput from './InviteUserInput';
 
 interface GroupAdminPanelProps {
   groupId: string;
   isFull: boolean;
+  memberIds: string[];
 }
 
 function PendingRow({ item, children }: { item: GroupPendingItem; children: React.ReactNode }) {
@@ -22,7 +24,7 @@ function PendingRow({ item, children }: { item: GroupPendingItem; children: Reac
   );
 }
 
-export default function GroupAdminPanel({ groupId, isFull }: GroupAdminPanelProps) {
+export default function GroupAdminPanel({ groupId, isFull, memberIds }: GroupAdminPanelProps) {
   const [username, setUsername] = useState('');
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const pendingQuery = useGroupPendingRequests(groupId, true);
@@ -54,6 +56,11 @@ export default function GroupAdminPanel({ groupId, isFull }: GroupAdminPanelProp
   const busyId = resolve.isPending ? resolve.variables?.requestId : null;
   const requests = pendingQuery.data?.requests ?? [];
   const invites = pendingQuery.data?.invites ?? [];
+  const excludedUserIds = [
+    ...memberIds,
+    ...requests.map((item) => item.user.id),
+    ...invites.map((item) => item.user.id),
+  ];
 
   return (
     <section aria-labelledby="group-admin-title" className="rounded-2xl border border-[#151b28] bg-brand-card p-4 sm:p-5">
@@ -66,14 +73,11 @@ export default function GroupAdminPanel({ groupId, isFull }: GroupAdminPanelProp
           Convidar
         </label>
         <div className="flex gap-2">
-          <input
-            id="group-invite-username"
+          <InviteUserInput
             value={username}
-            onChange={(event) => setUsername(event.target.value)}
-            placeholder="@usuario"
-            autoComplete="off"
+            onChange={setUsername}
+            excludedUserIds={excludedUserIds}
             disabled={isFull}
-            className="min-w-0 flex-1 rounded-2xl border border-[#222] bg-[#090d18] px-4 py-2.5 text-sm text-brand-text placeholder:text-brand-text-muted/60 focus:border-brand-gold focus:outline-none disabled:opacity-50"
           />
           <button
             type="submit"
@@ -85,7 +89,11 @@ export default function GroupAdminPanel({ groupId, isFull }: GroupAdminPanelProp
             {invite.isPending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
           </button>
         </div>
-        {isFull && <p className="text-xs text-brand-text-muted">O grupo está lotado.</p>}
+        {isFull ? (
+          <p className="text-xs text-brand-text-muted">O grupo está lotado.</p>
+        ) : (
+          <p className="text-xs text-brand-text-muted">Digite 3 letras para ver sugestões.</p>
+        )}
       </form>
 
       {feedback && (

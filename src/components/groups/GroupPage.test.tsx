@@ -28,6 +28,7 @@ const api = vi.hoisted(() => ({
 const navigation = vi.hoisted(() => ({ setLocation: vi.fn() }));
 
 vi.mock('../../lib/groups', () => api);
+vi.mock('../../lib/appData', () => ({ listRankedUsers: vi.fn().mockResolvedValue([]) }));
 vi.mock('wouter', () => ({ useLocation: () => ['/grupo/g-1', navigation.setLocation] }));
 
 const admin = { id: 'u-admin', username: 'alice', displayName: 'Alice', avatarPath: null };

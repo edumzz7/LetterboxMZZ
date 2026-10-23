@@ -750,6 +750,11 @@ function App() {
           onGoHome={() => {
             setLocation("/");
           }}
+          onGoDashboard={() => {
+            scrollToTop();
+            setActiveTab("home");
+            setLocation(`/${authenticatedSession.username}`);
+          }}
           searchSlot={<GlobalSearch users={users} onSelectUser={selectUser} />}
           hideTabs
           rightSlot={

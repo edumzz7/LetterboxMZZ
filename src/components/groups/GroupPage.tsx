@@ -266,7 +266,13 @@ export default function GroupPage({ groupId, currentUserId }: GroupPageProps) {
           </section>
 
           <aside className="flex min-w-0 flex-col gap-6">
-            {isAdmin && <GroupAdminPanel groupId={group.id} isFull={group.isFull} />}
+            {isAdmin && (
+              <GroupAdminPanel
+                groupId={group.id}
+                isFull={group.isFull}
+                memberIds={(group.members ?? []).map((member) => member.id)}
+              />
+            )}
 
             <section aria-labelledby="group-members-title" className="rounded-2xl border border-[#151b28] bg-brand-card p-4 sm:p-5">
               <h2 id="group-members-title" className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-gold">

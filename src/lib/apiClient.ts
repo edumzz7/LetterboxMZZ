@@ -18,6 +18,12 @@ apiClient.interceptors.response.use(
             : error.message;
       return Promise.reject(new Error(message));
     }
+    // No response at all (timeout, offline, server unreachable): axios only says "Network Error".
+    if (axios.isAxiosError(error) && !error.response) {
+      return Promise.reject(
+        new Error('Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.'),
+      );
+    }
     return Promise.reject(error);
   },
 );

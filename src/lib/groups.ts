@@ -1,6 +1,8 @@
 import apiClient from './apiClient';
+import { normalizeAvatarPath } from './appData';
 import type {
   GroupDetails,
+  GroupProfile,
   GroupPendingRequests,
   GroupRanking,
   GroupRequestAction,
@@ -15,6 +17,12 @@ export const MAX_GROUP_MEMBERS = 15;
 
 export function groupPath(groupId: string) {
   return `/grupo/${groupId}`;
+}
+
+/** Same avatar/display name rules as the user lists (legacy profiles keep both as JSON in avatarPath). */
+function normalizeProfile<T extends GroupProfile>(profile: T): T {
+  const { avatarId, displayName } = normalizeAvatarPath(profile.avatarPath, profile.id, profile.displayName);
+  return { ...profile, avatarPath: avatarId, displayName: displayName ?? null };
 }
 
 export async function listMyGroups(): Promise<MyGroupsResponse> {
@@ -32,7 +40,12 @@ export async function createGroup(input: { name: string; description?: string })
 }
 
 export async function getGroup(groupId: string): Promise<GroupDetails> {
-  return (await apiClient.get<GroupDetails>(`/groups/${groupId}`)).data;
+  const group = (await apiClient.get<GroupDetails>(`/groups/${groupId}`)).data;
+  return {
+    ...group,
+    admin: group.admin ? normalizeProfile(group.admin) : null,
+    members: group.members?.map(normalizeProfile),
+  };
 }
 
 export async function updateGroup(groupId: string, input: { name?: string; description?: string }) {
@@ -40,11 +53,14 @@ export async function updateGroup(groupId: string, input: { name?: string; descr
 }
 
 export async function getGroupRanking(groupId: string): Promise<GroupRanking> {
-  return (await apiClient.get<GroupRanking>(`/groups/${groupId}/ranking`)).data;
+  const ranking = (await apiClient.get<GroupRanking>(`/groups/${groupId}/ranking`)).data;
+  return { ...ranking, items: ranking.items.map(normalizeProfile) };
 }
 
 export async function listGroupPendingRequests(groupId: string): Promise<GroupPendingRequests> {
-  return (await apiClient.get<GroupPendingRequests>(`/groups/${groupId}/requests`)).data;
+  const pending = (await apiClient.get<GroupPendingRequests>(`/groups/${groupId}/requests`)).data;
+  const normalizeItem = (item: GroupPendingRequests['invites'][number]) => ({ ...item, user: normalizeProfile(item.user) });
+  return { invites: pending.invites.map(normalizeItem), requests: pending.requests.map(normalizeItem) };
 }
 
 export async function inviteToGroup(groupId: string, username: string) {

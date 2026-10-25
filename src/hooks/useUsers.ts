@@ -18,6 +18,7 @@ export function useAvatarMutation() {
       updateUserAvatar(userId, avatarId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['users'] });
+      void queryClient.invalidateQueries({ queryKey: ['reviews'] });
     },
   });
 }
@@ -29,6 +30,7 @@ export function useAvatarUploadMutation() {
     mutationFn: (file: File) => uploadAvatarImage(file),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['users'] });
+      void queryClient.invalidateQueries({ queryKey: ['reviews'] });
     },
   });
 }

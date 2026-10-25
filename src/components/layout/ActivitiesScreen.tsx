@@ -1,3 +1,4 @@
+import { activityDestination } from '../../lib/activityNavigation';
 import { useMemo } from 'react';
 import { Bell } from 'lucide-react';
 import { useLocation } from 'wouter';
@@ -80,14 +81,14 @@ export default function ActivitiesScreen({
       ) : (
         <ul className="mt-3 divide-y divide-white/5">
           {activities.map((activity) => {
-            const member = activity.message.match(/Novo membro! @([\w.-]+)/)?.[1];
+            const destination = activityDestination(activity);
 
             return (
               <li key={activity.id}>
                 <button
                   type="button"
-                  disabled={!member}
-                  onClick={() => member && setLocation(`/${member}`)}
+                  disabled={!destination}
+                  onClick={() => destination && setLocation(destination)}
                   className="w-full px-1 py-4 text-left transition enabled:hover:rounded-xl enabled:hover:bg-white/5"
                 >
                   <p className="text-sm leading-relaxed text-brand-text">{activity.message}</p>

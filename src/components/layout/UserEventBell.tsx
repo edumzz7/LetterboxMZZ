@@ -1,3 +1,5 @@
+import { activityDestination } from '../../lib/activityNavigation';
+import type { ActivityEntry } from '../../types/app';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Bell, Loader2 } from 'lucide-react';
 import { useLocation } from 'wouter';
@@ -57,10 +59,10 @@ export default function UserEventBell({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [, setLocation] = useLocation();
 
-  const handleNotificationClick = (message: string) => {
-    const match = message.match(/Novo membro! @([\w.-]+)/);
-    if (match && match[1]) {
-      setLocation(`/${match[1]}`);
+  const handleNotificationClick = (activity: ActivityEntry) => {
+    const destination = activityDestination(activity);
+    if (destination) {
+      setLocation(destination);
       setOpen(false);
     }
   };
@@ -197,20 +199,15 @@ export default function UserEventBell({
             ) : (
               <ul>
                 {items.map((item) => {
-                  const isNewMember = item.message.startsWith('Novo membro!');
+                  const destination = activityDestination(item);
                   return (
-                    <li 
-                      key={item.id} 
-                      className={clsx(
-                        "px-4 py-3 border-b border-[#121212] last:border-b-0",
-                        isNewMember && "cursor-pointer hover:bg-white/5 transition-colors"
-                      )}
-                      onClick={() => isNewMember && handleNotificationClick(item.message)}
-                    >
+                    <li key={item.id} className="border-b border-[#121212] last:border-b-0">
+                      <button type="button" disabled={!destination} onClick={() => handleNotificationClick(item)} className="w-full px-4 py-3 text-left transition-colors enabled:hover:bg-white/5">
                       <p className="text-sm leading-relaxed text-brand-text">{item.message}</p>
                       <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-brand-text-muted">
                         {formatTimestamp(item.created_at)}
                       </p>
+                      </button>
                     </li>
                   );
                 })}

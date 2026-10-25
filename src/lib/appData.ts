@@ -549,6 +549,14 @@ function activityMessage(a: ApiActivity): string {
       if (title) return `Avaliou ${title}.`;
       if (username) return `@${username} avaliou uma mídia.`;
       return "Avaliou uma mídia.";
+    case "liked_review":
+    case "disliked_review":
+    case "commented_review": {
+      const action = a.type === 'liked_review' ? 'concordou com a' : a.type === 'disliked_review' ? 'discordou da' : 'comentou na';
+      const actor = username ? `@${username}` : 'Alguém';
+      const author = typeof meta.authorUsername === 'string' ? ` de @${meta.authorUsername}` : '';
+      return `${actor} ${action} resenha${author}${title ? ` sobre ${title}` : ''}.`;
+    }
     case "added_to_watchlist":
       if (username && title)
         return `@${username} adicionou ${title} à watchlist.`;
@@ -2022,7 +2030,51 @@ export async function listUserReviews(userId: string) {
   );
 }
 
-export type PublicReview = {
+export type ReviewReaction = 'like' | 'dislike';
+
+export type ReviewReactionSummary = {
+  likes: number;
+  dislikes: number;
+  myReaction: ReviewReaction | null;
+};
+
+export async function setReviewReaction(reviewId: string, reaction: ReviewReaction | null) {
+  const { data } = reaction === null
+    ? await apiClient.delete<ReviewReactionSummary>(`/reviews/${reviewId}/reaction`)
+    : await apiClient.put<ReviewReactionSummary>(`/reviews/${reviewId}/reaction`, { reaction });
+  return data;
+}
+
+export type ReviewComment = {
+  id: string;
+  userId: string;
+  username: string;
+  avatarPath: string | null;
+  content: string;
+  createdAt: string;
+};
+
+export type ReviewCommentsPage = {
+  items: ReviewComment[];
+  nextCursor: string | null;
+};
+
+export async function listReviewComments(reviewId: string, cursor: string | null) {
+  const { data } = await apiClient.get<ReviewCommentsPage>(`/reviews/${reviewId}/comments`, {
+    params: cursor ? { cursor } : {},
+  });
+  return data;
+}
+
+export async function createReviewComment(reviewId: string, content: string) {
+  const { data } = await apiClient.post<{ comment: ReviewComment; commentCount: number }>(
+    `/reviews/${reviewId}/comments`, { content },
+  );
+  return data;
+}
+
+export type PublicReview = ReviewReactionSummary & {
+  commentCount: number;
   id: string;
   userId: string;
   username: string;

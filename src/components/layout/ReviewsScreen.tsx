@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef } from 'react';
 import { Clapperboard, Loader2, Star, Tv } from 'lucide-react';
 import { useLocation } from 'wouter';
 import AvatarDisplay from './AvatarDisplay';
+import ReviewInteractions from './ReviewInteractions';
+import { normalizeAvatarPath } from '../../lib/appData';
 import { usePublicReviews } from '../../hooks/useReviews';
 import { ListSkeleton, Skeleton } from '../ui/LoadingSkeleton';
 import TmdbImage from '../ui/TmdbImage';
@@ -57,11 +59,11 @@ export default function ReviewsScreen() {
   }
 
   return (
-    <section className="mx-auto max-w-5xl space-y-7">
+    <section className="mx-auto min-w-0 max-w-5xl space-y-5 sm:space-y-7">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.25em] text-brand-gold">Comunidade</p>
         <h1 className="mt-2 text-3xl font-light text-brand-text sm:text-4xl">Resenhas</h1>
-        <p className="mt-2 text-sm text-brand-text-muted">Veja o que a comunidade CineRats está assistindo e comentando.</p>
+        <p className="mt-2 max-w-lg text-sm leading-relaxed text-brand-text-muted">Veja o que a comunidade CineRats está assistindo e comentando.</p>
       </div>
 
       {reviews.length === 0 ? (
@@ -77,16 +79,16 @@ export default function ReviewsScreen() {
               const rating = Number(review.rating);
 
               return (
-                <article key={review.id} className="rounded-2xl border border-[#222] bg-[#111] p-4 transition-colors hover:border-brand-gold/30 sm:p-5">
+                <article key={review.id} className="min-w-0 rounded-2xl border border-white/10 bg-[#06080d] p-3.5 transition-colors hover:border-brand-gold/30 sm:bg-[#111] sm:p-5">
                   <button type="button" onClick={() => setLocation(`/${review.username}`)} className="group flex max-w-full items-center gap-3 text-left">
-                    <AvatarDisplay avatarId={review.avatarPath} className="h-10 w-10 border border-[#292929]" emojiClassName="text-lg" />
+                    <AvatarDisplay avatarId={normalizeAvatarPath(review.avatarPath, review.userId, null).avatarId} className="h-10 w-10 shrink-0 border border-[#292929]" emojiClassName="text-lg" />
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-semibold text-brand-text transition group-hover:text-brand-gold">{review.username}</span>
                       <span className="mt-0.5 block text-[11px] text-brand-text-muted">resenhou em {formatDate(review.createdAt)}</span>
                     </span>
                   </button>
 
-                  <p className="mt-4 whitespace-pre-wrap text-[15px] font-light leading-relaxed text-brand-text/90">
+                  <p className="mt-4 whitespace-pre-wrap break-words text-[15px] [overflow-wrap:anywhere] font-light leading-relaxed text-brand-text/90">
                     {review.review}
                   </p>
 
@@ -103,7 +105,7 @@ export default function ReviewsScreen() {
                         <span className="flex h-full items-center justify-center"><Clapperboard size={20} /></span>
                       )}
                     </div>
-                    <span className="flex min-w-0 flex-1 flex-col justify-center px-4 py-3">
+                    <span className="flex min-w-0 flex-1 flex-col justify-center px-3 py-3 sm:px-4">
                       <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-text-muted">
                         {isMovie ? <Clapperboard size={12} /> : <Tv size={12} />}{isMovie ? 'Filme' : 'Série'}
                       </span>
@@ -113,6 +115,8 @@ export default function ReviewsScreen() {
                       )}
                     </span>
                   </button>
+
+                  <ReviewInteractions review={review} />
                 </article>
               );
             })}

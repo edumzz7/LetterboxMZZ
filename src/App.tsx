@@ -12,6 +12,8 @@ import {
   Menu,
   Shuffle,
   Tv,
+  UserCheck,
+  UserPlus,
   UserRound,
   Users,
   X,
@@ -58,6 +60,8 @@ import PublicFooter from "./components/public/PublicFooter";
 import PublicHome from "./components/public/PublicHome";
 import CatalogPage from "./components/public/CatalogPage";
 import ProposalPage from "./components/public/ProposalPage";
+import LegalPage from "./components/public/LegalPage";
+import { PRIVACY_POLICY, TERMS_OF_USE } from "./data/legalDocuments";
 import PublicDashboardLite from "./components/public/PublicDashboardLite";
 import {
   changePassword,
@@ -92,7 +96,7 @@ const OTHER_PROFILE_TABS: Array<{ id: AppTab; label: string }> = [
   { id: "movies", label: "Filmes" },
   { id: "series", label: "Séries" },
   { id: "oscars", label: "Oscar" },
-  { id: "dashboard", label: "Painel" },
+  { id: "dashboard", label: "Perfil" },
 ];
 
 function readStoredSession(): SessionUser | null {
@@ -134,6 +138,8 @@ function App() {
   const [matchSeriesPage, seriesPageParams] = useRoute("/series/page/:page");
   const [matchProposal] = useRoute("/proposta");
   const [matchContact] = useRoute("/contato");
+  const [matchPrivacy] = useRoute("/privacidade");
+  const [matchTerms] = useRoute("/termos");
   const [matchRegister] = useRoute("/cadastro");
   const [matchConfirmPasswordReset] = useRoute("/conta/resetar-senha");
   const [authError, setAuthError] = useState<string | null>(null);
@@ -152,7 +158,8 @@ function App() {
   // If we have a stored session, skip the loading screen entirely
   const [isBootstrapping, setIsBootstrapping] = useState(!storedSession);
 
-  const { favorites } = useFavorites(session?.id || "");
+  const { favorites, isUserFavorited, toggleFavorite, isToggling } =
+    useFavorites(session?.id || "");
 
   const usersQuery = useUsers(Boolean(session));
   const avatarMutation = useAvatarMutation();
@@ -253,7 +260,7 @@ function App() {
   const isAchievementsRoute =
     urlUsername === "conquistas" || urlUsername === "ranking";
   const viewedUser =
-    matchChangelogs || matchFaq || matchActivities || matchCineMatch || matchGroups || isAchievementsRoute
+    matchChangelogs || matchFaq || matchActivities || matchCineMatch || matchGroups || matchPrivacy || matchTerms || isAchievementsRoute
       ? null
       : urlUsername
         ? users.find((user) => user.username === urlUsername) ||
@@ -553,6 +560,8 @@ function App() {
     matchProposal ||
     matchContact ||
     matchFaq ||
+    matchPrivacy ||
+    matchTerms ||
     matchRegister ||
     (!session && isPersonRoute) ||
     (!session && (matchMovie || matchSerie)) ||
@@ -639,6 +648,10 @@ function App() {
             </p>
           </section>
         </main>
+      ) : matchPrivacy ? (
+        <LegalPage document={PRIVACY_POLICY} />
+      ) : matchTerms ? (
+        <LegalPage document={TERMS_OF_USE} />
       ) : matchFaq ? (
         <main className="mx-auto w-full max-w-[1700px] px-3 py-8 sm:px-6">
           <section className="rounded-3xl border border-[#151b28] bg-[#06080d] p-4 sm:p-7">
@@ -960,13 +973,37 @@ function App() {
                     className="mx-auto h-20 w-20 border-[3px] border-brand-gold shadow-[0_0_32px_rgba(212,175,55,0.18)] sm:h-28 sm:w-28"
                     emojiClassName="text-4xl sm:text-5xl"
                   />
-                  <h1 className="mt-3 text-2xl font-light text-brand-text sm:mt-4 sm:text-3xl">
-                    {viewedUser.display_name || viewedUser.username}
-                  </h1>
+                  <div className="mt-3 flex items-center justify-center gap-3 sm:mt-4">
+                    <h1 className="min-w-0 truncate text-2xl font-light text-brand-text sm:text-3xl">
+                      {viewedUser.display_name || viewedUser.username}
+                    </h1>
+                    <button
+                      type="button"
+                      aria-label={
+                        isUserFavorited(viewedUser.id)
+                          ? "Remover dos amigos"
+                          : "Adicionar aos amigos"
+                      }
+                      title={
+                        isUserFavorited(viewedUser.id)
+                          ? "Remover dos amigos"
+                          : "Adicionar aos amigos"
+                      }
+                      disabled={isToggling}
+                      onClick={() => toggleFavorite(viewedUser.id)}
+                      className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-gold/45 text-brand-gold transition hover:bg-brand-gold/10 disabled:cursor-wait disabled:opacity-50 ${isUserFavorited(viewedUser.id) ? "bg-brand-gold/15" : ""}`}
+                    >
+                      {isUserFavorited(viewedUser.id) ? (
+                        <UserCheck size={18} />
+                      ) : (
+                        <UserPlus size={18} />
+                      )}
+                    </button>
+                  </div>
                   <p className="mt-1 text-sm text-brand-text-muted">
                     @{viewedUser.username}
                   </p>
-                  <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-brand-gold">
+                  <p className="mt-3 text-xs font-semibold tracking-[0.16em] text-brand-gold">
                     {viewedUser.mcoins} MCoins
                   </p>
 
@@ -1194,8 +1231,8 @@ function App() {
                   <span className="mt-0.5 block truncate text-xs text-brand-text-muted">
                     @{authenticatedSession.username}
                   </span>
-                  <span className="mt-1.5 inline-block text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-gold">
-                    {currentRankedUser.mcoins} MC
+                  <span className="mt-1.5 inline-block text-[10px] font-semibold tracking-[0.14em] text-brand-gold">
+                    {currentRankedUser.mcoins} MCoins
                   </span>
                 </span>
               </button>

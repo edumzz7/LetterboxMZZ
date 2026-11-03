@@ -43,8 +43,8 @@ export default function GroupRankingList({ items, currentUserId, onSelectUser }:
                 </span>
                 <span className="block truncate text-xs text-brand-text-muted">@{item.username}</span>
               </span>
-              <span className="shrink-0 text-xs font-semibold uppercase tracking-[0.12em] text-brand-gold">
-                {item.totalPoints} MC
+              <span className="shrink-0 text-xs font-semibold text-brand-gold">
+                {item.totalPoints} MCoins
               </span>
             </button>
           </li>

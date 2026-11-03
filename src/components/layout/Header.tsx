@@ -11,7 +11,7 @@ export const APP_NAVIGATION_TABS: Array<{ id: AppTab; label: string; show?: bool
   { id: 'series', label: 'Séries' },
   { id: 'reviews', label: 'Comunidade' },
   { id: 'oscars', label: 'Oscar 2027' },
-  { id: 'dashboard', label: 'Painel pessoal' },
+  { id: 'dashboard', label: 'Perfil' },
 ];
 
 interface HeaderProps {
@@ -43,8 +43,9 @@ const Header = ({ activeTab, onTabChange, canAccessOscars, canAccessHome, onGoHo
     <>
       <header className="fixed inset-x-0 top-0 z-40 w-screen overflow-visible border-b border-[#151b28] bg-[#06080d] shadow-[0_12px_36px_rgba(0,0,0,0.2)]">
       <div className="mx-auto grid w-full max-w-[1700px] grid-cols-1 items-center gap-3 border-b border-white/5 px-4 py-3 sm:px-6 lg:grid-cols-[auto_1fr_auto] lg:gap-5 lg:px-8">
+        {/* text-box trims the font's extra ascent so the caps share the icons' vertical center. */}
         <div className="flex items-center gap-3 justify-self-center lg:justify-self-start">
-          <button type="button" onClick={onGoHome} aria-label="Ir para a página inicial" className="text-xl font-semibold tracking-[0.12em] uppercase text-brand-text transition hover:opacity-80 sm:text-2xl">
+          <button type="button" onClick={onGoHome} aria-label="Ir para a página inicial" className="text-xl font-semibold tracking-[0.12em] uppercase text-brand-text transition hover:opacity-80 sm:text-2xl lg:[text-box:trim-both_cap_alphabetic]">
             <span className="text-brand-gold">C</span>ine<span className="text-brand-gold">R</span>ats
           </button>
           {onGoDashboard && (

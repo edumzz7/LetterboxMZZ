@@ -12,6 +12,7 @@ import PreferenceSearchInput, { type PreferenceSearchItem } from './PreferenceSe
 import { useUsers } from '../../hooks/useUsers';
 import WatchPartyHistory from './WatchPartyHistory';
 import FavoritePeopleList from '../people/FavoritePeopleList';
+import { StoredAchievementBadges } from '../ui/UserAchievements';
 
 interface DashboardTabProps {
   user: RankedUser;
@@ -264,6 +265,18 @@ export default function DashboardTab({ user, isOwnDashboard }: DashboardTabProps
 
       {/* Seção de Resenhas */}
       </>}
+
+      {!isOwnDashboard && (
+        <div className="col-span-1 md:col-span-2 lg:col-span-3 mt-6 flex flex-col gap-4">
+          <h2 className="text-sm font-semibold tracking-[0.25em] uppercase text-brand-gold">
+            Insígnias
+          </h2>
+          <StoredAchievementBadges
+            userId={user.id}
+            emptyMessage="Nenhuma insígnia desbloqueada ainda."
+          />
+        </div>
+      )}
 
       <div className="col-span-1 md:col-span-2 lg:col-span-3 mt-6 flex flex-col gap-4">
         <h2 className="text-sm font-semibold tracking-[0.25em] uppercase text-brand-gold">

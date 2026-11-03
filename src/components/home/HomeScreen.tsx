@@ -273,7 +273,7 @@ export default function HomeScreen({ userId, movies, series, favoriteGenre: favo
         icon={<Sparkles size={19} />}
         items={favoriteGenreQuery.data || []}
         isLoading={favoriteGenreQuery.isLoading}
-        emptyMessage={favoriteGenre ? 'Não encontramos sugestões desse gênero agora.' : 'Atualize seu gênero favorito no Painel Pessoal e atualize a página.'}
+        emptyMessage={favoriteGenre ? 'Não encontramos sugestões desse gênero agora.' : 'Atualize seu gênero favorito no seu Perfil e atualize a página.'}
         carousel
         limit={10}
       />

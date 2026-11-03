@@ -112,7 +112,7 @@ export default function PersonDetailScreen({ id, mode, currentUserId = null }: P
       <div className="relative -mx-4 sm:-mx-7 lg:-mx-9 -mt-4 sm:-mt-7 lg:-mt-9 h-44 sm:h-52 lg:h-56 overflow-hidden rounded-t-3xl bg-[#090d16]">
         {heroPhotoUrl && <><TmdbImage src={heroPhotoUrl} alt="" sizes="100vw" loading="eager" className="h-full w-full object-cover object-top opacity-40 blur-[1px] scale-110" /><div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" /></>}
         <button type="button" onClick={handleBack} className="absolute left-6 top-6 z-10 flex cursor-pointer items-center gap-2 rounded-xl border border-white/10 bg-black/60 px-4 py-2 text-xs uppercase tracking-widest text-brand-text backdrop-blur-md transition-all hover:border-brand-gold/30 hover:text-brand-gold">
-          <ArrowLeft size={14} /> Painel
+          <ArrowLeft size={14} /> Perfil
         </button>
       </div>
 

@@ -65,14 +65,14 @@ const SECRET_META = {
 const HEX_CLIP_PATH = 'polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0 50%)';
 
 const MCOIN_RULES = [
-  ['Assistir a uma mídia', '5 MC a cada 10 min'],
-  ['Limite diário de consumo', '120 MC (240 min)'],
-  ['Assistir a uma mídia indicada', '+1 MC de bônus'],
-  ['Bônus para quem indicou após a mídia ser assistida', '+3 MC'],
-  ['Indicar um filme ou série', '+5 MC'],
-  ['Avaliar uma mídia dentro de 72h', '+10 MC'],
-  ['Escrever uma resenha dentro de 72h', '+10 MC'],
-  ['Adicionar à watchlist ou reagir', '0 MC'],
+  ['Assistir a uma mídia', '5 MCoins a cada 10 min'],
+  ['Limite diário de consumo', '120 MCoins (240 min)'],
+  ['Assistir a uma mídia indicada', '+1 MCoin de bônus'],
+  ['Bônus para quem indicou após a mídia ser assistida', '+3 MCoins'],
+  ['Indicar um filme ou série', '+5 MCoins'],
+  ['Avaliar uma mídia dentro de 72h', '+10 MCoins'],
+  ['Escrever uma resenha dentro de 72h', '+10 MCoins'],
+  ['Adicionar à watchlist ou reagir', '0 MCoins'],
 ];
 
 function getIcon(achievement: Achievement): React.ElementType {
@@ -313,7 +313,7 @@ export default function RankingScreen({ user, users, movies, series, currentUser
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-brand-text-muted">Sua jornada cinéfila está em movimento. Cada filme, série e interação aproxima você da próxima conquista.</p>
               <div className="mt-4 flex flex-wrap gap-2 text-[10px] uppercase tracking-[0.12em]">
                 <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-brand-text-muted">@{user.username}</span>
-                <span className="rounded-full border border-brand-gold/30 bg-brand-gold/10 px-3 py-1.5 text-brand-gold">{user.mcoins} MCoins</span>
+                <span className="rounded-full border border-brand-gold/30 bg-brand-gold/10 px-3 py-1.5 normal-case tracking-normal text-brand-gold">{user.mcoins} MCoins</span>
                 <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-brand-text-muted">{unlockedCount} conquistas</span>
               </div>
             </div>

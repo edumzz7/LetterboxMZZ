@@ -216,15 +216,22 @@ export default function PublicHome({
               CineRats
             </p>
             <h1 className="mt-3 text-3xl font-light uppercase tracking-[0.08em] text-brand-text sm:text-5xl">
-              {
-                "Descubra hist\u00f3rias. Compartilhe o que ficou com voc\u00ea."
-              }
+              Sua cinemateca, com ranking e amigos.
             </h1>
             <p className="mt-4 max-w-lg text-sm leading-relaxed text-brand-text-muted sm:text-base">
               {
-                "Filmes, s\u00e9ries, listas e uma comunidade para fazer do seu hobby algo ainda mais interessante."
+                "Registre o que voc\u00ea assiste, avalie, escreva resenhas, dispute o ranking mensal e interaja com a comunidade."
               }
             </p>
+            {!session && (
+              <button
+                type="button"
+                onClick={() => setLocation("/cadastro")}
+                className="mt-7 rounded-xl bg-brand-gold px-6 py-3 text-sm font-semibold text-black transition hover:opacity-90"
+              >
+                {"Criar conta gr\u00e1tis"}
+              </button>
+            )}
           </div>
         </div>
       </section>{" "}
@@ -240,7 +247,7 @@ export default function PublicHome({
             </p>
           </div>
         </div>
-        <div className="grid gap-2 sm:grid-cols-5">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {rankingQuery.isLoading ? (
             Array.from({ length: 5 }, (_, index) => (
               <div
@@ -266,14 +273,14 @@ export default function PublicHome({
                   <span className="block truncate text-sm text-brand-text">
                     {user.displayName || user.username}
                   </span>
-                  <span className="text-[10px] uppercase tracking-wider text-brand-text-muted">
-                    {user.totalPoints} MC
+                  <span className="block truncate text-xs text-brand-text-muted">
+                    {user.totalPoints} MCoins
                   </span>
                 </span>
               </button>
             ))
           ) : (
-            <p className="sm:col-span-5 rounded-2xl border border-red-500/20 bg-red-500/5 px-4 py-4 text-sm text-brand-text-muted">
+            <p className="sm:col-span-2 lg:col-span-3 xl:col-span-5 rounded-2xl border border-red-500/20 bg-red-500/5 px-4 py-4 text-sm text-brand-text-muted">
               {rankingQuery.isError
                 ? "Não foi possível carregar o ranking agora."
                 : "Ainda não há participantes no ranking."}

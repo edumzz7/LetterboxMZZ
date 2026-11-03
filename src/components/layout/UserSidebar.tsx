@@ -391,7 +391,7 @@ export default function UserSidebar({
               >
                 <div className="flex items-center justify-between gap-2 text-xs uppercase tracking-[0.12em]">
                   <span className="text-brand-gold-alt">{user.rank}&ordm;</span>
-                  <span className="text-brand-gold">{user.mcoins} MC</span>
+                  <span className="normal-case tracking-normal text-brand-gold">{user.mcoins} MCoins</span>
                 </div>
 
                 <div className="mt-0.5 flex items-center justify-between gap-2">
@@ -448,7 +448,7 @@ export default function UserSidebar({
               >
                 <div className="flex items-center justify-between gap-2 text-xs uppercase tracking-[0.12em]">
                   <span className="text-brand-gold-alt">{currentUserItem.rank}&ordm;</span>
-                  <span className="text-brand-gold">{currentUserItem.mcoins} MC</span>
+                  <span className="normal-case tracking-normal text-brand-gold">{currentUserItem.mcoins} MCoins</span>
                 </div>
 
                 <div className="mt-0.5 flex items-center gap-2 min-w-0">

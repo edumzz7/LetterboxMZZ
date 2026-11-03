@@ -33,7 +33,7 @@ export default function ProfileSummary({ user, currentUserId, onSelectUser }: Pr
             )}
           </div>
           <p className="mt-1 truncate text-xs text-brand-text-muted">@{user.username}</p>
-          <span className="mt-3 inline-flex rounded-full border border-brand-gold/35 bg-brand-gold/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-gold">{user.mcoins} MC</span>
+          <span className="mt-3 inline-flex rounded-full border border-brand-gold/35 bg-brand-gold/10 px-3 py-1 text-[10px] font-semibold tracking-[0.16em] text-brand-gold">{user.mcoins} MCoins</span>
         </div>
       </div>
 

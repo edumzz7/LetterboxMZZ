@@ -1,8 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import * as Icons from 'lucide-react';
 import clsx from 'clsx';
 import { useQuery } from '@tanstack/react-query';
-import { getUnlockedAchievements, type Achievement } from '../../lib/achievements';
+import { ACHIEVEMENTS, getUnlockedAchievements, type Achievement } from '../../lib/achievements';
 import type { PersonalMovie, SeriesEntry, RankedUser } from '../../types/app';
 import { useOscarPredictions } from '../../hooks/useOscarPredictions';
 import { listUserAchievementIds, listUserActivity } from '../../lib/appData';
@@ -106,6 +106,44 @@ export function AchievementBadge({ achievement }: AchievementBadgeProps) {
           <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-[1px] border-[5px] border-transparent border-t-black/95" />
         </div>
       )}
+    </div>
+  );
+}
+
+/** Insígnias já gravadas de qualquer usuário (não depende dos filmes/séries carregados). */
+export function StoredAchievementBadges({
+  userId,
+  emptyMessage,
+}: {
+  userId: string;
+  emptyMessage: string;
+}) {
+  const achievementIdsQuery = useQuery({
+    queryKey: ['public-achievement-ids', userId],
+    queryFn: () => listUserAchievementIds(userId),
+    enabled: Boolean(userId),
+    staleTime: 60_000,
+  });
+  const badges = useMemo(() => {
+    const ids = new Set(achievementIdsQuery.data || []);
+    return ACHIEVEMENTS
+      .filter((achievement) => ids.has(achievement.id))
+      .sort((a, b) => b.level - a.level);
+  }, [achievementIdsQuery.data]);
+
+  if (achievementIdsQuery.isLoading) {
+    return <div className="h-16 animate-pulse rounded-xl bg-white/5" />;
+  }
+
+  if (!badges.length) {
+    return <p className="text-xs leading-relaxed text-brand-text-muted">{emptyMessage}</p>;
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 py-1">
+      {badges.map((achievement) => (
+        <AchievementBadge key={achievement.id} achievement={achievement} />
+      ))}
     </div>
   );
 }

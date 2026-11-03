@@ -390,7 +390,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
           onClick={handleBack}
           className="absolute top-6 left-6 px-4 py-2 border border-white/10 rounded-xl text-xs uppercase tracking-widest bg-black/60 backdrop-blur-md text-brand-text hover:text-brand-gold hover:border-brand-gold/30 transition-all flex items-center gap-2 z-10"
         >
-          <ArrowLeft size={14} /> Painel
+          <ArrowLeft size={14} /> Perfil
         </button>
       </div>
 

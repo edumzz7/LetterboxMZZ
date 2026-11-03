@@ -140,7 +140,7 @@ describe('GroupPage', () => {
     api.getGroupRanking.mockResolvedValue(ranking);
     renderWithProviders(<GroupPage groupId="g-1" currentUserId="u-bob" />);
 
-    expect(await screen.findByText('50 MC')).toBeInTheDocument();
+    expect(await screen.findByText('50 MCoins')).toBeInTheDocument();
     expect(screen.getByText('bob (Você)')).toBeInTheDocument();
     expect(screen.getByText('Membros (2)')).toBeInTheDocument();
     expect(screen.queryByText('Administração')).not.toBeInTheDocument();

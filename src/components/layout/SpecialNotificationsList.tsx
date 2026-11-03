@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import clsx from 'clsx';
 import { useLocation } from 'wouter';
 import type { SpecialNotification } from '../../types/app';
@@ -22,6 +23,20 @@ function formatTimestamp(value: string) {
   }).format(date);
 }
 
+const MAX_READ_NOTIFICATIONS = 3;
+
+/** Todas as não lidas aparecem; das já lidas, só as mais recentes. */
+function visibleNotifications(notifications: SpecialNotification[]) {
+  const recentReadIds = new Set(
+    notifications
+      .filter((notification) => notification.readAt)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, MAX_READ_NOTIFICATIONS)
+      .map((notification) => notification.id),
+  );
+  return notifications.filter((notification) => !notification.readAt || recentReadIds.has(notification.id));
+}
+
 /** Actionable notifications (group invites, requests...) that lead to a page of the app. */
 export default function SpecialNotificationsList({
   notifications,
@@ -32,8 +47,9 @@ export default function SpecialNotificationsList({
   variant = 'popover',
 }: SpecialNotificationsListProps) {
   const [, setLocation] = useLocation();
+  const visible = useMemo(() => visibleNotifications(notifications), [notifications]);
 
-  if (notifications.length === 0) return null;
+  if (visible.length === 0) return null;
 
   return (
     <section aria-label="Notificações">
@@ -55,7 +71,7 @@ export default function SpecialNotificationsList({
         )}
       </div>
       <ul className={variant === 'popover' ? 'border-b border-[#161616]' : 'divide-y divide-white/5'}>
-        {notifications.map((notification) => {
+        {visible.map((notification) => {
           const isUnread = !notification.readAt;
           return (
             <li key={notification.id}>

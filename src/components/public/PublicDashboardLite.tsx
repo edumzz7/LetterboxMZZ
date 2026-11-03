@@ -1,14 +1,11 @@
-import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import * as Icons from "lucide-react";
 import { useLocation } from "wouter";
 import type { RankedUser } from "../../types/app";
-import { ACHIEVEMENTS } from "../../lib/achievements";
-import { listUserAchievementIds } from "../../lib/appData";
 import AppHeader from "../layout/Header";
 import DashboardTab from "../layout/DashboardTab";
 import AvatarDisplay from "../layout/AvatarDisplay";
-import { AchievementBadge } from "../ui/UserAchievements";
+import { StoredAchievementBadges } from "../ui/UserAchievements";
 import PersonalMoviesSection from "../movies/PersonalMoviesSection";
 import SeriesSection from "../series/SeriesSection";
 import ReviewsScreen from "../layout/ReviewsScreen";
@@ -48,18 +45,6 @@ function LockedPanel({ title }: { title: string }) {
 export default function PublicDashboardLite({ user }: { user: RankedUser }) {
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState<PublicTab>("movies");
-  const achievementIdsQuery = useQuery({
-    queryKey: ["public-achievement-ids", user.id],
-    queryFn: () => listUserAchievementIds(user.id),
-    enabled: Boolean(user.id),
-    staleTime: 60_000,
-  });
-  const badges = useMemo(() => {
-    const ids = new Set(achievementIdsQuery.data || []);
-    return ACHIEVEMENTS
-      .filter((achievement) => ids.has(achievement.id))
-      .sort((a, b) => b.level - a.level);
-  }, [achievementIdsQuery.data]);
 
   return (
     <main className="mx-auto flex w-full max-w-[1700px] flex-col gap-6 overflow-x-hidden px-3 py-6 sm:px-6 lg:px-8 lg:py-8">
@@ -90,18 +75,14 @@ export default function PublicDashboardLite({ user }: { user: RankedUser }) {
             <div className="mt-6 grid grid-cols-2 border-t border-white/10 pt-5">
               <div>
                 <p className="text-xl text-brand-gold">#{user.rank}</p>
-                <p className="mt-1 text-[9px] uppercase tracking-[0.14em] text-brand-text-muted">
-                  Ranking
-                </p>
+                <p className="mt-1 text-xs text-brand-text-muted">Ranking</p>
               </div>
               <div>
                 <p className="flex items-center justify-center gap-1 text-xl text-brand-gold">
                   <Icons.Trophy size={15} />
                   {user.mcoins}
                 </p>
-                <p className="mt-1 text-[9px] uppercase tracking-[0.14em] text-brand-text-muted">
-                  MCoins
-                </p>
+                <p className="mt-1 text-xs text-brand-text-muted">MCoins</p>
               </div>
             </div>
           </section>
@@ -112,19 +93,12 @@ export default function PublicDashboardLite({ user }: { user: RankedUser }) {
                 Insígnias
               </h2>
             </div>
-            {achievementIdsQuery.isLoading ? (
-              <div className="mt-4 h-16 animate-pulse rounded-xl bg-white/5" />
-            ) : badges.length ? (
-              <div className="mt-4 flex flex-wrap items-center gap-2 py-1">
-                {badges.map((achievement) => (
-                  <AchievementBadge key={achievement.id} achievement={achievement} />
-                ))}
-              </div>
-            ) : (
-              <p className="mt-4 text-xs leading-relaxed text-brand-text-muted">
-                Nenhuma insígnia pública desbloqueada ainda.
-              </p>
-            )}
+            <div className="mt-4">
+              <StoredAchievementBadges
+                userId={user.id}
+                emptyMessage="Nenhuma insígnia pública desbloqueada ainda."
+              />
+            </div>
           </section>
         </aside>
         <section className="min-w-0 rounded-3xl border border-[#151b28] bg-[#06080d] p-4 sm:p-7 lg:p-9">
@@ -146,7 +120,7 @@ export default function PublicDashboardLite({ user }: { user: RankedUser }) {
             ) : activeTab === "reviews" ? (
               <ReviewsScreen />
             ) : activeTab === "dashboard" ? (
-              <LockedPanel title="Painel pessoal" />
+              <LockedPanel title="Perfil completo" />
             ) : (
               <LockedPanel title="Predições do Oscar" />
             )}

@@ -50,6 +50,29 @@ describe('SpecialNotificationsList', () => {
     expect(onNavigate).toHaveBeenCalled();
   });
 
+  it('mostra todas as não lidas e apenas as 3 lidas mais recentes', () => {
+    const at = (day: number) => `2026-10-${String(day).padStart(2, '0')}T10:00:00Z`;
+    const notifications = [
+      { ...notification('n-unread-1', null), createdAt: at(25) },
+      { ...notification('n-unread-2', null), createdAt: at(24) },
+      { ...notification('n-read-1', at(26)), createdAt: at(23) },
+      { ...notification('n-read-2', at(26)), createdAt: at(22) },
+      { ...notification('n-read-3', at(26)), createdAt: at(21) },
+      { ...notification('n-read-4', at(26)), createdAt: at(20) },
+      { ...notification('n-read-5', at(26)), createdAt: at(19) },
+    ];
+    render(
+      <SpecialNotificationsList notifications={notifications} unreadCount={2} onMarkRead={vi.fn()} onMarkAllRead={vi.fn()} />,
+    );
+
+    expect(screen.getAllByRole('button', { name: /convidou você/ })).toHaveLength(5);
+    expect(screen.getByText(/n-unread-1/)).toBeInTheDocument();
+    expect(screen.getByText(/n-unread-2/)).toBeInTheDocument();
+    expect(screen.getByText(/n-read-3/)).toBeInTheDocument();
+    expect(screen.queryByText(/n-read-4/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/n-read-5/)).not.toBeInTheDocument();
+  });
+
   it('não remarca notificação já lida e oferece "marcar todas" só com não lidas', async () => {
     const onMarkRead = vi.fn();
     const onMarkAllRead = vi.fn();

@@ -78,7 +78,7 @@ export default function UserDropdownMenu({
             >
               <p className="font-semibold">{currentRankedUser?.display_name || session.username}</p>
               <p className="text-xs text-brand-text-muted mt-0.5 opacity-70">
-                @{session.username} • {currentRankedUser?.mcoins || 0} MC
+                @{session.username} • {currentRankedUser?.mcoins || 0} MCoins
               </p>
             </div>
 

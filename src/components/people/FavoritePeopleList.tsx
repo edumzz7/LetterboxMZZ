@@ -7,7 +7,7 @@ import type { UserFavoritePerson } from '../../types/app';
 
 interface FavoritePeopleListProps {
   userId: string | null | undefined;
-  /** `compact` para o drawer (lista vertical); `grid` para o Painel Pessoal. */
+  /** `compact` para o drawer (lista vertical); `grid` para a aba Perfil. */
   variant?: 'compact' | 'grid';
   emptyMessage: string;
 }

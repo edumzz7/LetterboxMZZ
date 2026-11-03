@@ -195,20 +195,22 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
   const handleAddSeries = async (status: 'watchlist' | 'watching' | 'watched', isRetroactive = false) => {
     if (isGuest || !series || (isUpcoming && status !== 'watchlist')) return;
     const totalEpsOfSeason = activeSeasonMeta?.episode_count || 1;
+    const firstSeasonEpisodes = seasonsList.find((season) => season.season_number === 1)?.episode_count || 1;
     const targetSeason = status === 'watched'
       ? (lastSeasonMeta?.season_number || selectedSeason)
       : selectedSeason;
     const targetSeasonEpisodes = status === 'watched'
       ? (lastSeasonMeta?.episode_count || totalEpsOfSeason)
       : totalEpsOfSeason;
+    const isStartingSeries = status === 'watching';
 
     await addSeriesMutation.mutateAsync({
       titulo: series.name,
       capa_url: series.poster_path ? `https://image.tmdb.org/t/p/w500${series.poster_path}` : null,
       status,
-      temporada: targetSeason,
-      total_episodios: targetSeasonEpisodes,
-      episodios_vistos: status === 'watched' ? targetSeasonEpisodes : 0,
+      temporada: isStartingSeries ? 1 : targetSeason,
+      total_episodios: isStartingSeries ? firstSeasonEpisodes : targetSeasonEpisodes,
+      episodios_vistos: status === 'watched' ? targetSeasonEpisodes : isStartingSeries ? 1 : 0,
       plataforma_slug: 'stremio',
       source_movie_id: String(series.id),
       rating: null,

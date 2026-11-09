@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Film, Shuffle, Sparkles, Tv } from 'lucide-react';
+import { BookOpen, Film, Shuffle, Sparkles, Tv } from 'lucide-react';
 import type { RankedUser, WatchPartyMediaType } from '../../types/app';
 import { getCatalogGenres } from '../../lib/tmdb';
 import { getCineMatchPool, pickCineMatchCandidate } from '../../lib/cinematch';
@@ -8,6 +8,7 @@ import type { CineMatchCandidate } from '../../lib/cinematch';
 import { createWatchParty } from '../../lib/watchParties';
 import WatchPartyHistory from './WatchPartyHistory';
 import TmdbImage from '../ui/TmdbImage';
+import SynopsisModal from '../ui/SynopsisModal';
 import { Skeleton } from '../ui/LoadingSkeleton';
 
 interface Props { currentUserId: string; users: RankedUser[] }
@@ -21,6 +22,7 @@ export default function CineMatchPage({ currentUserId, users }: Props) {
   const [candidate, setCandidate] = useState<CineMatchCandidate | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [synopsisOpen, setSynopsisOpen] = useState(false);
   const partners = users.filter((user) => user.id !== currentUserId);
   const genreQuery = useQuery({ queryKey: ['cinematch-genres', mediaType], queryFn: () => getCatalogGenres(mediaType === 'movie' ? 'movie' : 'tv'), staleTime: 86_400_000 });
   const poolQuery = useQuery({
@@ -86,13 +88,18 @@ export default function CineMatchPage({ currentUserId, users }: Props) {
         {!candidate && <button type="button" disabled={poolQuery.isLoading || eligibleCount === 0} onClick={() => draw(false)} className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-lg bg-brand-gold px-4 py-2 text-sm font-semibold text-black disabled:cursor-not-allowed disabled:opacity-40"><Sparkles size={16} /> Sortear sugestão</button>}
       </div>}
       {candidate && <div className="mt-6 flex gap-4 rounded-xl border border-brand-gold/30 bg-brand-gold/5 p-4">
-        <TmdbImage src={`https://image.tmdb.org/t/p/w185${candidate.posterPath}`} alt="" sizes="84px" wrapperClassName="h-32 w-21 shrink-0 rounded" className="h-32 w-21 rounded object-cover" />
-        <div><p className="text-[10px] uppercase tracking-[0.2em] text-brand-gold">Sugestão para vocês</p><h2 className="mt-2 text-lg font-semibold">{candidate.title}</h2>
+        <button type="button" onClick={() => setSynopsisOpen(true)} aria-label={`Ver sinopse de ${candidate.title}`} className="shrink-0 cursor-pointer rounded transition hover:opacity-80">
+          <TmdbImage src={`https://image.tmdb.org/t/p/w185${candidate.posterPath}`} alt="" sizes="84px" wrapperClassName="h-32 w-21 shrink-0 rounded" className="h-32 w-21 rounded object-cover" />
+        </button>
+        <div><p className="text-[10px] uppercase tracking-[0.2em] text-brand-gold">Sugestão para vocês</p>
+          <button type="button" onClick={() => setSynopsisOpen(true)} className="mt-2 cursor-pointer text-left text-lg font-semibold transition hover:text-brand-gold">{candidate.title}</button>
+          <button type="button" onClick={() => setSynopsisOpen(true)} className="mt-1 flex cursor-pointer items-center gap-1 text-xs text-brand-text-muted transition hover:text-brand-gold"><BookOpen size={13} /> Ver sinopse</button>
           <div className="mt-4 flex flex-wrap gap-2"><button type="button" disabled={isSaving} onClick={() => void accept()} className="cursor-pointer rounded bg-brand-gold px-3 py-2 text-xs font-semibold text-black disabled:opacity-50">Escolher e criar watchparty</button><button type="button" onClick={() => draw(true)} className="cursor-pointer rounded border border-white/20 px-3 py-2 text-xs hover:border-brand-gold">Nova sugestão</button></div>
         </div>
       </div>}
       {error && <p role="alert" className="mt-3 text-sm text-red-300">{error}</p>}
     </header>
+    <SynopsisModal isOpen={synopsisOpen && Boolean(candidate)} onOpenChange={setSynopsisOpen} title={candidate?.title || ''} movieId={candidate?.id ?? null} mediaType={mediaType === 'movie' ? 'movie' : 'tv'} />
     <WatchPartyHistory currentUserId={currentUserId} users={users} />
   </main>;
 }

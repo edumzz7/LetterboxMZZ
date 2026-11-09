@@ -1,10 +1,10 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Tv, Eye, Plus, Trash2, Edit3, Star, ArrowLeft, Play, Video, Lock } from 'lucide-react';
+import { Tv, Eye, Plus, Trash2, Edit3, Star, ArrowLeft, Play, Video, Lock, ChevronDown } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { useSeries } from '../../hooks/useSeries';
 import { useUsers } from '../../hooks/useUsers';
-import { getTvDetailsRawWithFallback, getTvCredits, getTvSimilarWithFallback, getTvWatchProviders, getTvSeasonEpisodes, getTvYouTubeTrailer, isReleaseDateUpcoming, type TMDBTvSeasonMeta } from '../../lib/tmdb';
+import { getTvDetailsRawWithFallback, getTvCredits, getTvSimilarWithFallback, getTvWatchProviders, getTvSeasonEpisodes, getTvYouTubeTrailer, isGenericEpisodeName, isReleaseDateUpcoming, type TMDBTvSeasonMeta } from '../../lib/tmdb';
 import { getSeriesCineratsStats } from '../../lib/appData';
 import StarRatingInput from '../ui/StarRatingInput';
 import ReviewModal from '../ui/ReviewModal';
@@ -35,7 +35,22 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
   const [selectedSeason, setSelectedSeason] = useState(1);
   const [isUpdatingProgress, setIsUpdatingProgress] = useState(false);
   const [isWatchedTimingOpen, setIsWatchedTimingOpen] = useState(false);
+  const [expandedEpisodes, setExpandedEpisodes] = useState<Set<number>>(new Set());
   const isGuest = !currentUserId;
+
+  const toggleEpisodeExpanded = (episodeNumber: number) => {
+    setExpandedEpisodes((current) => {
+      const next = new Set(current);
+      if (next.has(episodeNumber)) next.delete(episodeNumber);
+      else next.add(episodeNumber);
+      return next;
+    });
+  };
+
+  // Collapse every episode summary when switching seasons.
+  useEffect(() => {
+    setExpandedEpisodes(new Set());
+  }, [selectedSeason]);
   const [pendingSeriesCompletion, setPendingSeriesCompletion] = useState<{
     temporada: number;
     total_episodios: number;
@@ -640,51 +655,82 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
                     <div role="status" aria-label="Carregando episódios" className="space-y-2">{[0, 1, 2, 3].map((item) => <div key={item} className="flex items-center gap-3 rounded-xl border border-white/5 p-3"><Skeleton className="h-12 w-20 shrink-0 rounded" /><div className="flex-1 space-y-2"><Skeleton className="h-3 w-1/2" /><Skeleton className="h-2.5 w-4/5" /></div></div>)}</div>
                   </div>
                 ) : episodesQuery.data && episodesQuery.data.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto pr-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 items-start gap-3 max-h-[50vh] overflow-y-auto pr-2">
                     {episodesQuery.data.map((ep) => {
                       const isSeen = userSeriesDoc &&
                         userSeriesDoc.temporada === selectedSeason &&
                         userSeriesDoc.episodios_vistos >= ep.episode_number;
-
+                      const isExpanded = expandedEpisodes.has(ep.episode_number);
+                      const episodeLabel = isGenericEpisodeName(ep.name)
+                        ? `Ep. ${ep.episode_number}`
+                        : `Ep. ${ep.episode_number} - ${ep.name}`;
+                      const overviewId = `episode-overview-${selectedSeason}-${ep.episode_number}`;
 
                       return (
                         <div
                           key={ep.episode_number}
-                          onClick={() => {
-                            if (userSeriesDoc && !isUpdatingProgress) {
-                              handleUpdateEpisodeProgress(
-                                isSeen ? ep.episode_number - 1 : ep.episode_number
-                              );
-                            }
-                          }}
                           className={clsx(
-                            'flex items-center justify-between p-3 rounded-xl border transition-all select-none',
-                            userSeriesDoc ? 'cursor-pointer hover:border-brand-gold/30 hover:bg-black/40' : '',
+                            'rounded-xl border transition-all',
                             isSeen
                               ? 'bg-brand-gold/5 border-brand-gold/20 text-brand-gold'
                               : 'bg-black/20 border-[#151515] text-brand-text-muted'
                           )}
                         >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <span className="text-[10px] font-semibold tracking-wider bg-black/40 px-2 py-0.5 rounded border border-[#222] shrink-0">
-                              EP {ep.episode_number}
-                            </span>
-                            <span className="text-xs font-light truncate">{ep.name}</span>
-                          </div>
-
-                          {userSeriesDoc && (
+                          <div className="flex items-center justify-between gap-2 p-3">
                             <button
                               type="button"
-                              disabled={isUpdatingProgress}
+                              onClick={() => toggleEpisodeExpanded(ep.episode_number)}
+                              aria-expanded={isExpanded}
+                              aria-controls={overviewId}
                               className={clsx(
-                                'p-1 rounded-full border transition-colors shrink-0',
-                                isSeen
-                                  ? 'border-brand-gold bg-brand-gold/25 text-brand-gold'
-                                  : 'border-[#222] text-[#333] hover:text-brand-text hover:border-brand-text'
+                                'min-w-0 flex-1 cursor-pointer text-left text-xs font-light transition-colors hover:text-brand-text',
+                                isExpanded ? 'whitespace-normal' : 'truncate'
                               )}
                             >
-                              <Eye size={12} />
+                              {episodeLabel}
                             </button>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {userSeriesDoc && (
+                                <button
+                                  type="button"
+                                  disabled={isUpdatingProgress}
+                                  onClick={() => {
+                                    if (!isUpdatingProgress) {
+                                      void handleUpdateEpisodeProgress(
+                                        isSeen ? ep.episode_number - 1 : ep.episode_number
+                                      );
+                                    }
+                                  }}
+                                  aria-label={isSeen ? `Desmarcar ${episodeLabel} como visto` : `Marcar ${episodeLabel} como visto`}
+                                  aria-pressed={Boolean(isSeen)}
+                                  className={clsx(
+                                    'p-1 rounded-full border transition-colors cursor-pointer disabled:cursor-wait disabled:opacity-60',
+                                    isSeen
+                                      ? 'border-brand-gold bg-brand-gold/25 text-brand-gold'
+                                      : 'border-[#222] text-[#333] hover:text-brand-text hover:border-brand-text'
+                                  )}
+                                >
+                                  <Eye size={12} />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => toggleEpisodeExpanded(ep.episode_number)}
+                                aria-expanded={isExpanded}
+                                aria-controls={overviewId}
+                                aria-label={isExpanded ? 'Ocultar resumo do episódio' : 'Mostrar resumo do episódio'}
+                                className="p-1 rounded-full cursor-pointer text-brand-text-muted transition-colors hover:text-brand-text"
+                              >
+                                <ChevronDown size={14} className={clsx('transition-transform duration-200', isExpanded && 'rotate-180')} />
+                              </button>
+                            </div>
+                          </div>
+
+                          {isExpanded && (
+                            <p id={overviewId} className="border-t border-white/5 px-3 pb-3 pt-2 text-xs font-light leading-relaxed text-brand-text-muted whitespace-pre-line">
+                              {ep.overview || 'Resumo não disponível para este episódio.'}
+                            </p>
                           )}
                         </div>
                       );

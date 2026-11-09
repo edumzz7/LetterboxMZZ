@@ -42,6 +42,7 @@ export interface TMDBGenre {
 export interface TMDBSeasonEpisode {
     episode_number: number;
     name: string;
+    overview: string;
 }
 
 export interface TMDBWatchProvider {
@@ -844,18 +845,49 @@ export async function getMediaDetailsMatchingTitle(mediaId: string | number, req
     return match ? { ...match.details, media_type: match.type } : null;
 }
 
+type RawSeasonEpisode = { episode_number?: number; name?: string; overview?: string };
+
+// TMDB returns a placeholder like "Episódio 3" when the pt-BR title is not translated.
+export function isGenericEpisodeName(name: string | null | undefined) {
+    return !name?.trim() || /^epis[oó]dio\s*\d+$/i.test(name.trim());
+}
+
+async function fetchSeasonEpisodes(tvId: number, seasonNumber: number, language: string): Promise<RawSeasonEpisode[]> {
+    const response = await fetch(
+        `${TMDB_BASE_URL}/tv/${tvId}/season/${seasonNumber}?api_key=${TMDB_API_KEY}&language=${language}`
+    );
+    if (!response.ok) throw new Error('TMDB TV Season Fetch Error');
+    return (await response.json())?.episodes || [];
+}
+
 export async function getTvSeasonEpisodes(tvId: number, seasonNumber: number): Promise<TMDBSeasonEpisode[]> {
     if (!TMDB_API_KEY || !tvId || seasonNumber <= 0) return [];
     try {
-        const response = await fetch(
-            `${TMDB_BASE_URL}/tv/${tvId}/season/${seasonNumber}?api_key=${TMDB_API_KEY}&language=pt-BR`
-        );
-        if (!response.ok) throw new Error('TMDB TV Season Fetch Error');
-        const data = await response.json();
-        return (data.episodes || []).map((episode: { episode_number?: number; name?: string }) => ({
-            episode_number: episode.episode_number ?? 0,
-            name: episode.name ?? `Episodio ${episode.episode_number ?? '?'}`,
-        }));
+        const episodes = await fetchSeasonEpisodes(tvId, seasonNumber, 'pt-BR');
+
+        // Only hit en-US when some pt-BR title or overview is missing.
+        let fallbackByNumber = new Map<number, RawSeasonEpisode>();
+        if (episodes.some((episode) => isGenericEpisodeName(episode.name) || !episode.overview?.trim())) {
+            try {
+                const fallback = await fetchSeasonEpisodes(tvId, seasonNumber, 'en-US');
+                fallbackByNumber = new Map(fallback.map((episode) => [episode.episode_number ?? 0, episode]));
+            } catch (error) {
+                console.error('Error fetching en-US season episodes:', error);
+            }
+        }
+
+        return episodes.map((episode) => {
+            const episodeNumber = episode.episode_number ?? 0;
+            const fallback = fallbackByNumber.get(episodeNumber);
+            const name = isGenericEpisodeName(episode.name) && !isGenericEpisodeName(fallback?.name)
+                ? fallback!.name!
+                : episode.name;
+            return {
+                episode_number: episodeNumber,
+                name: name ?? `Episódio ${episode.episode_number ?? '?'}`,
+                overview: episode.overview?.trim() || fallback?.overview?.trim() || '',
+            };
+        });
     } catch (error) {
         console.error('Error fetching TV season episodes:', error);
         return [];

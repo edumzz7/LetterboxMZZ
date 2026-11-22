@@ -10,17 +10,20 @@ import {
   Tv,
 } from "lucide-react";
 import { useLocation } from "wouter";
-import type { PersonalMovie, SeriesEntry, SessionUser } from "../../types/app";
+import type { PersonalMovie, SeriesEntry, SessionUser } from "../../types";
 import homeHero from "../../assets/public/cinerats-home-hero.webp";
 import homeHeroMobile from "../../assets/public/cinerats-home-hero-mobile.webp";
-import { listPublicRanking, listRecentPublicReviews } from "../../lib/appData";
-import { getReviewReaction } from "../../lib/reviewReactions";
+import {
+  listPublicRanking,
+  listRecentPublicReviews,
+} from "../../service/appData";
+import { getReviewReaction } from "../../service/reviewReactions";
 import {
   getTopRatedMovies,
   getTopRatedSeries,
   getWeeklyTrendingMedia,
   type TMDBHomeMedia,
-} from "../../lib/tmdb";
+} from "../../service/tmdb";
 import AvatarDisplay from "../layout/AvatarDisplay";
 import HomeScreen from "../home/HomeScreen";
 import TmdbImage from "../ui/TmdbImage";
@@ -78,7 +81,19 @@ function MediaRow({
         </h2>
       </div>
       {loading ? (
-        <div role="status" aria-label="Carregando seleção" className="flex gap-4 overflow-hidden">{Array.from({ length: 5 }, (_, index) => <div key={index} className="w-[166px] shrink-0"><Skeleton className="aspect-[2/3] rounded-xl" /><Skeleton className="mt-2 h-3 w-4/5" /><Skeleton className="mt-2 h-2.5 w-2/5" /></div>)}</div>
+        <div
+          role="status"
+          aria-label="Carregando seleção"
+          className="flex gap-4 overflow-hidden"
+        >
+          {Array.from({ length: 5 }, (_, index) => (
+            <div key={index} className="w-[166px] shrink-0">
+              <Skeleton className="aspect-[2/3] rounded-xl" />
+              <Skeleton className="mt-2 h-3 w-4/5" />
+              <Skeleton className="mt-2 h-2.5 w-2/5" />
+            </div>
+          ))}
+        </div>
       ) : (
         <div className="relative">
           <div
@@ -290,7 +305,9 @@ export default function PublicHome({
       </section>
       <section className="space-y-4">
         <div className="flex items-center gap-3">
-          <span className="text-brand-gold"><Star size={19} /></span>
+          <span className="text-brand-gold">
+            <Star size={19} />
+          </span>
           <div>
             <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-brand-gold">
               Últimas resenhas da comunidade
@@ -303,13 +320,19 @@ export default function PublicHome({
         {recentReviewsQuery.isLoading ? (
           <div className="grid gap-4 lg:grid-cols-3">
             {Array.from({ length: 3 }, (_, index) => (
-              <div key={index} className="h-36 animate-pulse rounded-2xl border border-white/5 bg-white/5" />
+              <div
+                key={index}
+                className="h-36 animate-pulse rounded-2xl border border-white/5 bg-white/5"
+              />
             ))}
           </div>
         ) : recentReviews.length ? (
           <div className="grid gap-4 lg:grid-cols-3">
             {recentReviews.map((item) => (
-              <article key={item.id} className="flex min-w-0 items-start gap-3 rounded-2xl border border-[#222] bg-[#111] p-4 transition-colors hover:border-brand-gold/20">
+              <article
+                key={item.id}
+                className="flex min-w-0 items-start gap-3 rounded-2xl border border-[#222] bg-[#111] p-4 transition-colors hover:border-brand-gold/20"
+              >
                 <img
                   src={getReviewReaction(Number(item.rating) || 0)}
                   alt={`Reação para nota ${Number(item.rating || 0).toFixed(1)} de 5`}
@@ -320,7 +343,13 @@ export default function PublicHome({
                   <div className="flex items-start justify-between gap-2">
                     <button
                       type="button"
-                      onClick={() => setLocation(item.type === "movie" ? `/filme/${item.providerExternalId}` : `/serie/${item.providerExternalId}`)}
+                      onClick={() =>
+                        setLocation(
+                          item.type === "movie"
+                            ? `/filme/${item.providerExternalId}`
+                            : `/serie/${item.providerExternalId}`,
+                        )
+                      }
                       className="min-w-0 truncate text-left text-sm font-semibold text-brand-text transition hover:text-brand-gold"
                       title={`Abrir ${item.title}`}
                     >
@@ -331,10 +360,15 @@ export default function PublicHome({
                     </span>
                   </div>
                   <div className="mt-1 flex items-center gap-1 text-[10px] text-brand-gold-alt">
-                    <Star size={10} className="fill-brand-gold-alt text-brand-gold-alt" />
+                    <Star
+                      size={10}
+                      className="fill-brand-gold-alt text-brand-gold-alt"
+                    />
                     <span>{Number(item.rating || 0).toFixed(1)} / 5.0</span>
                     <span className="text-brand-text-muted/40">•</span>
-                    <span className="uppercase tracking-wider text-brand-text-muted">{item.type === "movie" ? "Filme" : "Série"}</span>
+                    <span className="uppercase tracking-wider text-brand-text-muted">
+                      {item.type === "movie" ? "Filme" : "Série"}
+                    </span>
                   </div>
                   <p className="mt-3 line-clamp-3 break-words border-l-2 border-brand-gold/30 pl-3 text-xs italic leading-relaxed text-brand-text/90">
                     “{item.review}”
@@ -344,8 +378,14 @@ export default function PublicHome({
                     onClick={() => setLocation(`/${item.username}`)}
                     className="mt-3 inline-flex max-w-full items-center gap-2 text-[10px] text-brand-text-muted transition hover:text-brand-gold"
                   >
-                    <AvatarDisplay avatarId={item.avatarPath} className="h-5 w-5" emojiClassName="text-xs" />
-                    <span className="truncate">{item.displayName || item.username}</span>
+                    <AvatarDisplay
+                      avatarId={item.avatarPath}
+                      className="h-5 w-5"
+                      emojiClassName="text-xs"
+                    />
+                    <span className="truncate">
+                      {item.displayName || item.username}
+                    </span>
                   </button>
                 </div>
               </article>

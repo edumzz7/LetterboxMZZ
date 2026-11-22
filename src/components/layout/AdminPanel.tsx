@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import * as Dialog from '@radix-ui/react-dialog';
-import { KeyRound, Loader2, Shield, X } from 'lucide-react';
-import type { RankedUser } from '../../types/app';
+import { useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { KeyRound, Loader2, Shield, X } from "lucide-react";
+import type { RankedUser } from "../../types";
 
 interface AdminPanelProps {
   users: RankedUser[];
@@ -19,8 +19,8 @@ export default function AdminPanel({
   onAdminReset,
 }: AdminPanelProps) {
   const [resetting, setResetting] = useState<string | null>(null); // username being reset
-  const [newPassword, setNewPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
+  const [newPassword, setNewPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
@@ -29,8 +29,8 @@ export default function AdminPanel({
 
   const openReset = (username: string) => {
     setResetting(username);
-    setNewPassword('');
-    setConfirm('');
+    setNewPassword("");
+    setConfirm("");
     setError(null);
     setSuccessMsg(null);
   };
@@ -48,11 +48,11 @@ export default function AdminPanel({
     setSuccessMsg(null);
 
     if (newPassword.length < 4) {
-      setError('A senha deve ter pelo menos 4 caracteres.');
+      setError("A senha deve ter pelo menos 4 caracteres.");
       return;
     }
     if (newPassword !== confirm) {
-      setError('As senhas não coincidem.');
+      setError("As senhas não coincidem.");
       return;
     }
 
@@ -62,7 +62,9 @@ export default function AdminPanel({
       setSuccessMsg(`Senha de "${resetting}" redefinida com sucesso.`);
       setResetting(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Falha ao redefinir senha.');
+      setError(
+        err instanceof Error ? err.message : "Falha ao redefinir senha.",
+      );
     } finally {
       setIsPending(false);
     }
@@ -84,7 +86,6 @@ export default function AdminPanel({
           </div>
 
           <div className="p-6 flex flex-col gap-4 max-h-[70vh] overflow-y-auto">
-
             {/* Success feedback */}
             {successMsg && (
               <div className="text-xs text-emerald-300 border border-emerald-500/20 bg-emerald-500/10 rounded-lg px-3 py-2">
@@ -94,9 +95,13 @@ export default function AdminPanel({
 
             {/* Reset form inline */}
             {resetting ? (
-              <form onSubmit={handleReset} className="border border-brand-gold/20 rounded-xl p-4 flex flex-col gap-3 bg-brand-gold/5">
+              <form
+                onSubmit={handleReset}
+                className="border border-brand-gold/20 rounded-xl p-4 flex flex-col gap-3 bg-brand-gold/5"
+              >
                 <p className="text-sm text-brand-gold uppercase tracking-widest">
-                  Redefinir senha de <span className="font-semibold">@{resetting}</span>
+                  Redefinir senha de{" "}
+                  <span className="font-semibold">@{resetting}</span>
                 </p>
 
                 <div className="flex flex-col gap-1">
@@ -149,7 +154,13 @@ export default function AdminPanel({
                     disabled={isPending}
                     className="px-3 py-1.5 text-xs uppercase tracking-[0.14em] bg-brand-gold text-brand-bg rounded disabled:opacity-50 inline-flex items-center gap-1.5"
                   >
-                    {isPending ? <><Loader2 size={12} className="animate-spin" /> Salvando…</> : 'Confirmar reset'}
+                    {isPending ? (
+                      <>
+                        <Loader2 size={12} className="animate-spin" /> Salvando…
+                      </>
+                    ) : (
+                      "Confirmar reset"
+                    )}
                   </button>
                 </div>
               </form>
@@ -170,7 +181,9 @@ export default function AdminPanel({
                         <p className="text-sm text-brand-text font-medium">
                           {user.display_name || user.username}
                         </p>
-                        <p className="text-xs text-brand-text-muted">@{user.username}</p>
+                        <p className="text-xs text-brand-text-muted">
+                          @{user.username}
+                        </p>
                       </div>
                       <button
                         type="button"

@@ -3,7 +3,7 @@ import clsx from "clsx";
 import { useLocation } from "wouter";
 import { usePersonalMovies } from "../../hooks/usePersonalMovies";
 import { useSocialActions } from "../../hooks/useSocialActions";
-import type { PersonalMovie } from "../../types/app";
+import type { PersonalMovie } from "../../types";
 import AddMovieDialog from "./AddMovieDialog";
 import MovieCard from "./MovieCard";
 import { PosterGridSkeleton } from "../ui/LoadingSkeleton";
@@ -171,7 +171,7 @@ export default function PersonalMoviesSection({
                 }
                 onRate={async (selectedMovie, stars, review) =>
                   rateMutation.mutateAsync({
-                    actorUserId: currentUserId || '',
+                    actorUserId: currentUserId || "",
                     movieId: selectedMovie.id,
                     movieTitle: selectedMovie.titulo,
                     stars,
@@ -229,7 +229,7 @@ export default function PersonalMoviesSection({
                   }
                   onRate={async (selectedMovie, stars, review) => {
                     await rateMutation.mutateAsync({
-                      actorUserId: currentUserId || '',
+                      actorUserId: currentUserId || "",
                       movieId: selectedMovie.id,
                       movieTitle: selectedMovie.titulo,
                       stars,

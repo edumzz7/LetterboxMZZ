@@ -1,11 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   listSpecialNotifications,
   markAllSpecialNotificationsRead,
   markSpecialNotificationRead,
-} from '../lib/groups';
+} from "../service/groups";
 
-export const SPECIAL_NOTIFICATIONS_QUERY_KEY = 'special-notifications';
+export const SPECIAL_NOTIFICATIONS_QUERY_KEY = "special-notifications";
 
 export function useSpecialNotifications(enabled = true) {
   const queryClient = useQueryClient();

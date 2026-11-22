@@ -1,14 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
-import { Loader2, Search, Film, UserRound } from 'lucide-react';
-import { useLocation } from 'wouter';
-import type { RankedUser } from '../../types/app';
+import { useEffect, useRef, useState } from "react";
+import { Loader2, Search, Film, UserRound } from "lucide-react";
+import { useLocation } from "wouter";
+import type { RankedUser } from "../../types";
 import {
   searchMulti,
   searchPeople,
   type TMDBMultiResult,
   type TMDBPerson,
-} from '../../lib/tmdb';
-import AvatarDisplay from './AvatarDisplay';
+} from "../../service/tmdb";
+import AvatarDisplay from "./AvatarDisplay";
 
 interface GlobalSearchProps {
   users: RankedUser[];
@@ -27,7 +27,7 @@ export default function GlobalSearch({
   onMobileOpenChange,
   mobileBorderless = true,
 }: GlobalSearchProps) {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
   const [results, setResults] = useState<TMDBMultiResult[]>([]);
   const [personResults, setPersonResults] = useState<TMDBPerson[]>([]);
@@ -82,7 +82,7 @@ export default function GlobalSearch({
     .slice(0, 5);
 
   const close = () => {
-    setQuery('');
+    setQuery("");
     setFocused(false);
     inputRef.current?.blur();
     onMobileOpenChange?.(false);
@@ -90,15 +90,15 @@ export default function GlobalSearch({
 
   return (
     <div
-      className={`relative z-40 w-full max-w-2xl transition-all max-lg:max-w-none ${isMobileExpanded ? 'max-lg:w-full' : 'max-lg:w-12'}`}
+      className={`relative z-40 w-full max-w-2xl transition-all max-lg:max-w-none ${isMobileExpanded ? "max-lg:w-full" : "max-lg:w-12"}`}
     >
       <Search
         size={16}
-        className='pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-gold'
+        className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-gold"
       />
       <input
         ref={inputRef}
-        type='search'
+        type="search"
         value={query}
         onChange={(event) => {
           setQuery(event.target.value);
@@ -119,55 +119,55 @@ export default function GlobalSearch({
             onMobileOpenChange?.(false);
           }, 180)
         }
-        placeholder='Pesquisar usuários, filmes, séries e pessoas'
-        className={`w-full rounded-xl border border-[#252525] bg-black py-2.5 pl-10 pr-10 text-xs text-white placeholder:text-white/45 outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/15 sm:text-sm ${isMobileExpanded ? 'max-lg:w-full' : `max-lg:w-12 max-lg:cursor-pointer max-lg:pr-0 max-lg:text-transparent max-lg:placeholder:text-transparent ${mobileBorderless ? 'max-lg:border-transparent max-lg:bg-transparent' : ''}`}`}
+        placeholder="Pesquisar usuários, filmes, séries e pessoas"
+        className={`w-full rounded-xl border border-[#252525] bg-black py-2.5 pl-10 pr-10 text-xs text-white placeholder:text-white/45 outline-none transition focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/15 sm:text-sm ${isMobileExpanded ? "max-lg:w-full" : `max-lg:w-12 max-lg:cursor-pointer max-lg:pr-0 max-lg:text-transparent max-lg:placeholder:text-transparent ${mobileBorderless ? "max-lg:border-transparent max-lg:bg-transparent" : ""}`}`}
       />
       {loading && (
         <Loader2
           size={15}
-          className='absolute right-3.5 top-1/2 -translate-y-1/2 animate-spin text-brand-gold'
+          className="absolute right-3.5 top-1/2 -translate-y-1/2 animate-spin text-brand-gold"
         />
       )}
 
       {focused && query.trim() && (
-        <div className='absolute left-0 right-0 top-[calc(100%+8px)] z-[100] overflow-hidden rounded-xl border border-[#252525] bg-[#080a0f] shadow-2xl'>
+        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-100 overflow-hidden rounded-xl border border-[#252525] bg-[#080a0f] shadow-2xl">
           {[...userResults, ...results, ...personResults].length === 0 &&
           !loading ? (
-            <p className='px-4 py-4 text-center text-xs text-brand-text-muted'>
+            <p className="px-4 py-4 text-center text-xs text-brand-text-muted">
               Nenhum resultado encontrado.
             </p>
           ) : null}
           {userResults.map((user) => (
             <button
               key={user.id}
-              type='button'
+              type="button"
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => {
                 onSelectUser(user.id);
                 close();
               }}
-              className='flex w-full items-center gap-3 px-3.5 py-2.5 text-left hover:bg-white/5'
+              className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left hover:bg-white/5"
             >
               <AvatarDisplay
                 avatarId={user.avatar_id}
-                className='h-7 w-7 shrink-0'
+                className="h-7 w-7 shrink-0"
               />
-              <span className='min-w-0 truncate text-sm text-brand-text'>
-                {user.display_name || user.username}{' '}
-                <span className='text-brand-text-muted'>@{user.username}</span>
+              <span className="min-w-0 truncate text-sm text-brand-text">
+                {user.display_name || user.username}{" "}
+                <span className="text-brand-text-muted">@{user.username}</span>
               </span>
-              <span className='ml-auto text-[9px] uppercase tracking-wider text-brand-gold-alt'>
+              <span className="ml-auto text-[9px] uppercase tracking-wider text-brand-gold-alt">
                 usuário
               </span>
             </button>
           ))}
           {results.map((item) => {
-            const movie = item.media_type === 'movie';
+            const movie = item.media_type === "movie";
             const title = movie ? item.title : item.name;
             return (
               <button
                 key={`${item.media_type}-${item.id}`}
-                type='button'
+                type="button"
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => {
                   setLocation(
@@ -175,34 +175,34 @@ export default function GlobalSearch({
                   );
                   close();
                 }}
-                className='flex w-full items-center gap-3 border-t border-white/5 px-3.5 py-2.5 text-left hover:bg-white/5'
+                className="flex w-full items-center gap-3 border-t border-white/5 px-3.5 py-2.5 text-left hover:bg-white/5"
               >
                 {item.poster_path ? (
                   <img
                     src={`https://image.tmdb.org/t/p/w92${item.poster_path}`}
-                    alt=''
-                    className='h-9 w-6 rounded object-cover'
+                    alt=""
+                    className="h-9 w-6 rounded object-cover"
                   />
                 ) : (
-                  <span className='flex h-9 w-6 items-center justify-center rounded bg-brand-card'>
+                  <span className="flex h-9 w-6 items-center justify-center rounded bg-brand-card">
                     <Film size={12} />
                   </span>
                 )}
-                <span className='min-w-0 flex-1 truncate text-sm text-brand-text'>
+                <span className="min-w-0 flex-1 truncate text-sm text-brand-text">
                   {title}
                 </span>
-                <span className='text-[9px] uppercase tracking-wider text-brand-gold-alt'>
-                  {movie ? 'filme' : 'série'}
+                <span className="text-[9px] uppercase tracking-wider text-brand-gold-alt">
+                  {movie ? "filme" : "série"}
                 </span>
               </button>
             );
           })}
           {personResults.map((person) => {
-            const isDirector = person.known_for_department === 'Directing';
+            const isDirector = person.known_for_department === "Directing";
             return (
               <button
                 key={`person-${person.id}`}
-                type='button'
+                type="button"
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => {
                   setLocation(
@@ -212,24 +212,24 @@ export default function GlobalSearch({
                   );
                   close();
                 }}
-                className='flex w-full items-center gap-3 border-t border-white/5 px-3.5 py-2.5 text-left hover:bg-white/5'
+                className="flex w-full items-center gap-3 border-t border-white/5 px-3.5 py-2.5 text-left hover:bg-white/5"
               >
                 {person.profile_path ? (
                   <img
                     src={`https://image.tmdb.org/t/p/w92${person.profile_path}`}
-                    alt=''
-                    className='h-9 w-9 rounded-full object-cover'
+                    alt=""
+                    className="h-9 w-9 rounded-full object-cover"
                   />
                 ) : (
-                  <span className='flex h-9 w-9 items-center justify-center rounded-full bg-brand-card'>
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-card">
                     <UserRound size={13} />
                   </span>
                 )}
-                <span className='min-w-0 flex-1 truncate text-sm text-brand-text'>
+                <span className="min-w-0 flex-1 truncate text-sm text-brand-text">
                   {person.name}
                 </span>
-                <span className='text-[9px] uppercase tracking-wider text-brand-gold-alt'>
-                  {isDirector ? 'direção' : 'pessoa'}
+                <span className="text-[9px] uppercase tracking-wider text-brand-gold-alt">
+                  {isDirector ? "direção" : "pessoa"}
                 </span>
               </button>
             );

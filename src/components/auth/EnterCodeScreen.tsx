@@ -1,8 +1,13 @@
-import { useState } from 'react';
-import { Film, Loader2, Lock, Hash } from 'lucide-react';
+import { useState } from "react";
+import { Film, Loader2, Lock, Hash } from "lucide-react";
 
 interface EnterCodeScreenProps {
-  onSubmit: (email: string, code: string, password: string, confirmPassword: string) => Promise<void>;
+  onSubmit: (
+    email: string,
+    code: string,
+    password: string,
+    confirmPassword: string,
+  ) => Promise<void>;
   onBackToLogin: () => void;
   error: string | null;
   isPending: boolean;
@@ -19,9 +24,11 @@ export default function EnterCodeScreen({
   initialCode,
 }: EnterCodeScreenProps) {
   const [code, setCode] = useState(initialCode);
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPasswordFields, setShowPasswordFields] = useState(Boolean(initialCode));
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPasswordFields, setShowPasswordFields] = useState(
+    Boolean(initialCode),
+  );
 
   const handleCodeSubmit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -40,7 +47,8 @@ export default function EnterCodeScreen({
     await onSubmit(initialEmail, code, password, confirmPassword);
   };
 
-  const passwordsMatch = !password || !confirmPassword || password === confirmPassword;
+  const passwordsMatch =
+    !password || !confirmPassword || password === confirmPassword;
 
   if (!showPasswordFields) {
     // Tela de digitação de código
@@ -59,7 +67,9 @@ export default function EnterCodeScreen({
                   DIGITE O CÓDIGO.
                 </h1>
                 <p className="text-brand-text-muted leading-relaxed max-w-lg">
-                  Enviamos um código de 6 dígitos para <span className="text-brand-gold">{initialEmail}</span>. Verifique seu email ou clique no link que enviamos.
+                  Enviamos um código de 6 dígitos para{" "}
+                  <span className="text-brand-gold">{initialEmail}</span>.
+                  Verifique seu email ou clique no link que enviamos.
                 </p>
               </div>
             </div>
@@ -79,7 +89,11 @@ export default function EnterCodeScreen({
 
           <section className="p-8 md:p-12 flex flex-col justify-center">
             <div className="flex justify-center mb-10">
-              <img src="/logo-cn.png" alt="CineRats Logo" className="w-32 sm:w-40 drop-shadow-2xl opacity-90 hover:opacity-100 hover:scale-105 transition-all duration-300" />
+              <img
+                src="/logo-cn.png"
+                alt="CineRats Logo"
+                className="w-32 sm:w-40 drop-shadow-2xl opacity-90 hover:opacity-100 hover:scale-105 transition-all duration-300"
+              />
             </div>
 
             <div className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-brand-text-muted mb-6">
@@ -94,7 +108,10 @@ export default function EnterCodeScreen({
 
             <form onSubmit={handleCodeSubmit} className="space-y-5">
               <div className="space-y-2">
-                <label htmlFor="code" className="text-xs uppercase tracking-[0.25em] text-brand-text-muted">
+                <label
+                  htmlFor="code"
+                  className="text-xs uppercase tracking-[0.25em] text-brand-text-muted"
+                >
                   Código
                 </label>
                 <div className="flex items-center gap-3 border border-[#222] rounded-2xl px-4 py-3 bg-[#090d18]">
@@ -103,7 +120,9 @@ export default function EnterCodeScreen({
                     id="code"
                     type="text"
                     value={code}
-                    onChange={(event) => setCode(event.target.value.toUpperCase())}
+                    onChange={(event) =>
+                      setCode(event.target.value.toUpperCase())
+                    }
                     className="w-full bg-transparent outline-none text-center text-2xl tracking-widest"
                     placeholder="000000"
                     maxLength={6}
@@ -149,7 +168,8 @@ export default function EnterCodeScreen({
                 NOVA SENHA.
               </h1>
               <p className="text-brand-text-muted leading-relaxed max-w-lg">
-                Digite sua nova senha. Certifique-se de que seja segura e fácil de lembrar.
+                Digite sua nova senha. Certifique-se de que seja segura e fácil
+                de lembrar.
               </p>
             </div>
           </div>
@@ -169,7 +189,11 @@ export default function EnterCodeScreen({
 
         <section className="p-8 md:p-12 flex flex-col justify-center">
           <div className="flex justify-center mb-10">
-            <img src="/logo-cn.png" alt="CineRats Logo" className="w-32 sm:w-40 drop-shadow-2xl opacity-90 hover:opacity-100 hover:scale-105 transition-all duration-300" />
+            <img
+              src="/logo-cn.png"
+              alt="CineRats Logo"
+              className="w-32 sm:w-40 drop-shadow-2xl opacity-90 hover:opacity-100 hover:scale-105 transition-all duration-300"
+            />
           </div>
 
           <div className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-brand-text-muted mb-6">
@@ -184,7 +208,10 @@ export default function EnterCodeScreen({
 
           <form onSubmit={handlePasswordSubmit} className="space-y-5">
             <div className="space-y-2">
-              <label htmlFor="password" className="text-xs uppercase tracking-[0.25em] text-brand-text-muted">
+              <label
+                htmlFor="password"
+                className="text-xs uppercase tracking-[0.25em] text-brand-text-muted"
+              >
                 Nova Senha
               </label>
               <div className="flex items-center gap-3 border border-[#222] rounded-2xl px-4 py-3 bg-[#090d18]">
@@ -204,7 +231,10 @@ export default function EnterCodeScreen({
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="confirmPassword" className="text-xs uppercase tracking-[0.25em] text-brand-text-muted">
+              <label
+                htmlFor="confirmPassword"
+                className="text-xs uppercase tracking-[0.25em] text-brand-text-muted"
+              >
                 Confirmar Senha
               </label>
               <div className="flex items-center gap-3 border border-[#222] rounded-2xl px-4 py-3 bg-[#090d18]">
@@ -245,7 +275,7 @@ export default function EnterCodeScreen({
                   Processando
                 </span>
               ) : (
-                'Redefinir senha'
+                "Redefinir senha"
               )}
             </button>
           </form>

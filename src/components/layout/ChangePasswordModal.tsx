@@ -1,12 +1,16 @@
-import { useState } from 'react';
-import * as Dialog from '@radix-ui/react-dialog';
-import { KeyRound, Loader2, X, CheckCircle2 } from 'lucide-react';
+import { useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { KeyRound, Loader2, X, CheckCircle2 } from "lucide-react";
 
 interface ChangePasswordModalProps {
   userId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onChangePassword: (userId: string, current: string, next: string) => Promise<void>;
+  onChangePassword: (
+    userId: string,
+    current: string,
+    next: string,
+  ) => Promise<void>;
 }
 
 export default function ChangePasswordModal({
@@ -15,17 +19,17 @@ export default function ChangePasswordModal({
   onOpenChange,
   onChangePassword,
 }: ChangePasswordModalProps) {
-  const [current, setCurrent] = useState('');
-  const [next, setNext] = useState('');
-  const [confirm, setConfirm] = useState('');
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isPending, setIsPending] = useState(false);
 
   const reset = () => {
-    setCurrent('');
-    setNext('');
-    setConfirm('');
+    setCurrent("");
+    setNext("");
+    setConfirm("");
     setError(null);
     setSuccess(false);
   };
@@ -40,11 +44,11 @@ export default function ChangePasswordModal({
     setError(null);
 
     if (next.length < 4) {
-      setError('A nova senha deve ter pelo menos 4 caracteres.');
+      setError("A nova senha deve ter pelo menos 4 caracteres.");
       return;
     }
     if (next !== confirm) {
-      setError('As senhas não coincidem.');
+      setError("As senhas não coincidem.");
       return;
     }
 
@@ -54,7 +58,7 @@ export default function ChangePasswordModal({
       setSuccess(true);
       setTimeout(() => handleOpenChange(false), 1800);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Falha ao alterar senha.');
+      setError(err instanceof Error ? err.message : "Falha ao alterar senha.");
     } finally {
       setIsPending(false);
     }
@@ -75,7 +79,9 @@ export default function ChangePasswordModal({
           {success ? (
             <div className="mt-6 flex flex-col items-center gap-3 py-4 text-brand-gold">
               <CheckCircle2 size={48} strokeWidth={2} />
-              <p className="text-brand-gold text-sm uppercase tracking-widest">Senha alterada!</p>
+              <p className="text-brand-gold text-sm uppercase tracking-widest">
+                Senha alterada!
+              </p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="mt-5 flex flex-col gap-4">
@@ -143,7 +149,13 @@ export default function ChangePasswordModal({
                   disabled={isPending}
                   className="px-4 py-2 text-xs uppercase tracking-[0.14em] bg-brand-gold text-brand-bg rounded disabled:opacity-50 inline-flex items-center gap-2"
                 >
-                  {isPending ? <><Loader2 size={13} className="animate-spin" /> Salvando…</> : 'Salvar'}
+                  {isPending ? (
+                    <>
+                      <Loader2 size={13} className="animate-spin" /> Salvando…
+                    </>
+                  ) : (
+                    "Salvar"
+                  )}
                 </button>
               </div>
             </form>

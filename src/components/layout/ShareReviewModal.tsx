@@ -1,10 +1,10 @@
-import { useState, useRef } from 'react';
-import * as Dialog from '@radix-ui/react-dialog';
-import { Download, Instagram, Star, X } from 'lucide-react';
-import html2canvas from 'html2canvas';
-import { usePersonalMovies } from '../../hooks/usePersonalMovies';
-import { useSeries } from '../../hooks/useSeries';
-import { generateImagePath } from '../../lib/imageUtils';
+import { useState, useRef } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { Download, Instagram, Star, X } from "lucide-react";
+import html2canvas from "html2canvas";
+import { usePersonalMovies } from "../../hooks/usePersonalMovies";
+import { useSeries } from "../../hooks/useSeries";
+import { generateImagePath } from "../../utils/image";
 
 interface ShareReviewModalProps {
   currentUserId: string;
@@ -15,7 +15,7 @@ interface ShareReviewModalProps {
 
 interface SharedItem {
   id: string;
-  type: 'movie' | 'series';
+  type: "movie" | "series";
   titulo: string;
   capa_url: string | null;
   rating: number | null;
@@ -26,7 +26,7 @@ interface SharedItem {
 const CAPTURE_TIMEOUT_MS = 20_000;
 
 function waitForRenderedImages(element: HTMLElement) {
-  const images = Array.from(element.querySelectorAll('img'));
+  const images = Array.from(element.querySelectorAll("img"));
 
   return Promise.all(
     images.map((image) => {
@@ -34,14 +34,14 @@ function waitForRenderedImages(element: HTMLElement) {
 
       return new Promise<void>((resolve) => {
         const finish = () => {
-          image.removeEventListener('load', finish);
-          image.removeEventListener('error', finish);
+          image.removeEventListener("load", finish);
+          image.removeEventListener("error", finish);
           window.clearTimeout(timeout);
           resolve();
         };
         const timeout = window.setTimeout(finish, 8_000);
-        image.addEventListener('load', finish, { once: true });
-        image.addEventListener('error', finish, { once: true });
+        image.addEventListener("load", finish, { once: true });
+        image.addEventListener("error", finish, { once: true });
       });
     }),
   );
@@ -77,13 +77,13 @@ export default function ShareReviewModal({
 
   const movies = moviesQuery.data || [];
   const series = seriesQuery.data || [];
-  
+
   // Apenas filmes assistidos
   const watchedMovies: SharedItem[] = movies
-    .filter((m) => m.status === 'watched')
+    .filter((m) => m.status === "watched")
     .map((m) => ({
       id: m.id,
-      type: 'movie',
+      type: "movie",
       titulo: m.titulo,
       capa_url: m.capa_url,
       rating: m.rating ?? m.avaliacao ?? null,
@@ -93,10 +93,10 @@ export default function ShareReviewModal({
 
   // Apenas séries assistidas
   const watchedSeries: SharedItem[] = series
-    .filter((s) => s.status === 'watched')
+    .filter((s) => s.status === "watched")
     .map((s) => ({
       id: s.id,
-      type: 'series',
+      type: "series",
       titulo: s.titulo,
       capa_url: s.capa_url,
       rating: s.rating ?? s.avaliacao ?? null,
@@ -104,14 +104,20 @@ export default function ShareReviewModal({
       created_at: s.created_at,
     }));
 
-  const combinedItems = [...watchedMovies, ...watchedSeries]
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  const combinedItems = [...watchedMovies, ...watchedSeries].sort(
+    (a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  );
 
-  const ratedItems = combinedItems.filter((item) => Number.isFinite(Number(item.rating)) && Number(item.rating) > 0);
+  const ratedItems = combinedItems.filter(
+    (item) => Number.isFinite(Number(item.rating)) && Number(item.rating) > 0,
+  );
 
-  const [selectedKey, setSelectedKey] = useState<string>(''); // Formato: type-id (ex: "movie-123")
-  const [mediaFilter, setMediaFilter] = useState<'all' | 'movie' | 'series'>('all');
-  const [titleFilter, setTitleFilter] = useState('');
+  const [selectedKey, setSelectedKey] = useState<string>(""); // Formato: type-id (ex: "movie-123")
+  const [mediaFilter, setMediaFilter] = useState<"all" | "movie" | "series">(
+    "all",
+  );
+  const [titleFilter, setTitleFilter] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGeneratingAlternate, setIsGeneratingAlternate] = useState(false);
   const [generatedImages, setGeneratedImages] = useState<string[]>([]);
@@ -122,12 +128,16 @@ export default function ShareReviewModal({
   const previewTouchStartX = useRef<number | null>(null);
 
   const filteredItems = ratedItems.filter((item) => {
-    const matchesType = mediaFilter === 'all' || item.type === mediaFilter;
-    const matchesTitle = item.titulo.toLocaleLowerCase().includes(titleFilter.trim().toLocaleLowerCase());
+    const matchesType = mediaFilter === "all" || item.type === mediaFilter;
+    const matchesTitle = item.titulo
+      .toLocaleLowerCase()
+      .includes(titleFilter.trim().toLocaleLowerCase());
     return matchesType && matchesTitle;
   });
 
-  const selectedItem = ratedItems.find(item => `${item.type}-${item.id}` === selectedKey);
+  const selectedItem = ratedItems.find(
+    (item) => `${item.type}-${item.id}` === selectedKey,
+  );
 
   // Rewrite TMDB image URLs to go through our proxy (same-origin, no CORS issues)
   const getProxiedImageUrl = (item: SharedItem | undefined) => {
@@ -135,8 +145,8 @@ export default function ShareReviewModal({
     const rawUrl = generateImagePath(item.titulo, item.capa_url);
     if (!rawUrl) return null;
     // Rewrite https://image.tmdb.org/t/p/
-    if (rawUrl.includes('image.tmdb.org/t/p/')) {
-      return rawUrl.replace('https://image.tmdb.org/t/p/', '/tmdb-img/');
+    if (rawUrl.includes("image.tmdb.org/t/p/")) {
+      return rawUrl.replace("https://image.tmdb.org/t/p/", "/tmdb-img/");
     }
     return rawUrl;
   };
@@ -147,9 +157,9 @@ export default function ShareReviewModal({
     onOpenChange(nextOpen);
     if (!nextOpen) {
       setTimeout(() => {
-        setSelectedKey('');
-        setMediaFilter('all');
-        setTitleFilter('');
+        setSelectedKey("");
+        setMediaFilter("all");
+        setTitleFilter("");
         setGeneratedImages([]);
         setCurrentImageIndex(0);
         setIsGenerating(false);
@@ -173,17 +183,19 @@ export default function ShareReviewModal({
         imageTimeout: 10_000,
         logging: false,
         onclone: (clonedDocument) => {
-          clonedDocument.querySelectorAll('img[loading="lazy"]').forEach((image) => {
-            image.setAttribute('loading', 'eager');
-          });
+          clonedDocument
+            .querySelectorAll('img[loading="lazy"]')
+            .forEach((image) => {
+              image.setAttribute("loading", "eager");
+            });
         },
         ignoreElements: (elementToIgnore) =>
           elementToIgnore instanceof HTMLImageElement &&
-          elementToIgnore.loading === 'lazy',
+          elementToIgnore.loading === "lazy",
       }),
-      'A geração demorou mais que o esperado. Tente novamente.',
+      "A geração demorou mais que o esperado. Tente novamente.",
     );
-    const dataUrl = canvas.toDataURL('image/png');
+    const dataUrl = canvas.toDataURL("image/png");
     canvas.width = 0;
     canvas.height = 0;
     return dataUrl;
@@ -196,27 +208,33 @@ export default function ShareReviewModal({
     setCurrentImageIndex(0);
 
     try {
-      const dataUrlPhoto = await renderPost(postRefPhoto.current, '#0f0f0f');
+      const dataUrlPhoto = await renderPost(postRefPhoto.current, "#0f0f0f");
       setGeneratedImages([dataUrlPhoto]);
     } catch (error) {
-      console.error('Falha ao gerar imagem', error);
-      alert('Houve um erro ao gerar a imagem: ' + (error instanceof Error ? error.message : String(error)));
+      console.error("Falha ao gerar imagem", error);
+      alert(
+        "Houve um erro ao gerar a imagem: " +
+          (error instanceof Error ? error.message : String(error)),
+      );
     } finally {
       setIsGenerating(false);
     }
   };
 
   const generateAlternateImage = async () => {
-    if (!postRefDark.current || !selectedItem || generatedImages.length > 1) return;
+    if (!postRefDark.current || !selectedItem || generatedImages.length > 1)
+      return;
     setIsGeneratingAlternate(true);
 
     try {
-      const dataUrlDark = await renderPost(postRefDark.current, '#0a0f1e');
+      const dataUrlDark = await renderPost(postRefDark.current, "#0a0f1e");
       setGeneratedImages((images) => [...images, dataUrlDark]);
       setCurrentImageIndex(1);
     } catch (error) {
-      console.error('Falha ao gerar a versão sem fundo', error);
-      alert('Não foi possível gerar a versão sem fundo. Sua primeira imagem continua disponível.');
+      console.error("Falha ao gerar a versão sem fundo", error);
+      alert(
+        "Não foi possível gerar a versão sem fundo. Sua primeira imagem continua disponível.",
+      );
     } finally {
       setIsGeneratingAlternate(false);
     }
@@ -236,7 +254,8 @@ export default function ShareReviewModal({
     const startX = previewTouchStartX.current;
     const endX = event.changedTouches[0]?.clientX;
     previewTouchStartX.current = null;
-    if (startX === null || endX === undefined || generatedImages.length < 2) return;
+    if (startX === null || endX === undefined || generatedImages.length < 2)
+      return;
 
     const distance = endX - startX;
     if (Math.abs(distance) < 40) return;
@@ -246,10 +265,10 @@ export default function ShareReviewModal({
 
   const handleDownload = () => {
     if (generatedImages.length === 0 || !selectedItem) return;
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = generatedImages[currentImageIndex];
-    const styleName = currentImageIndex === 0 ? 'foto' : 'escuro';
-    link.download = `review-${selectedItem.titulo.toLowerCase().replace(/\s+/g, '-')}-${styleName}.png`;
+    const styleName = currentImageIndex === 0 ? "foto" : "escuro";
+    link.download = `review-${selectedItem.titulo.toLowerCase().replace(/\s+/g, "-")}-${styleName}.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -261,30 +280,45 @@ export default function ShareReviewModal({
     try {
       const response = await fetch(generatedImages[currentImageIndex]);
       const blob = await response.blob();
-      const styleName = currentImageIndex === 0 ? 'foto' : 'escuro';
-      const file = new File([blob], `review-${selectedItem.titulo.toLowerCase().replace(/\s+/g, '-')}-${styleName}.png`, { type: 'image/png' });
+      const styleName = currentImageIndex === 0 ? "foto" : "escuro";
+      const file = new File(
+        [blob],
+        `review-${selectedItem.titulo.toLowerCase().replace(/\s+/g, "-")}-${styleName}.png`,
+        { type: "image/png" },
+      );
 
-      if (!navigator.share || !navigator.canShare || !navigator.canShare({ files: [file] })) {
-        alert('O compartilhamento de imagens não está disponível neste dispositivo. Baixe a imagem e poste manualmente no Instagram.');
+      if (
+        !navigator.share ||
+        !navigator.canShare ||
+        !navigator.canShare({ files: [file] })
+      ) {
+        alert(
+          "O compartilhamento de imagens não está disponível neste dispositivo. Baixe a imagem e poste manualmente no Instagram.",
+        );
         return;
       }
 
       await navigator.share({
         files: [file],
-        title: 'Resenha CineRats',
+        title: "Resenha CineRats",
         text: `Confira minha resenha de ${selectedItem.titulo} no CineRats!`,
       });
     } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return;
-      console.error('Falha ao compartilhar', error);
-      alert('Não foi possível abrir o compartilhamento. Você pode baixar a imagem e postar manualmente.');
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      console.error("Falha ao compartilhar", error);
+      alert(
+        "Não foi possível abrir o compartilhamento. Você pode baixar a imagem e postar manualmente.",
+      );
     }
   };
 
   const renderStars = (rating?: number | null) => {
     if (!rating) return null;
     return (
-      <div className="flex items-center justify-center gap-1 mt-2" style={{ color: '#D4AF37' }}>
+      <div
+        className="flex items-center justify-center gap-1 mt-2"
+        style={{ color: "#D4AF37" }}
+      >
         {Array.from({ length: 5 }).map((_, i) => (
           <Star
             key={i}
@@ -295,7 +329,16 @@ export default function ShareReviewModal({
           />
         ))}
         {rating % 1 !== 0 && (
-          <Star size={40} color="#D4AF37" fill="#D4AF37" className="absolute" style={{ opacity: 0.5, clipPath: 'polygon(0 0, 50% 0, 50% 100%, 0% 100%)' }} />
+          <Star
+            size={40}
+            color="#D4AF37"
+            fill="#D4AF37"
+            className="absolute"
+            style={{
+              opacity: 0.5,
+              clipPath: "polygon(0 0, 50% 0, 50% 100%, 0% 100%)",
+            }}
+          />
         )}
       </div>
     );
@@ -304,7 +347,7 @@ export default function ShareReviewModal({
   const truncateReview = (text: string) => {
     const MAX_CHARS = 220;
     if (text.length <= MAX_CHARS) return text;
-    return text.substring(0, MAX_CHARS).trim() + '...';
+    return text.substring(0, MAX_CHARS).trim() + "...";
   };
 
   return (
@@ -322,18 +365,24 @@ export default function ShareReviewModal({
                 <p className="mb-2 text-xs uppercase tracking-[0.14em] text-brand-text-muted">
                   Escolha o tipo de mídia
                 </p>
-                <div className="grid grid-cols-3 gap-2" role="group" aria-label="Filtrar tipo de mídia">
-                  {([
-                    ['all', 'Todos'],
-                    ['movie', 'Filmes'],
-                    ['series', 'Séries'],
-                  ] as const).map(([value, label]) => (
+                <div
+                  className="grid grid-cols-3 gap-2"
+                  role="group"
+                  aria-label="Filtrar tipo de mídia"
+                >
+                  {(
+                    [
+                      ["all", "Todos"],
+                      ["movie", "Filmes"],
+                      ["series", "Séries"],
+                    ] as const
+                  ).map(([value, label]) => (
                     <button
                       key={value}
                       type="button"
                       onClick={() => setMediaFilter(value)}
                       aria-pressed={mediaFilter === value}
-                      className={`rounded-xl border px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] transition ${mediaFilter === value ? 'border-brand-gold/60 bg-brand-gold/10 text-brand-gold' : 'border-[#222] bg-[#151515] text-brand-text-muted hover:border-brand-gold/40 hover:text-brand-text'}`}
+                      className={`rounded-xl border px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] transition ${mediaFilter === value ? "border-brand-gold/60 bg-brand-gold/10 text-brand-gold" : "border-[#222] bg-[#151515] text-brand-text-muted hover:border-brand-gold/40 hover:text-brand-text"}`}
                     >
                       {label}
                     </button>
@@ -342,7 +391,10 @@ export default function ShareReviewModal({
               </div>
 
               <div>
-                <label htmlFor="share-review-title-filter" className="mb-2 block text-xs uppercase tracking-[0.14em] text-brand-text-muted">
+                <label
+                  htmlFor="share-review-title-filter"
+                  className="mb-2 block text-xs uppercase tracking-[0.14em] text-brand-text-muted"
+                >
                   Filtrar por título
                 </label>
                 <input
@@ -357,36 +409,58 @@ export default function ShareReviewModal({
 
               <div>
                 <div className="mb-2 flex items-center justify-between gap-3">
-                  <p className="text-xs uppercase tracking-[0.14em] text-brand-text-muted">Mídias avaliadas</p>
-                  <span className="text-[10px] uppercase tracking-[0.12em] text-brand-text-muted/70">{filteredItems.length} encontrada{filteredItems.length === 1 ? '' : 's'}</span>
+                  <p className="text-xs uppercase tracking-[0.14em] text-brand-text-muted">
+                    Mídias avaliadas
+                  </p>
+                  <span className="text-[10px] uppercase tracking-[0.12em] text-brand-text-muted/70">
+                    {filteredItems.length} encontrada
+                    {filteredItems.length === 1 ? "" : "s"}
+                  </span>
                 </div>
                 <div className="flex max-h-[min(42vh,380px)] flex-col gap-2 overflow-y-auto pr-1">
                   {filteredItems.map((item) => {
                     const itemKey = `${item.type}-${item.id}`;
                     const isSelected = selectedKey === itemKey;
-                    const tag = item.type === 'movie' ? 'Filme' : 'Série';
+                    const tag = item.type === "movie" ? "Filme" : "Série";
                     return (
                       <button
                         key={itemKey}
                         type="button"
                         onClick={() => setSelectedKey(itemKey)}
                         aria-pressed={isSelected}
-                        className={`flex min-w-0 items-center gap-3 rounded-xl border p-2 text-left transition ${isSelected ? 'border-brand-gold/70 bg-brand-gold/10' : 'border-[#222] bg-[#151515] hover:border-brand-gold/40'}`}
+                        className={`flex min-w-0 items-center gap-3 rounded-xl border p-2 text-left transition ${isSelected ? "border-brand-gold/70 bg-brand-gold/10" : "border-[#222] bg-[#151515] hover:border-brand-gold/40"}`}
                       >
                         <div className="h-14 w-10 shrink-0 overflow-hidden rounded-md bg-black">
-                          {getProxiedImageUrl(item) ? <img src={getProxiedImageUrl(item) || undefined} alt={item.titulo} className="h-full w-full object-cover" /> : null}
+                          {getProxiedImageUrl(item) ? (
+                            <img
+                              src={getProxiedImageUrl(item) || undefined}
+                              alt={item.titulo}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : null}
                         </div>
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm text-brand-text">{item.titulo}</span>
-                          <span className="mt-1 block text-[10px] uppercase tracking-[0.12em] text-brand-text-muted">{tag} · {item.rating} / 5</span>
+                          <span className="block truncate text-sm text-brand-text">
+                            {item.titulo}
+                          </span>
+                          <span className="mt-1 block text-[10px] uppercase tracking-[0.12em] text-brand-text-muted">
+                            {tag} · {item.rating} / 5
+                          </span>
                         </span>
-                        <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs ${isSelected ? 'border-brand-gold bg-brand-gold text-brand-bg' : 'border-[#444] text-transparent'}`} aria-hidden="true">✓</span>
+                        <span
+                          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs ${isSelected ? "border-brand-gold bg-brand-gold text-brand-bg" : "border-[#444] text-transparent"}`}
+                          aria-hidden="true"
+                        >
+                          ✓
+                        </span>
                       </button>
                     );
                   })}
                   {filteredItems.length === 0 && (
                     <p className="rounded-xl border border-dashed border-[#333] px-4 py-6 text-center text-sm text-brand-text-muted">
-                      {ratedItems.length === 0 ? 'Você ainda não possui mídias avaliadas para compartilhar.' : 'Nenhuma mídia avaliada corresponde aos filtros.'}
+                      {ratedItems.length === 0
+                        ? "Você ainda não possui mídias avaliadas para compartilhar."
+                        : "Nenhuma mídia avaliada corresponde aos filtros."}
                     </p>
                   )}
                 </div>
@@ -399,7 +473,7 @@ export default function ShareReviewModal({
                     disabled={isGenerating}
                     className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-gold px-6 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-brand-bg transition hover:bg-brand-gold/90 disabled:opacity-50 sm:w-auto"
                   >
-                    {isGenerating ? 'Gerando...' : 'Gerar Imagem'}
+                    {isGenerating ? "Gerando..." : "Gerar Imagem"}
                   </button>
                 </div>
               )}
@@ -408,8 +482,10 @@ export default function ShareReviewModal({
 
           {generatedImages.length > 0 && (
             <div className="flex min-h-0 flex-col items-center gap-3 overflow-y-auto pr-1 sm:gap-4">
-              <p className="shrink-0 text-xs uppercase tracking-[0.14em] text-brand-text-muted">Preview da Imagem</p>
-              
+              <p className="shrink-0 text-xs uppercase tracking-[0.14em] text-brand-text-muted">
+                Preview da Imagem
+              </p>
+
               <div className="grid w-full min-w-0 grid-cols-[4.5rem_minmax(0,1fr)_4.5rem] items-center justify-items-center gap-2 sm:gap-3">
                 {generatedImages.length > 1 ? (
                   <button
@@ -420,16 +496,23 @@ export default function ShareReviewModal({
                   >
                     &#8592;
                   </button>
-                ) : <div aria-hidden="true" />}
-                
+                ) : (
+                  <div aria-hidden="true" />
+                )}
+
                 <div
-                  className="relative aspect-[9/16] w-full max-w-[270px] touch-pan-y overflow-hidden rounded-lg border border-brand-gold/30 bg-black shadow-2xl"
+                  className="relative aspect-9/16 w-full max-w-67.5 touch-pan-y overflow-hidden rounded-lg border border-brand-gold/30 bg-black shadow-2xl"
                   onTouchStart={(event) => {
-                    previewTouchStartX.current = event.touches[0]?.clientX ?? null;
+                    previewTouchStartX.current =
+                      event.touches[0]?.clientX ?? null;
                   }}
                   onTouchEnd={handlePreviewTouchEnd}
                 >
-                  <img src={generatedImages[currentImageIndex]} alt="Preview" className="absolute inset-0 h-full w-full object-cover" />
+                  <img
+                    src={generatedImages[currentImageIndex]}
+                    alt="Preview"
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
                 </div>
 
                 {generatedImages.length > 1 ? (
@@ -446,9 +529,9 @@ export default function ShareReviewModal({
                     type="button"
                     onClick={generateAlternateImage}
                     disabled={isGeneratingAlternate}
-                    className="min-w-0 rounded-xl border border-[#333] px-2 py-3 text-[9px] font-semibold uppercase tracking-[0.1em] text-brand-text transition hover:border-brand-gold/40 hover:text-brand-gold disabled:opacity-50 sm:px-3 sm:text-[10px]"
+                    className="min-w-0 rounded-xl border border-[#333] px-2 py-3 text-[9px] font-semibold uppercase tracking-widest text-brand-text transition hover:border-brand-gold/40 hover:text-brand-gold disabled:opacity-50 sm:px-3 sm:text-[10px]"
                   >
-                    {isGeneratingAlternate ? 'Gerando...' : 'Sem BG'}
+                    {isGeneratingAlternate ? "Gerando..." : "Sem BG"}
                   </button>
                 )}
               </div>
@@ -458,27 +541,30 @@ export default function ShareReviewModal({
                   <button
                     key={idx}
                     onClick={() => setCurrentImageIndex(idx)}
-                    className={`w-2 h-2 rounded-full transition ${idx === currentImageIndex ? 'bg-brand-gold w-4' : 'bg-[#444]'}`}
+                    className={`w-2 h-2 rounded-full transition ${idx === currentImageIndex ? "bg-brand-gold w-4" : "bg-[#444]"}`}
                   />
                 ))}
               </div>
 
               <div className="grid w-full shrink-0 grid-cols-3 gap-2 pt-1 sm:gap-3">
                 <button
-                  onClick={() => { setGeneratedImages([]); setCurrentImageIndex(0); }}
-                  className="min-w-0 rounded-xl border border-[#333] px-2 py-3 text-[10px] uppercase tracking-[0.1em] text-brand-text transition hover:border-brand-gold/40 sm:px-4 sm:text-xs sm:tracking-[0.14em]"
+                  onClick={() => {
+                    setGeneratedImages([]);
+                    setCurrentImageIndex(0);
+                  }}
+                  className="min-w-0 rounded-xl border border-[#333] px-2 py-3 text-[10px] uppercase tracking-widest text-brand-text transition hover:border-brand-gold/40 sm:px-4 sm:text-xs sm:tracking-[0.14em]"
                 >
                   Voltar
                 </button>
                 <button
                   onClick={handleDownload}
-                  className="flex min-w-0 items-center justify-center gap-1 rounded-xl border border-[#333] bg-white/10 px-2 py-3 text-[10px] font-bold uppercase tracking-[0.1em] text-brand-text transition hover:bg-white/20 sm:gap-2 sm:px-4 sm:text-xs sm:tracking-[0.14em]"
+                  className="flex min-w-0 items-center justify-center gap-1 rounded-xl border border-[#333] bg-white/10 px-2 py-3 text-[10px] font-bold uppercase tracking-widest text-brand-text transition hover:bg-white/20 sm:gap-2 sm:px-4 sm:text-xs sm:tracking-[0.14em]"
                 >
                   <Download size={14} /> <span>Baixar</span>
                 </button>
                 <button
                   onClick={handleShare}
-                  className="flex min-w-0 items-center justify-center gap-1 rounded-xl bg-brand-gold px-2 py-3 text-[10px] font-bold uppercase tracking-[0.1em] text-brand-bg transition hover:bg-brand-gold/90 sm:gap-2 sm:px-4 sm:text-xs sm:tracking-[0.14em]"
+                  className="flex min-w-0 items-center justify-center gap-1 rounded-xl bg-brand-gold px-2 py-3 text-[10px] font-bold uppercase tracking-widest text-brand-bg transition hover:bg-brand-gold/90 sm:gap-2 sm:px-4 sm:text-xs sm:tracking-[0.14em]"
                 >
                   <Instagram size={14} /> <span>Postar</span>
                 </button>
@@ -495,32 +581,46 @@ export default function ShareReviewModal({
 
         {/* COMPONENTE OCULTO PARA RENDERIZAÇÃO (1080x1920) */}
         {selectedItem && (
-          <div className="fixed top-0 pointer-events-none flex" style={{ left: '-9999px', zIndex: -9999 }}>
-            
+          <div
+            className="fixed top-0 pointer-events-none flex"
+            style={{ left: "-9999px", zIndex: -9999 }}
+          >
             {/* VARIANTE 1: Fundo com a Foto */}
             <div
               ref={postRefPhoto}
               className="relative flex flex-col items-center overflow-hidden"
-              style={{ width: '1080px', height: '1920px', backgroundColor: '#0f0f0f' }}
+              style={{
+                width: "1080px",
+                height: "1920px",
+                backgroundColor: "#0f0f0f",
+              }}
             >
               {/* Background Decorativo e Fundo */}
-              <div 
+              <div
                 className="absolute inset-0 pointer-events-none"
                 style={{
                   opacity: 0.2,
-                  backgroundImage: coverImageUrl ? `url(${coverImageUrl})` : 'none',
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
+                  backgroundImage: coverImageUrl
+                    ? `url(${coverImageUrl})`
+                    : "none",
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
                 }}
               />
-              
+
               {/* Container Principal */}
               <div className="z-10 flex flex-col w-full h-full p-24">
                 {/* HEADER (Logo) */}
-                <div className="w-full flex justify-center mb-16" style={{ opacity: 0.8 }}>
-                  <div 
+                <div
+                  className="w-full flex justify-center mb-16"
+                  style={{ opacity: 0.8 }}
+                >
+                  <div
                     className="text-3xl tracking-[0.3em] font-light uppercase pb-4 px-12"
-                    style={{ color: '#D4AF37', borderBottom: '2px solid rgba(212, 175, 55, 0.3)' }}
+                    style={{
+                      color: "#D4AF37",
+                      borderBottom: "2px solid rgba(212, 175, 55, 0.3)",
+                    }}
                   >
                     CineRats
                   </div>
@@ -528,54 +628,78 @@ export default function ShareReviewModal({
 
                 {/* MEIO (Capa e Título) */}
                 <div className="flex-1 flex flex-col items-center justify-center w-full">
-                  <div 
-                    className="w-[600px] h-[900px] rounded-xl overflow-hidden mb-16 relative flex items-center justify-center"
-                    style={{ 
-                       backgroundColor: '#1a1a1a', 
-                       boxShadow: '0 0 80px rgba(212, 175, 55, 0.15)',
-                       border: '4px solid rgba(212, 175, 55, 0.4)'
+                  <div
+                    className="w-150 h-225 rounded-xl overflow-hidden mb-16 relative flex items-center justify-center"
+                    style={{
+                      backgroundColor: "#1a1a1a",
+                      boxShadow: "0 0 80px rgba(212, 175, 55, 0.15)",
+                      border: "4px solid rgba(212, 175, 55, 0.4)",
                     }}
                   >
                     {coverImageUrl ? (
-                      <img 
-                        src={coverImageUrl} 
-                        alt="Capa" 
+                      <img
+                        src={coverImageUrl}
+                        alt="Capa"
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="text-4xl font-light uppercase tracking-widest" style={{ color: '#666666' }}>
+                      <div
+                        className="text-4xl font-light uppercase tracking-widest"
+                        style={{ color: "#666666" }}
+                      >
                         Sem Capa
                       </div>
                     )}
                   </div>
-                  
-                  <h2 className="text-6xl font-light text-center px-12 leading-tight uppercase tracking-wider mb-8" style={{ color: '#ffffff' }}>
+
+                  <h2
+                    className="text-6xl font-light text-center px-12 leading-tight uppercase tracking-wider mb-8"
+                    style={{ color: "#ffffff" }}
+                  >
                     {selectedItem.titulo}
                   </h2>
-                  
+
                   {renderStars(selectedItem.rating)}
                 </div>
 
                 {/* TEXTO (Resenha) */}
-                <div className="h-[350px] w-full flex items-center justify-center px-16">
+                <div className="h-87.5 w-full flex items-center justify-center px-16">
                   {selectedItem.review ? (
-                    <p className="text-4xl text-center font-light leading-[1.6] italic" style={{ color: '#d1d5db' }}>
+                    <p
+                      className="text-4xl text-center font-light leading-[1.6] italic"
+                      style={{ color: "#d1d5db" }}
+                    >
                       "{truncateReview(selectedItem.review)}"
                     </p>
                   ) : (
-                    <div className="text-3xl uppercase tracking-widest font-light" style={{ color: '#6b7280' }}>
-                      {selectedItem.type === 'movie' ? 'Avaliado no CineRats' : 'Avaliada no CineRats'}
+                    <div
+                      className="text-3xl uppercase tracking-widest font-light"
+                      style={{ color: "#6b7280" }}
+                    >
+                      {selectedItem.type === "movie"
+                        ? "Avaliado no CineRats"
+                        : "Avaliada no CineRats"}
                     </div>
                   )}
                 </div>
 
                 {/* RODAPÉ (Usuário) */}
-                <div className="w-full flex justify-between items-end pt-12 mt-8" style={{ borderTop: '1px solid #333333' }}>
+                <div
+                  className="w-full flex justify-between items-end pt-12 mt-8"
+                  style={{ borderTop: "1px solid #333333" }}
+                >
                   <div className="flex flex-col">
-                    <span className="text-2xl uppercase tracking-[0.2em] mb-2" style={{ color: 'rgba(212, 175, 55, 0.7)' }}>
-                      {selectedItem.type === 'movie' ? 'Filme' : 'Série'} • Resenha por
+                    <span
+                      className="text-2xl uppercase tracking-[0.2em] mb-2"
+                      style={{ color: "rgba(212, 175, 55, 0.7)" }}
+                    >
+                      {selectedItem.type === "movie" ? "Filme" : "Série"} •
+                      Resenha por
                     </span>
-                    <span className="text-4xl font-medium tracking-wide" style={{ color: '#ffffff' }}>
+                    <span
+                      className="text-4xl font-medium tracking-wide"
+                      style={{ color: "#ffffff" }}
+                    >
                       {currentDisplayName}
                     </span>
                   </div>
@@ -587,72 +711,105 @@ export default function ShareReviewModal({
             <div
               ref={postRefDark}
               className="relative flex flex-col items-center overflow-hidden"
-              style={{ width: '1080px', height: '1920px', backgroundColor: '#0a0f1e' }}
+              style={{
+                width: "1080px",
+                height: "1920px",
+                backgroundColor: "#0a0f1e",
+              }}
             >
               <div className="z-10 flex flex-col w-full h-full p-24">
-                <div className="w-full flex justify-center mb-16" style={{ opacity: 0.8 }}>
-                  <div 
+                <div
+                  className="w-full flex justify-center mb-16"
+                  style={{ opacity: 0.8 }}
+                >
+                  <div
                     className="text-3xl tracking-[0.3em] font-light uppercase pb-4 px-12"
-                    style={{ color: '#D4AF37', borderBottom: '2px solid rgba(212, 175, 55, 0.3)' }}
+                    style={{
+                      color: "#D4AF37",
+                      borderBottom: "2px solid rgba(212, 175, 55, 0.3)",
+                    }}
                   >
                     CineRats
                   </div>
                 </div>
 
                 <div className="flex-1 flex flex-col items-center justify-center w-full">
-                  <div 
-                    className="w-[600px] h-[900px] rounded-xl overflow-hidden mb-16 relative flex items-center justify-center"
-                    style={{ 
-                       backgroundColor: '#1a1a1a', 
-                       boxShadow: '0 0 80px rgba(212, 175, 55, 0.15)',
-                       border: '4px solid rgba(212, 175, 55, 0.4)'
+                  <div
+                    className="w-150 h-225 rounded-xl overflow-hidden mb-16 relative flex items-center justify-center"
+                    style={{
+                      backgroundColor: "#1a1a1a",
+                      boxShadow: "0 0 80px rgba(212, 175, 55, 0.15)",
+                      border: "4px solid rgba(212, 175, 55, 0.4)",
                     }}
                   >
                     {coverImageUrl ? (
-                      <img 
-                        src={coverImageUrl} 
-                        alt="Capa" 
+                      <img
+                        src={coverImageUrl}
+                        alt="Capa"
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="text-4xl font-light uppercase tracking-widest" style={{ color: '#666666' }}>
+                      <div
+                        className="text-4xl font-light uppercase tracking-widest"
+                        style={{ color: "#666666" }}
+                      >
                         Sem Capa
                       </div>
                     )}
                   </div>
-                  
-                  <h2 className="text-6xl font-light text-center px-12 leading-tight uppercase tracking-wider mb-8" style={{ color: '#ffffff' }}>
+
+                  <h2
+                    className="text-6xl font-light text-center px-12 leading-tight uppercase tracking-wider mb-8"
+                    style={{ color: "#ffffff" }}
+                  >
                     {selectedItem.titulo}
                   </h2>
-                  
+
                   {renderStars(selectedItem.rating)}
                 </div>
 
-                <div className="h-[350px] w-full flex items-center justify-center px-16">
+                <div className="h-87.5 w-full flex items-center justify-center px-16">
                   {selectedItem.review ? (
-                    <p className="text-4xl text-center font-light leading-[1.6] italic" style={{ color: '#d1d5db' }}>
+                    <p
+                      className="text-4xl text-center font-light leading-[1.6] italic"
+                      style={{ color: "#d1d5db" }}
+                    >
                       "{truncateReview(selectedItem.review)}"
                     </p>
                   ) : (
-                    <div className="text-3xl uppercase tracking-widest font-light" style={{ color: '#6b7280' }}>
-                      {selectedItem.type === 'movie' ? 'Avaliado no CineRats' : 'Avaliada no CineRats'}
+                    <div
+                      className="text-3xl uppercase tracking-widest font-light"
+                      style={{ color: "#6b7280" }}
+                    >
+                      {selectedItem.type === "movie"
+                        ? "Avaliado no CineRats"
+                        : "Avaliada no CineRats"}
                     </div>
                   )}
                 </div>
 
-                <div className="w-full flex justify-between items-end pt-12 mt-8" style={{ borderTop: '1px solid #333333' }}>
+                <div
+                  className="w-full flex justify-between items-end pt-12 mt-8"
+                  style={{ borderTop: "1px solid #333333" }}
+                >
                   <div className="flex flex-col">
-                    <span className="text-2xl uppercase tracking-[0.2em] mb-2" style={{ color: 'rgba(212, 175, 55, 0.7)' }}>
-                      {selectedItem.type === 'movie' ? 'Filme' : 'Série'} • Resenha por
+                    <span
+                      className="text-2xl uppercase tracking-[0.2em] mb-2"
+                      style={{ color: "rgba(212, 175, 55, 0.7)" }}
+                    >
+                      {selectedItem.type === "movie" ? "Filme" : "Série"} •
+                      Resenha por
                     </span>
-                    <span className="text-4xl font-medium tracking-wide" style={{ color: '#ffffff' }}>
+                    <span
+                      className="text-4xl font-medium tracking-wide"
+                      style={{ color: "#ffffff" }}
+                    >
                       {currentDisplayName}
                     </span>
                   </div>
                 </div>
               </div>
             </div>
-
           </div>
         )}
       </Dialog.Portal>

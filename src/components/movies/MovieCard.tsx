@@ -1,30 +1,39 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { Film, Eye, EyeOff, Trash2, Loader2, Pencil, MessageSquare, MoreVertical, BookOpen, Plus } from 'lucide-react';
-import clsx from 'clsx';
-import { useLocation } from 'wouter';
-import { generateImagePath } from '../../lib/imageUtils';
-import TmdbImage from '../ui/TmdbImage';
+import { useEffect, useMemo, useRef, useState } from "react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import {
+  Film,
+  Eye,
+  EyeOff,
+  Trash2,
+  Loader2,
+  Pencil,
+  MessageSquare,
+  MoreVertical,
+  BookOpen,
+  Plus,
+} from "lucide-react";
+import clsx from "clsx";
+import { useLocation } from "wouter";
+import { generateImagePath } from "../../utils/image";
+import TmdbImage from "../ui/TmdbImage";
 import {
   findMovieIdByTitle,
   getMovieWatchProviders,
   type TMDBWatchProvider,
-} from '../../lib/tmdb';
-import {
-  updatePersonalMovieStreaming,
-} from '../../lib/appData';
-import { usePersonalMovieMutations } from '../../hooks/usePersonalMovies';
-import StarRatingInput from '../ui/StarRatingInput';
-import ReviewModal from '../ui/ReviewModal';
-import SynopsisModal from '../ui/SynopsisModal';
-import type { MovieStatus, PersonalMovie } from '../../types/app';
+} from "../../service/tmdb";
+import { updatePersonalMovieStreaming } from "../../service/appData";
+import { usePersonalMovieMutations } from "../../hooks/usePersonalMovies";
+import StarRatingInput from "../ui/StarRatingInput";
+import ReviewModal from "../ui/ReviewModal";
+import SynopsisModal from "../ui/SynopsisModal";
+import type { MovieStatus, PersonalMovie } from "../../types";
 
 type CardMovie = PersonalMovie;
 type ProviderItem = TMDBWatchProvider;
 
 interface MovieCardProps {
   movie: CardMovie;
-  layout?: 'carousel' | 'grid';
+  layout?: "carousel" | "grid";
   canEdit?: boolean;
   showPlatformSelector?: boolean;
   currentUserId?: string;
@@ -32,7 +41,11 @@ interface MovieCardProps {
   onToggleStatus?: (movie: CardMovie, nextStatus: MovieStatus) => void;
   onDelete?: (movie: PersonalMovie) => void;
   onPlatformChange?: (movie: CardMovie, platformId: string) => void;
-  onRate?: (movie: PersonalMovie, stars: number, review?: string | null) => Promise<unknown> | unknown;
+  onRate?: (
+    movie: PersonalMovie,
+    stars: number,
+    review?: string | null,
+  ) => Promise<unknown> | unknown;
 }
 
 // Removed: isPersonalMovie type guard - no longer needed
@@ -40,7 +53,9 @@ interface MovieCardProps {
 //   return true;
 // }
 
-function parseProviders(streamingData: string | null | undefined): ProviderItem[] {
+function parseProviders(
+  streamingData: string | null | undefined,
+): ProviderItem[] {
   if (!streamingData) return [];
   try {
     const parsed = JSON.parse(streamingData) as ProviderItem[];
@@ -61,7 +76,7 @@ function parseTmdbFromSource(sourceMovieId: string | null | undefined) {
 
 export default function MovieCard({
   movie,
-  layout = 'carousel',
+  layout = "carousel",
   canEdit = false,
   showPlatformSelector = true,
   currentUserId,
@@ -83,30 +98,34 @@ export default function MovieCard({
   };
 
   const imageSrc = generateImagePath(movie.titulo, movie.capa_url);
-  const isWatched = movie.status === 'watched';
-  const isFriendCard = Boolean(currentUserId) && movie.user_id !== currentUserId;
-  const canRate = canEdit
-    && Boolean(currentUserId)
-    && movie.user_id === currentUserId
-    && !isFriendCard
-    && isWatched
-    && Boolean(onRate);
+  const isWatched = movie.status === "watched";
+  const isFriendCard =
+    Boolean(currentUserId) && movie.user_id !== currentUserId;
+  const canRate =
+    canEdit &&
+    Boolean(currentUserId) &&
+    movie.user_id === currentUserId &&
+    !isFriendCard &&
+    isWatched &&
+    Boolean(onRate);
   const suggestionBadge = useMemo(() => {
-    return (movie.source_movie_id ?? '').includes('|rec:');
+    return (movie.source_movie_id ?? "").includes("|rec:");
   }, [movie]);
 
   const [providers, setProviders] = useState<ProviderItem[]>([]);
   const [showProviders, setShowProviders] = useState(false);
   const [providersLoading, setProvidersLoading] = useState(false);
 
-  const { addMovieMutation } = usePersonalMovieMutations(currentUserId || '');
+  const { addMovieMutation } = usePersonalMovieMutations(currentUserId || "");
   const [addedToWatchlist, setAddedToWatchlist] = useState(false);
 
   const [ratingPending, setRatingPending] = useState<number | null>(null);
   const [synopsisModalOpen, setSynopsisModalOpen] = useState(false);
   const [resolvedTmdbId, setResolvedTmdbId] = useState<number | null>(null);
   const [ratingError, setRatingError] = useState<string | null>(null);
-  const [localRating, setLocalRating] = useState<number>(Number(movie.rating ?? movie.avaliacao) || 0);
+  const [localRating, setLocalRating] = useState<number>(
+    Number(movie.rating ?? movie.avaliacao) || 0,
+  );
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [pendingRating, setPendingRating] = useState<number>(localRating);
   const showReadOnlyRating = isWatched && (canRate || localRating > 0);
@@ -123,12 +142,15 @@ export default function MovieCard({
 
   useEffect(() => {
     const onClickOutside = (event: MouseEvent) => {
-      if (providersRef.current && !providersRef.current.contains(event.target as Node)) {
+      if (
+        providersRef.current &&
+        !providersRef.current.contains(event.target as Node)
+      ) {
         setShowProviders(false);
       }
     };
-    document.addEventListener('mousedown', onClickOutside);
-    return () => document.removeEventListener('mousedown', onClickOutside);
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
   const handleOpenSynopsis = async () => {
@@ -142,7 +164,7 @@ export default function MovieCard({
 
   const handleToggleStatus = () => {
     if (!canEdit || !onToggleStatus) return;
-    onToggleStatus(movie, isWatched ? 'watchlist' : 'watched');
+    onToggleStatus(movie, isWatched ? "watchlist" : "watched");
   };
 
   const handleDelete = (event?: Event) => {
@@ -167,7 +189,9 @@ export default function MovieCard({
       await onRate(movie, stars, review);
     } catch (error) {
       setLocalRating(previousRating);
-      setRatingError(error instanceof Error ? error.message : 'Falha ao salvar avaliacao.');
+      setRatingError(
+        error instanceof Error ? error.message : "Falha ao salvar avaliacao.",
+      );
     } finally {
       setRatingPending(null);
     }
@@ -179,10 +203,10 @@ export default function MovieCard({
       titulo: movie.titulo,
       capa_url: movie.capa_url,
       source_movie_id: movie.source_movie_id,
-      status: 'watchlist',
+      status: "watchlist",
       plataforma_slug: movie.plataforma_slug,
       ano_lancamento: movie.ano_lancamento,
-      source: 'manual',
+      source: "manual",
     });
     setAddedToWatchlist(true);
   };
@@ -192,13 +216,15 @@ export default function MovieCard({
     setProvidersLoading(true);
     try {
       const tmdbId = parseTmdbFromSource(movie.source_movie_id);
-      const resolvedId = tmdbId ?? (await findMovieIdByTitle(movie.titulo, movie.ano_lancamento));
+      const resolvedId =
+        tmdbId ??
+        (await findMovieIdByTitle(movie.titulo, movie.ano_lancamento));
       if (!resolvedId) {
         setProviders([]);
         return;
       }
 
-      const nextProviders = await getMovieWatchProviders(resolvedId, 'BR');
+      const nextProviders = await getMovieWatchProviders(resolvedId, "BR");
       setProviders(nextProviders);
       const serialized = JSON.stringify(nextProviders);
       await updatePersonalMovieStreaming(movie.id, serialized);
@@ -210,13 +236,15 @@ export default function MovieCard({
   return (
     <div
       className={clsx(
-        layout === 'grid' ? 'group/card relative flex flex-row gap-3 rounded-2xl border border-[#151b28] bg-[#06080d] p-2 md:flex-col md:gap-3 md:rounded-none md:border-0 md:bg-transparent md:p-0' : 'flex flex-col gap-3 group/card min-w-[160px] md:min-w-[200px] snap-center',
-        isPending && 'opacity-90',
+        layout === "grid"
+          ? "group/card relative flex flex-row gap-3 rounded-2xl border border-[#151b28] bg-[#06080d] p-2 md:flex-col md:gap-3 md:rounded-none md:border-0 md:bg-transparent md:p-0"
+          : "flex flex-col gap-3 group/card min-w-40 md:min-w-50 snap-center",
+        isPending && "opacity-90",
       )}
     >
       <div
         onClick={handleCardClick}
-        className="static h-32 w-20 shrink-0 overflow-hidden rounded-md border border-[#222] bg-brand-card transition-all hover:border-brand-gold-alt hover:shadow-[0_0_15px_rgba(212,175,55,0.15)] group cursor-pointer md:relative md:h-auto md:w-full md:aspect-[2/3]"
+        className="static h-32 w-20 shrink-0 overflow-hidden rounded-md border border-[#222] bg-brand-card transition-all hover:border-brand-gold-alt hover:shadow-[0_0_15px_rgba(212,175,55,0.15)] group cursor-pointer md:relative md:h-auto md:w-full md:aspect-2/3"
       >
         <TmdbImage
           src={imageSrc}
@@ -225,7 +253,9 @@ export default function MovieCard({
           loading="lazy"
           sizes="(max-width: 767px) 80px, 20vw"
           onError={(event) => {
-            event.currentTarget.parentElement?.nextElementSibling?.classList.remove('hidden');
+            event.currentTarget.parentElement?.nextElementSibling?.classList.remove(
+              "hidden",
+            );
           }}
         />
         <div className="hidden absolute inset-0 w-full h-full flex-col items-center justify-center p-4 text-center bg-brand-card">
@@ -273,13 +303,15 @@ export default function MovieCard({
                     disabled={addedToWatchlist || addMovieMutation.isPending}
                     className={clsx(
                       "flex items-center gap-2 px-2 py-2 text-xs text-brand-text rounded-md outline-none transition-colors",
-                      (addedToWatchlist || addMovieMutation.isPending)
+                      addedToWatchlist || addMovieMutation.isPending
                         ? "opacity-50 cursor-not-allowed"
-                        : "cursor-pointer hover:bg-brand-gold/10 hover:text-brand-gold focus:bg-brand-gold/10 focus:text-brand-gold"
+                        : "cursor-pointer hover:bg-brand-gold/10 hover:text-brand-gold focus:bg-brand-gold/10 focus:text-brand-gold",
                     )}
                   >
                     <Plus size={14} />
-                    {addedToWatchlist ? 'Adicionado à Watchlist' : 'Adicionar à Watchlist'}
+                    {addedToWatchlist
+                      ? "Adicionado à Watchlist"
+                      : "Adicionar à Watchlist"}
                   </DropdownMenu.Item>
                 )}
 
@@ -289,10 +321,10 @@ export default function MovieCard({
                     className="flex items-center gap-2 px-2 py-2 text-xs text-brand-text rounded-md cursor-pointer outline-none hover:bg-brand-gold/10 hover:text-brand-gold transition-colors focus:bg-brand-gold/10 focus:text-brand-gold"
                   >
                     {isWatched ? <Eye size={14} /> : <EyeOff size={14} />}
-                    {isWatched ? 'Mudar para Watchlist' : 'Marcar como visto'}
+                    {isWatched ? "Mudar para Watchlist" : "Marcar como visto"}
                   </DropdownMenu.Item>
                 )}
-                
+
                 {canEdit && (
                   <>
                     <DropdownMenu.Separator className="h-[1px] bg-[#222] my-1" />
@@ -354,11 +386,14 @@ export default function MovieCard({
                 ) : providers.length > 0 ? (
                   <ul className="flex flex-col gap-1">
                     {providers.map((provider) => (
-                      <li key={provider.provider_id ?? provider.provider_name} className="text-xs text-brand-text flex items-center gap-2">
+                      <li
+                        key={provider.provider_id ?? provider.provider_name}
+                        className="text-xs text-brand-text flex items-center gap-2"
+                      >
                         {provider.logo_path ? (
                           <img
                             src={`https://image.tmdb.org/t/p/w92${provider.logo_path}`}
-                            alt={provider.provider_name ?? 'provider'}
+                            alt={provider.provider_name ?? "provider"}
                             className="w-5 h-5 rounded"
                           />
                         ) : null}
@@ -400,7 +435,10 @@ export default function MovieCard({
                   className="p-1 text-brand-text-muted hover:text-brand-gold transition-colors"
                   title="Escrever Resenha"
                 >
-                  <Pencil size={12} className={clsx(movie.review && "text-brand-gold-alt")} />
+                  <Pencil
+                    size={12}
+                    className={clsx(movie.review && "text-brand-gold-alt")}
+                  />
                 </button>
               ) : (
                 movie.review && (
@@ -418,9 +456,18 @@ export default function MovieCard({
                   </button>
                 )
               )}
-              {canRate && ratingPending ? <Loader2 size={12} className="animate-spin text-brand-gold ml-1" /> : null}
+              {canRate && ratingPending ? (
+                <Loader2
+                  size={12}
+                  className="animate-spin text-brand-gold ml-1"
+                />
+              ) : null}
             </div>
-            {ratingError ? <p className="text-[10px] leading-relaxed text-red-300">{ratingError}</p> : null}
+            {ratingError ? (
+              <p className="text-[10px] leading-relaxed text-red-300">
+                {ratingError}
+              </p>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -432,7 +479,7 @@ export default function MovieCard({
           title={movie.titulo}
           coverUrl={movie.capa_url}
           initialRating={pendingRating}
-          initialReview={movie.review || ''}
+          initialReview={movie.review || ""}
           isReadOnly={!canRate}
           onSave={async (stars, text) => {
             await handleRate(stars, text);
@@ -440,7 +487,7 @@ export default function MovieCard({
           onSkip={async (stars) => {
             await handleRate(stars, movie.review);
           }}
-          watchedAt={movie.status === 'watched' ? movie.created_at : null}
+          watchedAt={movie.status === "watched" ? movie.created_at : null}
           isRetroactive={Boolean(movie.is_retroactive)}
         />
       )}

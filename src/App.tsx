@@ -19,7 +19,6 @@ import {
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import AppHeader, { APP_NAVIGATION_TABS, type AppTab } from "./components/layout/Header";
 import DashboardTab from "./components/layout/DashboardTab";
 import UserSidebar, {
   RECOMMENDATIONS_STORAGE_KEY_PREFIX,
@@ -60,6 +59,7 @@ import PublicFooter from "./components/public/PublicFooter";
 import PublicHome from "./components/public/PublicHome";
 import CatalogPage from "./components/public/CatalogPage";
 import ProposalPage from "./components/public/ProposalPage";
+import AppHeader from "./components/layout/Header";
 import LegalPage from "./components/public/LegalPage";
 import { PRIVACY_POLICY, TERMS_OF_USE } from "./data/legalDocuments";
 import PublicDashboardLite from "./components/public/PublicDashboardLite";
@@ -75,8 +75,9 @@ import {
   requestPasswordReset,
   confirmPasswordReset,
   listPublicRanking,
-} from "./lib/appData";
-import type { RankedUser, SessionUser } from "./types/app";
+} from "./service/appData";
+import type { RankedUser, SessionUser } from "./types";
+import { APP_NAVIGATION_TABS, type AppTab } from "./utils/navigation";
 
 const SESSION_KEY = "letterboxmzz_session_v1";
 const ADMIN_USERNAME = import.meta.env.VITE_OSCAR_ADMIN_USERNAME as
@@ -112,7 +113,13 @@ function readStoredSession(): SessionUser | null {
 
 function App() {
   const [activeTab, setActiveTab] = useState<
-    "home" | "dashboard" | "oscars" | "movies" | "series" | "reviews" | "personal"
+    | "home"
+    | "dashboard"
+    | "oscars"
+    | "movies"
+    | "series"
+    | "reviews"
+    | "personal"
   >("home");
   const storedSession = readStoredSession();
   const [session, setSession] = useState<SessionUser | null>(storedSession);
@@ -260,7 +267,14 @@ function App() {
   const isAchievementsRoute =
     urlUsername === "conquistas" || urlUsername === "ranking";
   const viewedUser =
-    matchChangelogs || matchFaq || matchActivities || matchCineMatch || matchGroups || matchPrivacy || matchTerms || isAchievementsRoute
+    matchChangelogs ||
+    matchFaq ||
+    matchActivities ||
+    matchCineMatch ||
+    matchGroups ||
+    matchPrivacy ||
+    matchTerms ||
+    isAchievementsRoute
       ? null
       : urlUsername
         ? users.find((user) => user.username === urlUsername) ||
@@ -582,8 +596,8 @@ function App() {
           onRegister={handleRegister}
           error={authError}
           isPending={authPending}
-          onForgotPassword={() => setLocation('/conta/esqueci-senha')}
-          initialMode='register'
+          onForgotPassword={() => setLocation("/conta/esqueci-senha")}
+          initialMode="register"
         />
       ) : matchMovies || matchMoviesPage ? (
         <CatalogPage
@@ -817,7 +831,7 @@ function App() {
                   aria-label="Abrir CineMatch"
                   title="CineMatch"
                   onClick={() => {
-                    setLocation('/cinematch');
+                    setLocation("/cinematch");
                   }}
                   className="inline-flex h-11 w-11 items-center justify-center rounded-full text-white transition hover:bg-white/5 hover:text-brand-gold"
                 >
@@ -853,7 +867,10 @@ function App() {
                       onSelectUser={selectUser}
                     />
                   </div>
-                  <nav aria-label="Navegação do perfil" className="hidden flex-col rounded-2xl border border-[#151b28] bg-[#06080d] p-2 lg:flex">
+                  <nav
+                    aria-label="Navegação do perfil"
+                    className="hidden flex-col rounded-2xl border border-[#151b28] bg-[#06080d] p-2 lg:flex"
+                  >
                     {APP_NAVIGATION_TABS.filter((tab) => {
                       if (tab.id === "home") return true;
                       if (tab.id === "oscars") return canAccessOscars;
@@ -933,31 +950,31 @@ function App() {
                     </div>
                   </nav>
                   <div>
-                  <UserSidebar
-                    users={users}
-                    currentUserId={authenticatedSession.id}
-                    selectedUserId={
-                      isOwnDashboard
-                        ? selectedUserId || authenticatedSession.id
-                        : ""
-                    }
-                    onSelectUser={selectUser}
-                    isOpen={false}
-                    onClose={() => undefined}
-                    section="discover"
-                  />
+                    <UserSidebar
+                      users={users}
+                      currentUserId={authenticatedSession.id}
+                      selectedUserId={
+                        isOwnDashboard
+                          ? selectedUserId || authenticatedSession.id
+                          : ""
+                      }
+                      onSelectUser={selectUser}
+                      isOpen={false}
+                      onClose={() => undefined}
+                      section="discover"
+                    />
                   </div>
                   <div className="hidden rounded-2xl border border-[#151b28] bg-[#06080d] px-4 py-4 text-xs text-brand-text-muted lg:block">
-                  <p className="flex items-center gap-2">
-                    <Film size={14} className="text-brand-gold-alt" />
-                    CineRats • edumzz
-                  </p>
-                  <a
-                    href="mailto:contato@cinerats.com"
-                    className="mt-2 block transition hover:text-brand-gold"
-                  >
-                    contato@cinerats.com
-                  </a>
+                    <p className="flex items-center gap-2">
+                      <Film size={14} className="text-brand-gold-alt" />
+                      CineRats • edumzz
+                    </p>
+                    <a
+                      href="mailto:contato@cinerats.com"
+                      className="mt-2 block transition hover:text-brand-gold"
+                    >
+                      contato@cinerats.com
+                    </a>
                   </div>
                 </SmartStickySidebar>
               </aside>
@@ -1042,7 +1059,10 @@ function App() {
                   currentUserId={authenticatedSession.id}
                 />
               ) : matchCineMatch ? (
-                <CineMatchPage currentUserId={authenticatedSession.id} users={users} />
+                <CineMatchPage
+                  currentUserId={authenticatedSession.id}
+                  users={users}
+                />
               ) : matchActivities ? (
                 <ActivitiesScreen
                   currentUserId={authenticatedSession.id}
@@ -1067,9 +1087,17 @@ function App() {
                   currentUserId={session.id}
                 />
               ) : matchActor ? (
-                <PersonDetailScreen id={actorParams.id} mode="actor" currentUserId={session.id} />
+                <PersonDetailScreen
+                  id={actorParams.id}
+                  mode="actor"
+                  currentUserId={session.id}
+                />
               ) : matchDirector ? (
-                <PersonDetailScreen id={directorParams.id} mode="director" currentUserId={session.id} />
+                <PersonDetailScreen
+                  id={directorParams.id}
+                  mode="director"
+                  currentUserId={session.id}
+                />
               ) : matchImportTvTime ? (
                 <ImportTvTimePage
                   currentUserId={session.id}
@@ -1147,7 +1175,11 @@ function App() {
 
             {isProfileRoute && viewedUser && (
               <aside className="order-4 min-w-0 lg:self-stretch">
-                <SmartStickySidebar topGap={136} bottomGap={16} className="flex flex-col gap-5">
+                <SmartStickySidebar
+                  topGap={136}
+                  bottomGap={16}
+                  className="flex flex-col gap-5"
+                >
                   <LatestUpdatesSection />
                   <UserSidebar
                     users={users}
@@ -1178,12 +1210,13 @@ function App() {
             contato@cinerats.com
           </a>
         </footer>
-
       </div>
       {isMobileLayout && isNavigationDrawerOpen && (
         <div
           className="fixed inset-x-0 top-0 z-[60]"
-          style={{ bottom: "calc(3.25rem + max(0.75rem, env(safe-area-inset-bottom)))" }}
+          style={{
+            bottom: "calc(3.25rem + max(0.75rem, env(safe-area-inset-bottom)))",
+          }}
         >
           <button
             type="button"
@@ -1198,7 +1231,9 @@ function App() {
             className="relative flex h-full w-[min(26rem,calc(100vw-1rem))] flex-col overflow-y-auto overscroll-contain border-r border-[#151b28] bg-[#06080d] px-3 py-4 shadow-[20px_0_60px_rgba(0,0,0,0.4)]"
           >
             <div className="mb-4 flex items-center justify-between px-2">
-              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-gold">Navegação</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-gold">
+                Navegação
+              </span>
               <button
                 type="button"
                 aria-label="Fechar navegação"
@@ -1226,7 +1261,8 @@ function App() {
                 />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold text-brand-text">
-                    {currentRankedUser.display_name || authenticatedSession.username}
+                    {currentRankedUser.display_name ||
+                      authenticatedSession.username}
                   </span>
                   <span className="mt-0.5 block truncate text-xs text-brand-text-muted">
                     @{authenticatedSession.username}
@@ -1380,7 +1416,7 @@ function App() {
               aria-label="Abrir CineMatch"
               title="CineMatch"
               onClick={() => {
-                setLocation('/cinematch');
+                setLocation("/cinematch");
               }}
               className="inline-flex h-11 w-11 items-center justify-center rounded-full text-white transition hover:bg-white/5 hover:text-brand-gold"
             >

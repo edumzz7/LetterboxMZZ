@@ -1,4 +1,4 @@
-import { avatarEmoji, customAvatarSrc } from '../../lib/avatars';
+import { avatarEmoji, customAvatarSrc } from "../../utils/avatar";
 
 interface AvatarDisplayProps {
   avatarId: string | null | undefined;
@@ -8,8 +8,8 @@ interface AvatarDisplayProps {
 
 export default function AvatarDisplay({
   avatarId,
-  className = 'w-8 h-8',
-  emojiClassName = 'text-lg',
+  className = "w-8 h-8",
+  emojiClassName = "text-lg",
 }: AvatarDisplayProps) {
   const imageSrc = customAvatarSrc(avatarId);
 
@@ -25,8 +25,12 @@ export default function AvatarDisplay({
   }
 
   return (
-    <div className={`${className} shrink-0 rounded-full flex items-center justify-center bg-[#151515]`}>
-      <span className={`${emojiClassName} leading-none`}>{avatarEmoji(avatarId)}</span>
+    <div
+      className={`${className} shrink-0 rounded-full flex items-center justify-center bg-[#151515]`}
+    >
+      <span className={`${emojiClassName} leading-none`}>
+        {avatarEmoji(avatarId)}
+      </span>
     </div>
   );
 }

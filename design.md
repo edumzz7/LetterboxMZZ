@@ -16,33 +16,33 @@ Este documento é a referência visual e de interface do CineRats. Qualquer pág
 
 ### Paleta principal
 
-| Papel | Token / valor | Uso |
-| --- | --- | --- |
-| Fundo da aplicação | `brand-bg` — `#000000` | Canvas da página e fundos absolutamente escuros. |
-| Superfície azul-marinho | `brand-card` — `#0A0F1E` | Inputs, cartões secundários e áreas internas. |
-| Superfície elevada | `brand-card-light` — `#181D2C` | Estados elevados ou selecionados, com parcimônia. |
-| Painel principal | `#06080D` | Containers de conteúdo, header, popovers e barras laterais. |
-| Dourado principal | `brand-gold` — `#D4AF37` | CTA primário, item ativo, foco, moedas, ranking e destaque. |
-| Dourado secundário | `brand-gold-alt` — `#C5A059` | Metadados de destaque, ícones auxiliares e variação sutil. |
-| Texto principal | `brand-text` — `#E0E0E0` | Títulos, valores, conteúdo de leitura. |
-| Texto secundário | `brand-text-muted` — `#A0A0A0` | Rótulos, ajuda, placeholders e informações terciárias. |
-| Borda estrutural | `#151B28` | Borda padrão de painéis escuros. |
-| Borda de campo | `#222222` | Inputs, poster e elementos internos. |
-| Divisor suave | `white/5` ou `white/10` | Separação interna sem criar ruído visual. |
+| Papel                   | Token / valor                  | Uso                                                         |
+| ----------------------- | ------------------------------ | ----------------------------------------------------------- |
+| Fundo da aplicação      | `brand-bg` — `#000000`         | Canvas da página e fundos absolutamente escuros.            |
+| Superfície azul-marinho | `brand-card` — `#0A0F1E`       | Inputs, cartões secundários e áreas internas.               |
+| Superfície elevada      | `brand-card-light` — `#181D2C` | Estados elevados ou selecionados, com parcimônia.           |
+| Painel principal        | `#06080D`                      | Containers de conteúdo, header, popovers e barras laterais. |
+| Dourado principal       | `brand-gold` — `#D4AF37`       | CTA primário, item ativo, foco, moedas, ranking e destaque. |
+| Dourado secundário      | `brand-gold-alt` — `#C5A059`   | Metadados de destaque, ícones auxiliares e variação sutil.  |
+| Texto principal         | `brand-text` — `#E0E0E0`       | Títulos, valores, conteúdo de leitura.                      |
+| Texto secundário        | `brand-text-muted` — `#A0A0A0` | Rótulos, ajuda, placeholders e informações terciárias.      |
+| Borda estrutural        | `#151B28`                      | Borda padrão de painéis escuros.                            |
+| Borda de campo          | `#222222`                      | Inputs, poster e elementos internos.                        |
+| Divisor suave           | `white/5` ou `white/10`        | Separação interna sem criar ruído visual.                   |
 
 ### Cores semânticas
 
 Estas cores são exceções com significado; não use como decoração genérica.
 
-| Situação | Tratamento |
-| --- | --- |
-| Sucesso / sugestão confirmada | Verde esmeralda (`emerald-300` no texto, `emerald-500/10` no fundo e `/20`–`/40` na borda). |
-| Erro, remoção ou ação destrutiva | Vermelho (`red-300`/`red-400` no texto, `red-500/10` no fundo e `/20`–`/40` na borda). |
-| Nota por estrelas | Amarelo (`yellow-400`); restrito ao sistema de avaliação. |
-| Conquista rara | Azul-céu (`sky-400`/`sky-950`). |
-| Conquista épica / destaque máximo | Dourado da marca. |
-| Conquista secreta | Roxo (`purple-400`/`purple-950`). |
-| Conquista comum | Cinza ardósia (`slate-*`). |
+| Situação                          | Tratamento                                                                                  |
+| --------------------------------- | ------------------------------------------------------------------------------------------- |
+| Sucesso / sugestão confirmada     | Verde esmeralda (`emerald-300` no texto, `emerald-500/10` no fundo e `/20`–`/40` na borda). |
+| Erro, remoção ou ação destrutiva  | Vermelho (`red-300`/`red-400` no texto, `red-500/10` no fundo e `/20`–`/40` na borda).      |
+| Nota por estrelas                 | Amarelo (`yellow-400`); restrito ao sistema de avaliação.                                   |
+| Conquista rara                    | Azul-céu (`sky-400`/`sky-950`).                                                             |
+| Conquista épica / destaque máximo | Dourado da marca.                                                                           |
+| Conquista secreta                 | Roxo (`purple-400`/`purple-950`).                                                           |
+| Conquista comum                   | Cinza ardósia (`slate-*`).                                                                  |
 
 **Regra de contraste:** texto normal deve usar `brand-text`; `brand-text-muted` deve ficar reservado a conteúdo secundário e nunca ser a única indicação de estado. Em fundos dourados, use `text-brand-bg`/preto.
 
@@ -62,16 +62,16 @@ Não aplique caixa alta a textos longos, nomes de filmes, nomes de pessoas ou co
 
 Use a escala Tailwind de 4 px como base. Os valores mais recorrentes são:
 
-| Intenção | Valores preferenciais |
-| --- | --- |
-| Espaço compacto entre ícone e texto | `gap-1.5` / `gap-2` (6 / 8 px) |
-| Espaço de itens relacionados | `gap-3` / `gap-4` (12 / 16 px) |
-| Espaço entre blocos | `gap-5` / `gap-6` (20 / 24 px) |
-| Respiro de seção | `gap-8` ou superior (32 px+) |
-| Padding de cartões pequenos | `p-3` a `p-5` (12–20 px) |
-| Padding de painel de conteúdo | `p-4` no mobile; `sm:p-7`; `lg:p-9` |
-| Altura de ícone-botão | `h-10 w-10` (40 × 40 px) |
-| Área mínima de toque | 40 × 40 px sempre que possível |
+| Intenção                            | Valores preferenciais               |
+| ----------------------------------- | ----------------------------------- |
+| Espaço compacto entre ícone e texto | `gap-1.5` / `gap-2` (6 / 8 px)      |
+| Espaço de itens relacionados        | `gap-3` / `gap-4` (12 / 16 px)      |
+| Espaço entre blocos                 | `gap-5` / `gap-6` (20 / 24 px)      |
+| Respiro de seção                    | `gap-8` ou superior (32 px+)        |
+| Padding de cartões pequenos         | `p-3` a `p-5` (12–20 px)            |
+| Padding de painel de conteúdo       | `p-4` no mobile; `sm:p-7`; `lg:p-9` |
+| Altura de ícone-botão               | `h-10 w-10` (40 × 40 px)            |
+| Área mínima de toque                | 40 × 40 px sempre que possível      |
 
 **Container:** o shell geral usa `max-w-[1700px]`, largura total e `px-3 py-4` no mobile; cresce para `sm:px-6`, `lg:px-8` e `lg:py-6`. Não crie uma página full-width sem justificativa.
 
@@ -81,15 +81,15 @@ Use a escala Tailwind de 4 px como base. Os valores mais recorrentes são:
 
 ## 5. Bordas, raios e elevação
 
-| Elemento | Raio | Borda | Fundo |
-| --- | --- | --- | --- |
-| Header e painel principal | `rounded-2xl` a `rounded-3xl` (16–24 px) | `border-[#151b28]` | `#06080D` |
-| Cartão lateral | `rounded-3xl` | `border-[#151b28]` | `#06080D` |
-| Campo e bloco interno | `rounded-xl` ou `rounded-2xl` | `border-[#222]` | `#090D18` / `brand-card` |
-| Poster | `rounded-md` ou `rounded-lg` | `border-[#222]` | `brand-card` |
-| Popover / menu | `rounded-xl` | `border-[#222]` | `#0A0F1E` (pode ter `backdrop-blur`) |
-| Pill / badge / contador | `rounded-full` | dourado com opacidade | dourado com opacidade baixa |
-| Botão de ação principal | `rounded-lg` a `rounded-2xl`, conforme o contexto | sem borda necessária | `brand-gold` |
+| Elemento                  | Raio                                              | Borda                 | Fundo                                |
+| ------------------------- | ------------------------------------------------- | --------------------- | ------------------------------------ |
+| Header e painel principal | `rounded-2xl` a `rounded-3xl` (16–24 px)          | `border-[#151b28]`    | `#06080D`                            |
+| Cartão lateral            | `rounded-3xl`                                     | `border-[#151b28]`    | `#06080D`                            |
+| Campo e bloco interno     | `rounded-xl` ou `rounded-2xl`                     | `border-[#222]`       | `#090D18` / `brand-card`             |
+| Poster                    | `rounded-md` ou `rounded-lg`                      | `border-[#222]`       | `brand-card`                         |
+| Popover / menu            | `rounded-xl`                                      | `border-[#222]`       | `#0A0F1E` (pode ter `backdrop-blur`) |
+| Pill / badge / contador   | `rounded-full`                                    | dourado com opacidade | dourado com opacidade baixa          |
+| Botão de ação principal   | `rounded-lg` a `rounded-2xl`, conforme o contexto | sem borda necessária  | `brand-gold`                         |
 
 Sombras são sutis e reservadas a elementos realmente elevados: header, modais, painel de login, perfil e menus. Use preto translúcido; o brilho dourado (`0 0 10–28px rgba(212,175,55,0.15–0.20)`) é exclusivo de itens especiais como avatar, conquistas e CTA em contexto escuro.
 

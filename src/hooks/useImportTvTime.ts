@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback } from "react";
 import {
   uploadTvTimeImport,
   listUserImports,
@@ -7,7 +7,7 @@ import {
   downloadImportErrorsCSV,
   type DataImport,
   type ImportError,
-} from '../lib/appData';
+} from "../service/appData";
 
 export function useImportTvTime(userId: string) {
   void userId;
@@ -17,19 +17,16 @@ export function useImportTvTime(userId: string) {
   const [imports, setImports] = useState<DataImport[]>([]);
   const [importErrors, setImportErrors] = useState<ImportError[]>([]);
 
-  const uploadImport = useCallback(
-    async (file: File) => {
-      setIsUploading(true);
-      try {
-        const result = await uploadTvTimeImport(file);
-        setCurrentImport(result);
-        return result;
-      } finally {
-        setIsUploading(false);
-      }
-    },
-    []
-  );
+  const uploadImport = useCallback(async (file: File) => {
+    setIsUploading(true);
+    try {
+      const result = await uploadTvTimeImport(file);
+      setCurrentImport(result);
+      return result;
+    } finally {
+      setIsUploading(false);
+    }
+  }, []);
 
   const listImports = useCallback(async () => {
     try {
@@ -37,7 +34,7 @@ export function useImportTvTime(userId: string) {
       setImports(result);
       return result;
     } catch (error) {
-      console.error('Failed to list imports:', error);
+      console.error("Failed to list imports:", error);
       return [];
     }
   }, []);
@@ -48,7 +45,7 @@ export function useImportTvTime(userId: string) {
       setCurrentImport(result);
       return result;
     } catch (error) {
-      console.error('Failed to get import status:', error);
+      console.error("Failed to get import status:", error);
       return null;
     }
   }, []);
@@ -60,7 +57,7 @@ export function useImportTvTime(userId: string) {
       setImportErrors(result);
       return result;
     } catch (error) {
-      console.error('Failed to list import errors:', error);
+      console.error("Failed to list import errors:", error);
       return [];
     } finally {
       setIsLoadingErrors(false);
@@ -71,7 +68,7 @@ export function useImportTvTime(userId: string) {
     try {
       await downloadImportErrorsCSV(importId);
     } catch (error) {
-      console.error('Failed to download CSV:', error);
+      console.error("Failed to download CSV:", error);
       throw error;
     }
   }, []);

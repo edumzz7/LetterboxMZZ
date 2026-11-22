@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Film, Loader2, Mail } from 'lucide-react';
+import { useState } from "react";
+import { Film, Loader2, Mail } from "lucide-react";
 
 interface RequestPasswordResetScreenProps {
   onSubmit: (email: string) => Promise<void>;
@@ -16,7 +16,7 @@ export default function RequestPasswordResetScreen({
   isPending,
   success,
 }: RequestPasswordResetScreenProps) {
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState("");
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -39,7 +39,8 @@ export default function RequestPasswordResetScreen({
                 RESETAR SENHA.
               </h1>
               <p className="text-brand-text-muted leading-relaxed max-w-lg">
-                Informe o e-mail cadastrado e enviaremos um código de 6 dígitos para redefinir sua senha.
+                Informe o e-mail cadastrado e enviaremos um código de 6 dígitos
+                para redefinir sua senha.
               </p>
             </div>
           </div>
@@ -59,7 +60,11 @@ export default function RequestPasswordResetScreen({
 
         <section className="p-8 md:p-12 flex flex-col justify-center">
           <div className="flex justify-center mb-10">
-            <img src="/logo-cn.png" alt="CineRats Logo" className="w-32 sm:w-40 drop-shadow-2xl opacity-90 hover:opacity-100 hover:scale-105 transition-all duration-300" />
+            <img
+              src="/logo-cn.png"
+              alt="CineRats Logo"
+              className="w-32 sm:w-40 drop-shadow-2xl opacity-90 hover:opacity-100 hover:scale-105 transition-all duration-300"
+            />
           </div>
 
           {success ? (
@@ -82,7 +87,10 @@ export default function RequestPasswordResetScreen({
 
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="space-y-2">
-                  <label htmlFor="email" className="text-xs uppercase tracking-[0.25em] text-brand-text-muted">
+                  <label
+                    htmlFor="email"
+                    className="text-xs uppercase tracking-[0.25em] text-brand-text-muted"
+                  >
                     E-mail
                   </label>
                   <div className="flex items-center gap-3 border border-[#222] rounded-2xl px-4 py-3 bg-[#090d18]">
@@ -117,7 +125,7 @@ export default function RequestPasswordResetScreen({
                       Enviando
                     </span>
                   ) : (
-                    'Enviar código'
+                    "Enviar código"
                   )}
                 </button>
               </form>

@@ -1,6 +1,6 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import type { PersonalMovie } from '../types/app';
-import { rateMovie } from '../lib/appData';
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import type { PersonalMovie } from "../types";
+import { rateMovie } from "../service/appData";
 
 export function useSocialActions() {
   const queryClient = useQueryClient();
@@ -21,7 +21,7 @@ export function useSocialActions() {
     }) => rateMovie(actorUserId, movieId, movieTitle, stars, review),
     onSuccess: (_data, variables) => {
       queryClient.setQueriesData<PersonalMovie[]>(
-        { queryKey: ['personal-movies'] },
+        { queryKey: ["personal-movies"] },
         (current) =>
           Array.isArray(current)
             ? current.map((movie) =>
@@ -30,7 +30,10 @@ export function useSocialActions() {
                       ...movie,
                       avaliacao: variables.stars,
                       rating: variables.stars,
-                      review: variables.review !== undefined ? variables.review : movie.review,
+                      review:
+                        variables.review !== undefined
+                          ? variables.review
+                          : movie.review,
                     }
                   : movie,
               )

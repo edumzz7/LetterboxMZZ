@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -9,7 +9,10 @@ interface ErrorBoundaryState {
   error: Error | null;
 }
 
-export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+export class ErrorBoundary extends React.Component<
+  ErrorBoundaryProps,
+  ErrorBoundaryState
+> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false, error: null };
@@ -18,12 +21,20 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     return { hasError: true, error };
   }
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    console.error("ErrorBoundary caught an error:", error, errorInfo);
   }
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{padding: '20px', color: 'red', backgroundColor: 'black', minHeight: '100vh', fontFamily: 'monospace'}}>
+        <div
+          style={{
+            padding: "20px",
+            color: "red",
+            backgroundColor: "black",
+            minHeight: "100vh",
+            fontFamily: "monospace",
+          }}
+        >
           <h1>Algo deu errado (Erro de renderização):</h1>
           <pre>{this.state.error?.toString()}</pre>
           <pre>{this.state.error?.stack}</pre>

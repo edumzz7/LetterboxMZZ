@@ -1,16 +1,16 @@
-import { useState, useEffect, useMemo } from 'react';
-import * as Dialog from '@radix-ui/react-dialog';
-import { X, Loader2, Clock, AlertCircle } from 'lucide-react';
-import clsx from 'clsx';
-import StarRatingInput from './StarRatingInput';
-import { generateImagePath } from '../../lib/imageUtils';
+import { useState, useEffect, useMemo } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { X, Loader2, Clock, AlertCircle } from "lucide-react";
+import clsx from "clsx";
+import StarRatingInput from "./StarRatingInput";
+import { generateImagePath } from "../../utils/image";
 import {
   validateReviewText,
   sanitizeReviewText,
   MIN_REVIEW_LENGTH,
   getReviewDeadlineMessage,
   canEarnPointsForReview,
-} from '../../lib/reviewValidation';
+} from "../../service/reviewValidation";
 
 interface ReviewModalProps {
   isOpen: boolean;
@@ -91,9 +91,15 @@ export default function ReviewModal({
       onOpenChange(false);
     } catch (err) {
       // Tratar erro 422 específico da API
-      const errorMessage = err instanceof Error ? err.message : 'Falha ao salvar resenha.';
-      if (errorMessage.includes('at least 25 characters') || errorMessage.includes('mínimo')) {
-        setError(`A review deve ter no mínimo ${MIN_REVIEW_LENGTH} caracteres (sem contar espaços extras)`);
+      const errorMessage =
+        err instanceof Error ? err.message : "Falha ao salvar resenha.";
+      if (
+        errorMessage.includes("at least 25 characters") ||
+        errorMessage.includes("mínimo")
+      ) {
+        setError(
+          `A review deve ter no mínimo ${MIN_REVIEW_LENGTH} caracteres (sem contar espaços extras)`,
+        );
       } else {
         setError(errorMessage);
       }
@@ -113,7 +119,7 @@ export default function ReviewModal({
       }
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Falha ao salvar nota.');
+      setError(err instanceof Error ? err.message : "Falha ao salvar nota.");
     } finally {
       setIsSkipping(false);
     }
@@ -129,17 +135,24 @@ export default function ReviewModal({
           <div className="flex gap-4">
             {/* Media Cover */}
             <div className="w-24 aspect-[2/3] rounded-lg overflow-hidden border border-[#222] shrink-0 bg-brand-card">
-              <img src={imageSrc} alt={title} className="w-full h-full object-cover" />
+              <img
+                src={imageSrc}
+                alt={title}
+                className="w-full h-full object-cover"
+              />
             </div>
 
             {/* Content info */}
             <div className="flex flex-col min-w-0 w-full justify-between py-1">
               <div>
-                <Dialog.Title className="text-lg font-light text-brand-gold tracking-wide truncate" title={title}>
+                <Dialog.Title
+                  className="text-lg font-light text-brand-gold tracking-wide truncate"
+                  title={title}
+                >
                   {title}
                 </Dialog.Title>
                 <Dialog.Description className="text-xs text-brand-text-muted mt-1 uppercase tracking-widest font-extralight">
-                  {isReadOnly ? 'Visualizar Resenha' : 'Deixe sua opinião'}
+                  {isReadOnly ? "Visualizar Resenha" : "Deixe sua opinião"}
                 </Dialog.Description>
               </div>
 
@@ -153,7 +166,7 @@ export default function ReviewModal({
                   disabled={isReadOnly}
                 />
                 <span className="text-xs text-brand-gold font-light">
-                  {rating > 0 ? Number(rating).toFixed(1) : 'Sem nota'}
+                  {rating > 0 ? Number(rating).toFixed(1) : "Sem nota"}
                 </span>
               </div>
             </div>
@@ -162,8 +175,13 @@ export default function ReviewModal({
           <form onSubmit={handleSave} className="mt-5 flex flex-col gap-4">
             {isReadOnly ? (
               <div className="bg-[#0a0f1e]/60 border border-[#222] rounded-xl p-4 min-h-[100px] flex flex-col justify-between">
-                <p className={clsx("text-sm leading-relaxed whitespace-pre-wrap", !initialReview && "text-brand-text-muted italic")}>
-                  {initialReview || 'Sem resenha.'}
+                <p
+                  className={clsx(
+                    "text-sm leading-relaxed whitespace-pre-wrap",
+                    !initialReview && "text-brand-text-muted italic",
+                  )}
+                >
+                  {initialReview || "Sem resenha."}
                 </p>
               </div>
             ) : (
@@ -175,7 +193,7 @@ export default function ReviewModal({
                     "w-full min-h-[120px] bg-[#0a0f1e] border text-brand-text p-3.5 rounded-xl focus:outline-none transition-colors text-sm placeholder-brand-text-muted resize-none",
                     review && sanitizedLength < MIN_REVIEW_LENGTH
                       ? "border-red-400/50 focus:border-red-400"
-                      : "border-[#222] focus:border-brand-gold"
+                      : "border-[#222] focus:border-brand-gold",
                   )}
                   placeholder="Escreva seus pensamentos sobre esta obra (opcional)..."
                   disabled={isSaving || isSkipping}
@@ -184,10 +202,14 @@ export default function ReviewModal({
                 {/* Contador de caracteres */}
                 {review && (
                   <div className="flex items-center justify-between text-xs">
-                    <span className={clsx(
-                      "font-light",
-                      sanitizedLength >= MIN_REVIEW_LENGTH ? "text-green-400" : "text-red-400"
-                    )}>
+                    <span
+                      className={clsx(
+                        "font-light",
+                        sanitizedLength >= MIN_REVIEW_LENGTH
+                          ? "text-green-400"
+                          : "text-red-400",
+                      )}
+                    >
                       {sanitizedLength}/{MIN_REVIEW_LENGTH} caracteres
                     </span>
                     {sanitizedLength < MIN_REVIEW_LENGTH && (
@@ -202,16 +224,21 @@ export default function ReviewModal({
                 {isRetroactive && (
                   <div className="flex items-center gap-2 text-xs p-2 rounded-lg border bg-yellow-950/20 border-yellow-500/30 text-yellow-400">
                     <AlertCircle size={14} />
-                    <span>Esta mídia foi marcada como vista há mais tempo. Salvar a avaliação ou a resenha não gerará pontos.</span>
+                    <span>
+                      Esta mídia foi marcada como vista há mais tempo. Salvar a
+                      avaliação ou a resenha não gerará pontos.
+                    </span>
                   </div>
                 )}
                 {!isRetroactive && watchedAt && deadlineMessage && (
-                  <div className={clsx(
-                    "flex items-center gap-2 text-xs p-2 rounded-lg border",
-                    canEarnPoints
-                      ? "bg-green-950/20 border-green-500/30 text-green-400"
-                      : "bg-yellow-950/20 border-yellow-500/30 text-yellow-400"
-                  )}>
+                  <div
+                    className={clsx(
+                      "flex items-center gap-2 text-xs p-2 rounded-lg border",
+                      canEarnPoints
+                        ? "bg-green-950/20 border-green-500/30 text-green-400"
+                        : "bg-yellow-950/20 border-yellow-500/30 text-yellow-400",
+                    )}
+                  >
                     <Clock size={14} />
                     <span>{deadlineMessage}</span>
                   </div>
@@ -219,13 +246,20 @@ export default function ReviewModal({
                 {!isRetroactive && watchedAt && !canEarnPoints && (
                   <div className="flex items-center gap-2 text-xs p-2 rounded-lg border bg-gray-950/20 border-gray-500/30 text-gray-400">
                     <AlertCircle size={14} />
-                    <span>Prazo de 72h expirado. Você não ganhará pontos por esta review.</span>
+                    <span>
+                      Prazo de 72h expirado. Você não ganhará pontos por esta
+                      review.
+                    </span>
                   </div>
                 )}
               </div>
             )}
 
-            {error && <div className="text-xs text-red-400 font-light leading-relaxed">{error}</div>}
+            {error && (
+              <div className="text-xs text-red-400 font-light leading-relaxed">
+                {error}
+              </div>
+            )}
 
             <div className="flex gap-3 justify-end items-center mt-2">
               {isReadOnly ? (
@@ -246,9 +280,12 @@ export default function ReviewModal({
                     className="px-4 py-2.5 text-xs uppercase tracking-wider text-brand-text-muted hover:text-brand-text transition-colors disabled:opacity-50"
                   >
                     {isSkipping ? (
-                      <Loader2 size={14} className="animate-spin text-brand-gold" />
+                      <Loader2
+                        size={14}
+                        className="animate-spin text-brand-gold"
+                      />
                     ) : (
-                      'Pular'
+                      "Pular"
                     )}
                   </button>
                   <button
@@ -257,7 +294,7 @@ export default function ReviewModal({
                     className="px-6 py-2.5 text-xs uppercase tracking-widest bg-brand-gold text-brand-bg font-semibold rounded-lg transition-all hover:bg-opacity-90 active:scale-95 shadow-[0_0_10px_rgba(212,175,55,0.15)] disabled:opacity-50 flex items-center gap-1.5"
                   >
                     {isSaving && <Loader2 size={12} className="animate-spin" />}
-                    {isSaving ? 'Salvando...' : 'Salvar'}
+                    {isSaving ? "Salvando..." : "Salvar"}
                   </button>
                 </>
               )}

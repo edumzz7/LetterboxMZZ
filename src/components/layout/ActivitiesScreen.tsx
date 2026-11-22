@@ -1,29 +1,18 @@
-import { activityDestination } from '../../lib/activityNavigation';
-import { useMemo } from 'react';
-import { Bell } from 'lucide-react';
-import { useLocation } from 'wouter';
-import { useUserActivity } from '../../hooks/useUserActivity';
-import { useSpecialNotifications } from '../../hooks/useSpecialNotifications';
-import SpecialNotificationsList from './SpecialNotificationsList';
-import { ListSkeleton } from '../ui/LoadingSkeleton';
+import { useMemo } from "react";
+import { Bell } from "lucide-react";
+import { useLocation } from "wouter";
+import { useUserActivity } from "../../hooks/useUserActivity";
+import { useSpecialNotifications } from "../../hooks/useSpecialNotifications";
+import SpecialNotificationsList from "./SpecialNotificationsList";
+import { ListSkeleton } from "../ui/LoadingSkeleton";
+import { formatTimestamp } from "../../utils/datetime";
+import { activityDestination } from "../../navigation";
 
 interface ActivitiesScreenProps {
   currentUserId: string;
   viewedUserId: string;
   isOwnDashboard: boolean;
   friendIds?: string[];
-}
-
-function formatTimestamp(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-
-  return new Intl.DateTimeFormat('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
 }
 
 export default function ActivitiesScreen({
@@ -34,7 +23,8 @@ export default function ActivitiesScreen({
 }: ActivitiesScreenProps) {
   const [, setLocation] = useLocation();
   const activityUserIds = useMemo(
-    () => (isOwnDashboard ? [currentUserId, 'global', ...friendIds] : [viewedUserId]),
+    () =>
+      isOwnDashboard ? [currentUserId, "global", ...friendIds] : [viewedUserId],
     [currentUserId, friendIds, isOwnDashboard, viewedUserId],
   );
   const activityQuery = useUserActivity(activityUserIds);
@@ -43,7 +33,7 @@ export default function ActivitiesScreen({
     const seenBroadcasts = new Set<string>();
 
     return (activityQuery.data ?? []).filter((activity) => {
-      if (!activity.message.startsWith('Novo membro!')) return true;
+      if (!activity.message.startsWith("Novo membro!")) return true;
 
       const key = activity.message.trim().toLowerCase();
       if (seenBroadcasts.has(key)) return false;
@@ -58,7 +48,9 @@ export default function ActivitiesScreen({
         <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-brand-gold-alt">
           <Bell size={14} /> Atualizações
         </p>
-        <h1 className="mt-2 text-2xl font-semibold text-brand-text">Atividades</h1>
+        <h1 className="mt-2 text-2xl font-semibold text-brand-text">
+          Atividades
+        </h1>
         <p className="mt-2 text-sm text-brand-text-muted">
           Acompanhe as novidades da comunidade e de seus amigos.
         </p>
@@ -73,7 +65,9 @@ export default function ActivitiesScreen({
       />
 
       {activityQuery.isLoading ? (
-        <div className="mt-3"><ListSkeleton count={6} /></div>
+        <div className="mt-3">
+          <ListSkeleton count={6} />
+        </div>
       ) : activities.length === 0 ? (
         <p className="py-14 text-center text-sm text-brand-text-muted">
           Nenhuma atividade recente por enquanto.
@@ -91,7 +85,9 @@ export default function ActivitiesScreen({
                   onClick={() => destination && setLocation(destination)}
                   className="w-full px-1 py-4 text-left transition enabled:hover:rounded-xl enabled:hover:bg-white/5"
                 >
-                  <p className="text-sm leading-relaxed text-brand-text">{activity.message}</p>
+                  <p className="text-sm leading-relaxed text-brand-text">
+                    {activity.message}
+                  </p>
                   <p className="mt-1.5 text-[10px] uppercase tracking-[0.12em] text-brand-text-muted">
                     {formatTimestamp(activity.created_at)}
                   </p>

@@ -1,11 +1,18 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { addFavoritePerson, listFavoritePeople, removeFavoritePerson } from '../lib/appData';
-import type { UserFavoritePerson } from '../types/app';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  addFavoritePerson,
+  listFavoritePeople,
+  removeFavoritePerson,
+} from "../service/appData";
+import type { UserFavoritePerson } from "../types";
 
-export const FAVORITE_PEOPLE_QUERY_KEY = 'favorite_people';
+export const FAVORITE_PEOPLE_QUERY_KEY = "favorite_people";
 export const MAX_FAVORITE_PEOPLE = 25;
 
-export type FavoritePersonInput = Pick<UserFavoritePerson, 'tmdbPersonId' | 'name' | 'profilePath' | 'department'>;
+export type FavoritePersonInput = Pick<
+  UserFavoritePerson,
+  "tmdbPersonId" | "name" | "profilePath" | "department"
+>;
 
 /** Lista pública de artistas favoritos de qualquer usuário. */
 export function useUserFavoritePeople(userId: string | null | undefined) {
@@ -21,13 +28,21 @@ export function useUserFavoritePeople(userId: string | null | undefined) {
 export function useFavoritePeople(currentUserId: string | null | undefined) {
   const queryClient = useQueryClient();
   const queryKey = [FAVORITE_PEOPLE_QUERY_KEY, currentUserId];
-  const { data: favorites = [], isLoading } = useUserFavoritePeople(currentUserId);
+  const { data: favorites = [], isLoading } =
+    useUserFavoritePeople(currentUserId);
 
-  const isFavorited = (tmdbPersonId: number) => favorites.some((item) => item.tmdbPersonId === tmdbPersonId);
+  const isFavorited = (tmdbPersonId: number) =>
+    favorites.some((item) => item.tmdbPersonId === tmdbPersonId);
   const isLimitReached = favorites.length >= MAX_FAVORITE_PEOPLE;
 
   const toggleMutation = useMutation({
-    mutationFn: async ({ person, isFavorite }: { person: FavoritePersonInput; isFavorite: boolean }) => {
+    mutationFn: async ({
+      person,
+      isFavorite,
+    }: {
+      person: FavoritePersonInput;
+      isFavorite: boolean;
+    }) => {
       if (isFavorite) {
         await removeFavoritePerson(person.tmdbPersonId);
         return null;
@@ -36,13 +51,21 @@ export function useFavoritePeople(currentUserId: string | null | undefined) {
     },
     onMutate: async ({ person, isFavorite }) => {
       await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData<UserFavoritePerson[]>(queryKey) ?? [];
+      const previous =
+        queryClient.getQueryData<UserFavoritePerson[]>(queryKey) ?? [];
 
-      queryClient.setQueryData<UserFavoritePerson[]>(queryKey, (old = []) => (
+      queryClient.setQueryData<UserFavoritePerson[]>(queryKey, (old = []) =>
         isFavorite
           ? old.filter((item) => item.tmdbPersonId !== person.tmdbPersonId)
-          : [{ ...person, id: `temp-${person.tmdbPersonId}`, createdAt: new Date().toISOString() }, ...old]
-      ));
+          : [
+              {
+                ...person,
+                id: `temp-${person.tmdbPersonId}`,
+                createdAt: new Date().toISOString(),
+              },
+              ...old,
+            ],
+      );
 
       return { previous };
     },
@@ -51,7 +74,7 @@ export function useFavoritePeople(currentUserId: string | null | undefined) {
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey });
-      void queryClient.invalidateQueries({ queryKey: ['user-activity'] });
+      void queryClient.invalidateQueries({ queryKey: ["user-activity"] });
     },
   });
 

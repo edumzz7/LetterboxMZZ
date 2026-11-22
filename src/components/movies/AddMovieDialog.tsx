@@ -1,26 +1,32 @@
-import React, { useEffect, useRef, useState } from 'react';
-import * as Dialog from '@radix-ui/react-dialog';
-import { Edit3, Loader2, Plus, X } from 'lucide-react';
-import clsx from 'clsx';
-import { getMovieWatchProviders, searchMovies, type TMDBMovie } from '../../lib/tmdb';
-import type { PersonalMovie } from '../../types/app';
+import React, { useEffect, useRef, useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { Edit3, Loader2, Plus, X } from "lucide-react";
+import clsx from "clsx";
+import {
+  getMovieWatchProviders,
+  searchMovies,
+  type TMDBMovie,
+} from "../../service/tmdb";
+import type { PersonalMovie } from "../../types";
 
 type AddMovieDialogProps = {
-  mode?: 'personal';
-  onSubmit: (movie: Omit<PersonalMovie, 'id' | 'user_id' | 'created_at'>) => Promise<unknown>;
+  mode?: "personal";
+  onSubmit: (
+    movie: Omit<PersonalMovie, "id" | "user_id" | "created_at">,
+  ) => Promise<unknown>;
   isPending: boolean;
-  layout?: 'carousel' | 'grid';
-  defaultStatus?: 'watchlist' | 'watched';
+  layout?: "carousel" | "grid";
+  defaultStatus?: "watchlist" | "watched";
 };
 
 export default function AddMovieDialog(props: AddMovieDialogProps) {
-  const { onSubmit, isPending, layout = 'carousel' } = props;
-  const personalDefaultStatus = props.defaultStatus ?? 'watchlist';
+  const { onSubmit, isPending, layout = "carousel" } = props;
+  const personalDefaultStatus = props.defaultStatus ?? "watchlist";
   const [open, setOpen] = useState(false);
-  const [titulo, setTitulo] = useState('');
+  const [titulo, setTitulo] = useState("");
   const [ano, setAno] = useState(new Date().getFullYear().toString());
-  const [, setCategoria] = useState('');
-  const [capaUrl, setCapaUrl] = useState('');
+  const [, setCategoria] = useState("");
+  const [capaUrl, setCapaUrl] = useState("");
   const [searchResults, setSearchResults] = useState<TMDBMovie[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -34,21 +40,24 @@ export default function AddMovieDialog(props: AddMovieDialogProps) {
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setShowDropdown(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const resetForm = () => {
     setOpen(false);
-    setTitulo('');
+    setTitulo("");
     setAno(new Date().getFullYear().toString());
-    setCategoria('');
-    setCapaUrl('');
+    setCategoria("");
+    setCapaUrl("");
     setSearchResults([]);
     setShowDropdown(false);
     setIsPosterReadOnly(false);
@@ -85,7 +94,7 @@ export default function AddMovieDialog(props: AddMovieDialogProps) {
     setSelectedMovie(movie);
     setTitulo(movie.title);
     if (movie.release_date) {
-      setAno(movie.release_date.split('-')[0]);
+      setAno(movie.release_date.split("-")[0]);
     }
     if (movie.poster_path) {
       setCapaUrl(`https://image.tmdb.org/t/p/w500${movie.poster_path}`);
@@ -93,7 +102,7 @@ export default function AddMovieDialog(props: AddMovieDialogProps) {
     }
     setShowDropdown(false);
     void (async () => {
-      const providers = await getMovieWatchProviders(movie.id, 'BR');
+      const providers = await getMovieWatchProviders(movie.id, "BR");
       setStreamingData(JSON.stringify(providers));
     })();
   };
@@ -108,9 +117,9 @@ export default function AddMovieDialog(props: AddMovieDialogProps) {
         titulo,
         ano_lancamento: parseInt(ano, 10) || new Date().getFullYear(),
         capa_url: capaUrl.trim() || null,
-        plataforma_slug: 'stremio',
+        plataforma_slug: "stremio",
         status: personalDefaultStatus,
-        source: 'manual',
+        source: "manual",
         source_movie_id: selectedMovie ? String(selectedMovie.id) : null,
         rating: null,
         streaming_data: streamingData,
@@ -118,7 +127,9 @@ export default function AddMovieDialog(props: AddMovieDialogProps) {
       });
       resetForm();
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'Falha ao adicionar filme.');
+      setSubmitError(
+        error instanceof Error ? error.message : "Falha ao adicionar filme.",
+      );
     }
   };
 
@@ -127,13 +138,16 @@ export default function AddMovieDialog(props: AddMovieDialogProps) {
       <Dialog.Trigger asChild>
         <button
           className={clsx(
-            'flex items-center justify-center gap-2 border border-[#222] text-brand-gold-alt text-xs tracking-widest uppercase rounded-md hover:border-brand-gold hover:text-brand-gold transition-all bg-brand-bg group border-dashed',
-            layout === 'grid'
-              ? 'h-32 w-full min-w-0 flex-row md:min-h-[140px] md:h-auto md:aspect-[2/3] md:flex-col'
-              : 'px-4 py-2 min-h-[143px] w-[160px] md:w-[200px] shrink-0 snap-center',
+            "flex items-center justify-center gap-2 border border-[#222] text-brand-gold-alt text-xs tracking-widest uppercase rounded-md hover:border-brand-gold hover:text-brand-gold transition-all bg-brand-bg group border-dashed",
+            layout === "grid"
+              ? "h-32 w-full min-w-0 flex-row md:min-h-35 md:h-auto md:aspect-2/3 md:flex-col"
+              : "px-4 py-2 min-h-35.75 w-40 md:w-50 shrink-0 snap-center",
           )}
         >
-          <Plus size={20} className="group-hover:scale-110 transition-transform" />
+          <Plus
+            size={20}
+            className="group-hover:scale-110 transition-transform"
+          />
           <span>Add Filme</span>
         </button>
       </Dialog.Trigger>
@@ -152,7 +166,10 @@ export default function AddMovieDialog(props: AddMovieDialogProps) {
 
           <form onSubmit={handleSave} className="flex flex-col gap-4 mt-2">
             <div className="flex flex-col gap-2 relative" ref={dropdownRef}>
-              <label htmlFor="titulo" className="text-xs text-brand-text uppercase tracking-widest">
+              <label
+                htmlFor="titulo"
+                className="text-xs text-brand-text uppercase tracking-widest"
+              >
                 Titulo do Filme *
               </label>
               <div className="relative">
@@ -162,9 +179,10 @@ export default function AddMovieDialog(props: AddMovieDialogProps) {
                   value={titulo}
                   onChange={handleTitleChange}
                   onFocus={() => {
-                    if (titulo.trim() && searchResults.length > 0) setShowDropdown(true);
+                    if (titulo.trim() && searchResults.length > 0)
+                      setShowDropdown(true);
                   }}
-                  className="w-full bg-[#0a0f1e] border border-[#222] text-brand-text p-2.5 rounded focus:outline-none focus:border-brand-gold font-light pr-10"
+                  className="w-full bg-brand-card border border-[#222] text-brand-text p-2.5 rounded focus:outline-none focus:border-brand-gold font-light pr-10"
                   placeholder="Ex: Oppenheimer"
                   autoComplete="off"
                 />
@@ -176,7 +194,7 @@ export default function AddMovieDialog(props: AddMovieDialogProps) {
               </div>
 
               {showDropdown ? (
-                <div className="absolute top-[100%] left-0 w-full mt-1 bg-[#0a0f1e] border border-[#222] rounded-md shadow-[0_10px_30px_rgba(0,0,0,0.8)] z-50 max-h-60 overflow-y-auto">
+                <div className="absolute top-full left-0 w-full mt-1 bg-brand-card border border-[#222] rounded-md shadow-[0_10px_30px_rgba(0,0,0,0.8)] z-50 max-h-60 overflow-y-auto">
                   {isSearching && searchResults.length === 0 ? (
                     <div className="p-4 text-center text-sm text-brand-text-muted font-light">
                       Buscando no TMDB...
@@ -197,7 +215,9 @@ export default function AddMovieDialog(props: AddMovieDialogProps) {
                             />
                           ) : (
                             <div className="w-8 h-12 bg-black flex items-center justify-center rounded border border-[#222]">
-                              <span className="text-[10px] text-brand-text-muted">N/A</span>
+                              <span className="text-[10px] text-brand-text-muted">
+                                N/A
+                              </span>
                             </div>
                           )}
                           <div className="flex flex-col">
@@ -205,17 +225,21 @@ export default function AddMovieDialog(props: AddMovieDialogProps) {
                               {movie.title}
                             </span>
                             <span className="text-xs text-brand-gold-alt">
-                              {movie.release_date ? movie.release_date.split('-')[0] : 'N/D'}
+                              {movie.release_date
+                                ? movie.release_date.split("-")[0]
+                                : "N/D"}
                             </span>
                           </div>
                         </li>
                       ))}
                     </ul>
-                  ) : titulo.trim() !== '' && !isSearching ? (
+                  ) : titulo.trim() !== "" && !isSearching ? (
                     <div className="p-4 text-center text-sm text-brand-text-muted font-light leading-relaxed">
                       Nenhum filme encontrado no TMDB.
                       <br />
-                      <span className="opacity-60 text-xs">Voce pode preencher manualmente.</span>
+                      <span className="opacity-60 text-xs">
+                        Voce pode preencher manualmente.
+                      </span>
                     </div>
                   ) : null}
                 </div>
@@ -224,7 +248,10 @@ export default function AddMovieDialog(props: AddMovieDialogProps) {
 
             <div className="flex gap-4">
               <div className="flex flex-col gap-2 w-1/3">
-                <label htmlFor="ano" className="text-xs text-brand-text uppercase tracking-widest">
+                <label
+                  htmlFor="ano"
+                  className="text-xs text-brand-text uppercase tracking-widest"
+                >
                   Ano
                 </label>
                 <input
@@ -232,46 +259,48 @@ export default function AddMovieDialog(props: AddMovieDialogProps) {
                   type="number"
                   value={ano}
                   onChange={(event) => setAno(event.target.value)}
-                  className="w-full bg-[#0a0f1e] border border-[#222] text-brand-text p-2.5 rounded focus:outline-none focus:border-brand-gold font-light"
+                  className="w-full bg-brand-card border border-[#222] text-brand-text p-2.5 rounded focus:outline-none focus:border-brand-gold font-light"
                   placeholder="2026"
                 />
               </div>
-
             </div>
 
-            {personalDefaultStatus === 'watched' ? (
+            {personalDefaultStatus === "watched" ? (
               <div className="flex flex-col gap-2">
                 <label className="text-xs text-brand-text uppercase tracking-widest">
                   Quando voce assistiu?
                 </label>
                 <div className="flex gap-4">
                   <label className="flex items-center gap-2 cursor-pointer text-sm font-light text-brand-text hover:text-brand-gold transition-colors">
-                    <input 
-                      type="radio" 
+                    <input
+                      type="radio"
                       name="retroactive"
-                      checked={!isRetroactive} 
-                      onChange={() => setIsRetroactive(false)} 
-                      className="accent-brand-gold" 
+                      checked={!isRetroactive}
+                      onChange={() => setIsRetroactive(false)}
+                      className="accent-brand-gold"
                     />
                     Recentemente (Ganha pontos)
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer text-sm font-light text-brand-text hover:text-brand-gold transition-colors">
-                    <input 
-                      type="radio" 
+                    <input
+                      type="radio"
                       name="retroactive"
-                      checked={isRetroactive} 
-                      onChange={() => setIsRetroactive(true)} 
-                      className="accent-brand-gold" 
+                      checked={isRetroactive}
+                      onChange={() => setIsRetroactive(true)}
+                      className="accent-brand-gold"
                     />
                     Há mais tempo (Sem pontos)
                   </label>
                 </div>
               </div>
             ) : null}
-            
+
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <label htmlFor="capa" className="text-xs text-brand-text uppercase tracking-widest">
+                <label
+                  htmlFor="capa"
+                  className="text-xs text-brand-text uppercase tracking-widest"
+                >
                   URL do poster
                 </label>
                 {isPosterReadOnly ? (
@@ -291,10 +320,10 @@ export default function AddMovieDialog(props: AddMovieDialogProps) {
                 onChange={(event) => setCapaUrl(event.target.value)}
                 readOnly={isPosterReadOnly}
                 className={clsx(
-                  'w-full border p-2.5 rounded focus:outline-none font-light text-sm transition-colors',
+                  "w-full border p-2.5 rounded focus:outline-none font-light text-sm transition-colors",
                   isPosterReadOnly
-                    ? 'bg-black/50 border-[#111] text-brand-text-muted cursor-not-allowed select-none'
-                    : 'bg-[#0a0f1e] border-[#222] text-brand-text focus:border-brand-gold',
+                    ? "bg-black/50 border-[#111] text-brand-text-muted cursor-not-allowed select-none"
+                    : "bg-brand-card border-[#222] text-brand-text focus:border-brand-gold",
                 )}
                 placeholder="https://..."
               />

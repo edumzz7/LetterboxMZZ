@@ -1,15 +1,18 @@
-import { useState, useEffect } from 'react';
-import * as Dialog from '@radix-ui/react-dialog';
-import { X } from 'lucide-react';
-import { Skeleton } from './LoadingSkeleton';
-import { getMovieDetailsWithFallback, getTvDetailsRawWithFallback } from '../../lib/tmdb';
+import { useState, useEffect } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { X } from "lucide-react";
+import { Skeleton } from "./LoadingSkeleton";
+import {
+  getMovieDetailsWithFallback,
+  getTvDetailsRawWithFallback,
+} from "../../service/tmdb";
 
 interface SynopsisModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
   movieId: number | null;
-  mediaType?: 'movie' | 'tv';
+  mediaType?: "movie" | "tv";
 }
 
 export default function SynopsisModal({
@@ -17,7 +20,7 @@ export default function SynopsisModal({
   onOpenChange,
   title,
   movieId,
-  mediaType = 'movie',
+  mediaType = "movie",
 }: SynopsisModalProps) {
   const [synopsis, setSynopsis] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -30,7 +33,7 @@ export default function SynopsisModal({
 
     const loadSynopsis = async () => {
       if (!movieId) {
-        setSynopsis('Sinopse não disponível para este título.');
+        setSynopsis("Sinopse não disponível para este título.");
         return;
       }
 
@@ -38,16 +41,19 @@ export default function SynopsisModal({
       setError(null);
 
       try {
-        const data = mediaType === 'tv'
-          ? await getTvDetailsRawWithFallback(movieId)
-          : await getMovieDetailsWithFallback(movieId);
+        const data =
+          mediaType === "tv"
+            ? await getTvDetailsRawWithFallback(movieId)
+            : await getMovieDetailsWithFallback(movieId);
 
         if (!cancelled) {
-          setSynopsis(data?.overview || 'Sinopse não disponível para este título.');
+          setSynopsis(
+            data?.overview || "Sinopse não disponível para este título.",
+          );
         }
       } catch {
         if (!cancelled) {
-          setError('Falha ao carregar a sinopse.');
+          setError("Falha ao carregar a sinopse.");
         }
       } finally {
         if (!cancelled) {
@@ -68,7 +74,6 @@ export default function SynopsisModal({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40" />
         <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-[92vw] max-w-md translate-x-[-50%] translate-y-[-50%] border border-brand-gold/10 bg-[#050811] p-6 shadow-2xl rounded-2xl focus:outline-none flex flex-col max-h-[80vh]">
-          
           <div className="flex justify-between items-start mb-4">
             <Dialog.Title className="text-lg font-light text-brand-gold tracking-wide pr-6">
               Sinopse: {title}
@@ -83,7 +88,16 @@ export default function SynopsisModal({
 
           <div className="flex-1 overflow-y-auto pr-2">
             {isLoading ? (
-              <div role="status" aria-label="Carregando sinopse" className="space-y-2 py-3"><Skeleton className="h-3 w-full" /><Skeleton className="h-3 w-full" /><Skeleton className="h-3 w-4/5" /><Skeleton className="h-3 w-2/3" /></div>
+              <div
+                role="status"
+                aria-label="Carregando sinopse"
+                className="space-y-2 py-3"
+              >
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-4/5" />
+                <Skeleton className="h-3 w-2/3" />
+              </div>
             ) : error ? (
               <p className="text-sm text-red-400">{error}</p>
             ) : (
@@ -92,7 +106,6 @@ export default function SynopsisModal({
               </p>
             )}
           </div>
-
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

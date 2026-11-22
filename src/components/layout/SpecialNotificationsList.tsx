@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
-import clsx from 'clsx';
-import { useLocation } from 'wouter';
-import type { SpecialNotification } from '../../types/app';
+import { useMemo } from "react";
+import clsx from "clsx";
+import { useLocation } from "wouter";
+import type { SpecialNotification } from "../../types";
+import { formatTimestamp } from "../../utils/datetime";
 
 interface SpecialNotificationsListProps {
   notifications: SpecialNotification[];
@@ -9,18 +10,7 @@ interface SpecialNotificationsListProps {
   onMarkRead: (id: string) => void;
   onMarkAllRead: () => void;
   onNavigate?: () => void;
-  variant?: 'popover' | 'page';
-}
-
-function formatTimestamp(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return new Intl.DateTimeFormat('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
+  variant?: "popover" | "page";
 }
 
 const MAX_READ_NOTIFICATIONS = 3;
@@ -30,11 +20,17 @@ function visibleNotifications(notifications: SpecialNotification[]) {
   const recentReadIds = new Set(
     notifications
       .filter((notification) => notification.readAt)
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      )
       .slice(0, MAX_READ_NOTIFICATIONS)
       .map((notification) => notification.id),
   );
-  return notifications.filter((notification) => !notification.readAt || recentReadIds.has(notification.id));
+  return notifications.filter(
+    (notification) =>
+      !notification.readAt || recentReadIds.has(notification.id),
+  );
 }
 
 /** Actionable notifications (group invites, requests...) that lead to a page of the app. */
@@ -44,10 +40,13 @@ export default function SpecialNotificationsList({
   onMarkRead,
   onMarkAllRead,
   onNavigate,
-  variant = 'popover',
+  variant = "popover",
 }: SpecialNotificationsListProps) {
   const [, setLocation] = useLocation();
-  const visible = useMemo(() => visibleNotifications(notifications), [notifications]);
+  const visible = useMemo(
+    () => visibleNotifications(notifications),
+    [notifications],
+  );
 
   if (visible.length === 0) return null;
 
@@ -55,11 +54,15 @@ export default function SpecialNotificationsList({
     <section aria-label="Notificações">
       <div
         className={clsx(
-          'flex items-center justify-between gap-3',
-          variant === 'popover' ? 'border-b border-[#161616] px-4 py-3' : 'pt-5 pb-2',
+          "flex items-center justify-between gap-3",
+          variant === "popover"
+            ? "border-b border-[#161616] px-4 py-3"
+            : "pt-5 pb-2",
         )}
       >
-        <span className="text-xs uppercase tracking-[0.18em] text-brand-gold-alt">Notificações</span>
+        <span className="text-xs uppercase tracking-[0.18em] text-brand-gold-alt">
+          Notificações
+        </span>
         {unreadCount > 0 && (
           <button
             type="button"
@@ -70,7 +73,13 @@ export default function SpecialNotificationsList({
           </button>
         )}
       </div>
-      <ul className={variant === 'popover' ? 'border-b border-[#161616]' : 'divide-y divide-white/5'}>
+      <ul
+        className={
+          variant === "popover"
+            ? "border-b border-[#161616]"
+            : "divide-y divide-white/5"
+        }
+      >
         {visible.map((notification) => {
           const isUnread = !notification.readAt;
           return (
@@ -85,19 +94,24 @@ export default function SpecialNotificationsList({
                   }
                 }}
                 className={clsx(
-                  'flex w-full items-start gap-3 text-left transition hover:bg-white/5',
-                  variant === 'popover' ? 'px-4 py-3' : 'rounded-xl px-1 py-4',
+                  "flex w-full items-start gap-3 text-left transition hover:bg-white/5",
+                  variant === "popover" ? "px-4 py-3" : "rounded-xl px-1 py-4",
                 )}
               >
                 <span
                   aria-hidden
                   className={clsx(
-                    'mt-1.5 h-2 w-2 shrink-0 rounded-full',
-                    isUnread ? 'bg-brand-gold' : 'bg-transparent',
+                    "mt-1.5 h-2 w-2 shrink-0 rounded-full",
+                    isUnread ? "bg-brand-gold" : "bg-transparent",
                   )}
                 />
                 <span className="min-w-0 flex-1">
-                  <span className={clsx('block text-sm leading-relaxed', isUnread ? 'text-brand-text' : 'text-brand-text-muted')}>
+                  <span
+                    className={clsx(
+                      "block text-sm leading-relaxed",
+                      isUnread ? "text-brand-text" : "text-brand-text-muted",
+                    )}
+                  >
                     {notification.message}
                     {isUnread && <span className="sr-only"> (não lida)</span>}
                   </span>

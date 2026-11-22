@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
-import clsx from 'clsx';
-import AvatarDisplay from '../layout/AvatarDisplay';
-import { useUsers } from '../../hooks/useUsers';
+import { useMemo, useState } from "react";
+import clsx from "clsx";
+import AvatarDisplay from "../layout/AvatarDisplay";
+import { useUsers } from "../../hooks/useUsers";
 
 export const MIN_SUGGESTION_CHARS = 3;
 const MAX_SUGGESTIONS = 6;
@@ -15,12 +15,17 @@ interface InviteUserInputProps {
 }
 
 /** "@usuario" field that suggests users from 3 typed characters, like the main search. */
-export default function InviteUserInput({ value, onChange, excludedUserIds, disabled }: InviteUserInputProps) {
+export default function InviteUserInput({
+  value,
+  onChange,
+  excludedUserIds,
+  disabled,
+}: InviteUserInputProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const usersQuery = useUsers(true);
 
-  const term = value.trim().replace(/^@/, '').toLowerCase();
+  const term = value.trim().replace(/^@/, "").toLowerCase();
   const suggestions = useMemo(() => {
     if (term.length < MIN_SUGGESTION_CHARS) return [];
     const excluded = new Set(excludedUserIds);
@@ -28,7 +33,8 @@ export default function InviteUserInput({ value, onChange, excludedUserIds, disa
       .filter(
         (user) =>
           !excluded.has(user.id) &&
-          (user.username.toLowerCase().includes(term) || user.display_name?.toLowerCase().includes(term)),
+          (user.username.toLowerCase().includes(term) ||
+            user.display_name?.toLowerCase().includes(term)),
       )
       .slice(0, MAX_SUGGESTIONS);
   }, [excludedUserIds, term, usersQuery.data]);
@@ -43,17 +49,19 @@ export default function InviteUserInput({ value, onChange, excludedUserIds, disa
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (!showList) return;
-    if (event.key === 'ArrowDown') {
+    if (event.key === "ArrowDown") {
       event.preventDefault();
       setActiveIndex((index) => (index + 1) % suggestions.length);
-    } else if (event.key === 'ArrowUp') {
+    } else if (event.key === "ArrowUp") {
       event.preventDefault();
-      setActiveIndex((index) => (index <= 0 ? suggestions.length - 1 : index - 1));
-    } else if (event.key === 'Enter' && activeIndex >= 0) {
+      setActiveIndex((index) =>
+        index <= 0 ? suggestions.length - 1 : index - 1,
+      );
+    } else if (event.key === "Enter" && activeIndex >= 0) {
       // Enter picks the highlighted suggestion instead of submitting the form.
       event.preventDefault();
       select(suggestions[activeIndex].username);
-    } else if (event.key === 'Escape') {
+    } else if (event.key === "Escape") {
       setIsOpen(false);
     }
   };
@@ -78,7 +86,9 @@ export default function InviteUserInput({ value, onChange, excludedUserIds, disa
         aria-expanded={showList}
         aria-controls="group-invite-suggestions"
         aria-autocomplete="list"
-        aria-activedescendant={activeIndex >= 0 ? `group-invite-option-${activeIndex}` : undefined}
+        aria-activedescendant={
+          activeIndex >= 0 ? `group-invite-option-${activeIndex}` : undefined
+        }
         className="w-full rounded-2xl border border-[#222] bg-[#090d18] px-4 py-2.5 text-sm text-brand-text placeholder:text-brand-text-muted/60 focus:border-brand-gold focus:outline-none disabled:opacity-50"
       />
       {showList && (
@@ -100,13 +110,17 @@ export default function InviteUserInput({ value, onChange, excludedUserIds, disa
                 select(user.username);
               }}
               className={clsx(
-                'flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 transition',
-                index === activeIndex ? 'bg-brand-gold/10' : 'hover:bg-white/5',
+                "flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 transition",
+                index === activeIndex ? "bg-brand-gold/10" : "hover:bg-white/5",
               )}
             >
-              <AvatarDisplay avatarId={user.avatar_id} className="h-7 w-7" emojiClassName="text-sm" />
+              <AvatarDisplay
+                avatarId={user.avatar_id}
+                className="h-7 w-7"
+                emojiClassName="text-sm"
+              />
               <span className="min-w-0 truncate text-xs text-brand-text">
-                {user.display_name || user.username}{' '}
+                {user.display_name || user.username}{" "}
                 <span className="text-brand-text-muted">@{user.username}</span>
               </span>
             </li>

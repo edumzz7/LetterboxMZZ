@@ -11,7 +11,7 @@ export const MIN_REVIEW_LENGTH = 25;
  * - Substitui múltiplos espaços por um único espaço
  */
 export function sanitizeReviewText(text: string): string {
-  return text.trim().replace(/\s+/g, ' ');
+  return text.trim().replace(/\s+/g, " ");
 }
 
 /**
@@ -19,7 +19,9 @@ export function sanitizeReviewText(text: string): string {
  * @param text - Texto da review
  * @returns Mensagem de erro ou null se válido
  */
-export function validateReviewText(text: string | null | undefined): string | null {
+export function validateReviewText(
+  text: string | null | undefined,
+): string | null {
   // Review é opcional
   if (!text) return null;
 
@@ -40,7 +42,8 @@ export function validateReviewText(text: string | null | undefined): string | nu
  * @returns Horas restantes (0 se expirado)
  */
 export function getReviewDeadlineHours(watchedAt: Date | string): number {
-  const watchedDate = typeof watchedAt === 'string' ? new Date(watchedAt) : watchedAt;
+  const watchedDate =
+    typeof watchedAt === "string" ? new Date(watchedAt) : watchedAt;
   const now = new Date();
 
   let hoursElapsed = (now.getTime() - watchedDate.getTime()) / (1000 * 60 * 60);
@@ -68,7 +71,9 @@ export function canEarnPointsForReview(watchedAt: Date | string): boolean {
  * @param watchedAt - Data em que o conteúdo foi assistido
  * @returns Mensagem formatada ou null se expirado
  */
-export function getReviewDeadlineMessage(watchedAt: Date | string): string | null {
+export function getReviewDeadlineMessage(
+  watchedAt: Date | string,
+): string | null {
   const hoursRemaining = getReviewDeadlineHours(watchedAt);
 
   if (hoursRemaining === 0) {
@@ -77,7 +82,7 @@ export function getReviewDeadlineMessage(watchedAt: Date | string): string | nul
 
   if (hoursRemaining < 1) {
     const minutesRemaining = Math.floor(hoursRemaining * 60);
-    return `${minutesRemaining} minuto${minutesRemaining !== 1 ? 's' : ''} restante${minutesRemaining !== 1 ? 's' : ''} para pontuar`;
+    return `${minutesRemaining} minuto${minutesRemaining !== 1 ? "s" : ""} restante${minutesRemaining !== 1 ? "s" : ""} para pontuar`;
   }
 
   if (hoursRemaining < 24) {

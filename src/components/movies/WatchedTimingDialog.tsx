@@ -1,12 +1,12 @@
-import { useState } from 'react';
-import * as Dialog from '@radix-ui/react-dialog';
-import { Clock3, Loader2, X } from 'lucide-react';
+import { useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { Clock3, Loader2, X } from "lucide-react";
 
 interface WatchedTimingDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   mediaTitle: string;
-  mediaType?: 'movie' | 'series';
+  mediaType?: "movie" | "series";
   isPending: boolean;
   onConfirm: (isRetroactive: boolean) => Promise<void>;
 }
@@ -15,7 +15,7 @@ export default function WatchedTimingDialog({
   open,
   onOpenChange,
   mediaTitle,
-  mediaType = 'movie',
+  mediaType = "movie",
   isPending,
   onConfirm,
 }: WatchedTimingDialogProps) {
@@ -28,7 +28,11 @@ export default function WatchedTimingDialog({
       await onConfirm(isRetroactive);
       onOpenChange(false);
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'Falha ao marcar mídia como vista.');
+      setSubmitError(
+        error instanceof Error
+          ? error.message
+          : "Falha ao marcar mídia como vista.",
+      );
     }
   };
 
@@ -39,10 +43,12 @@ export default function WatchedTimingDialog({
         <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-[92vw] max-w-sm translate-x-[-50%] translate-y-[-50%] rounded-xl border border-[#222] bg-brand-bg p-6 shadow-lg">
           <div className="flex flex-col gap-2 text-center">
             <Dialog.Title className="flex items-center justify-center gap-2 text-lg font-light tracking-wider text-brand-gold">
-              <Clock3 size={18} /> {mediaType === 'series' ? 'SÉRIE VISTA' : 'FILME VISTO'}
+              <Clock3 size={18} />{" "}
+              {mediaType === "series" ? "SÉRIE VISTA" : "FILME VISTO"}
             </Dialog.Title>
             <Dialog.Description className="text-sm font-light text-brand-text-muted">
-              Quando você assistiu a <span className="text-brand-text">{mediaTitle}</span>?
+              Quando você assistiu a{" "}
+              <span className="text-brand-text">{mediaTitle}</span>?
             </Dialog.Description>
           </div>
 
@@ -53,7 +59,11 @@ export default function WatchedTimingDialog({
               onClick={() => void handleConfirm(false)}
               className="rounded-xl border border-brand-gold bg-brand-gold px-4 py-3 text-xs font-semibold uppercase tracking-widest text-brand-bg transition hover:bg-opacity-90 disabled:pointer-events-none disabled:opacity-50"
             >
-              {isPending ? <Loader2 size={15} className="mx-auto animate-spin" /> : 'Visto recentemente (Ganha pontos)'}
+              {isPending ? (
+                <Loader2 size={15} className="mx-auto animate-spin" />
+              ) : (
+                "Visto recentemente (Ganha pontos)"
+              )}
             </button>
             <button
               type="button"

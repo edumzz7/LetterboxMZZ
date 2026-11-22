@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import * as Dialog from '@radix-ui/react-dialog';
-import { Loader2, Users, X } from 'lucide-react';
+import { useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { Loader2, Users, X } from "lucide-react";
 
 const NAME_MIN = 3;
 const NAME_MAX = 50;
@@ -9,7 +9,7 @@ const DESCRIPTION_MAX = 280;
 interface GroupFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  mode: 'create' | 'edit';
+  mode: "create" | "edit";
   initialName?: string;
   initialDescription?: string | null;
   onSubmit: (values: { name: string; description: string }) => Promise<unknown>;
@@ -19,25 +19,25 @@ export default function GroupFormDialog({
   open,
   onOpenChange,
   mode,
-  initialName = '',
-  initialDescription = '',
+  initialName = "",
+  initialDescription = "",
   onSubmit,
 }: GroupFormDialogProps) {
   const [name, setName] = useState(initialName);
-  const [description, setDescription] = useState(initialDescription ?? '');
+  const [description, setDescription] = useState(initialDescription ?? "");
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (nextOpen) {
       setName(initialName);
-      setDescription(initialDescription ?? '');
+      setDescription(initialDescription ?? "");
     }
     setError(null);
     onOpenChange(nextOpen);
   };
 
-  const trimmedName = name.trim().replace(/\s+/g, ' ');
+  const trimmedName = name.trim().replace(/\s+/g, " ");
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -51,13 +51,15 @@ export default function GroupFormDialog({
       await onSubmit({ name: trimmedName, description: description.trim() });
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Não foi possível salvar o grupo.');
+      setError(
+        err instanceof Error ? err.message : "Não foi possível salvar o grupo.",
+      );
     } finally {
       setIsPending(false);
     }
   };
 
-  const title = mode === 'create' ? 'Criar grupo' : 'Editar grupo';
+  const title = mode === "create" ? "Criar grupo" : "Editar grupo";
 
   return (
     <Dialog.Root open={open} onOpenChange={handleOpenChange}>
@@ -70,9 +72,9 @@ export default function GroupFormDialog({
                 <Users size={16} /> {title}
               </Dialog.Title>
               <Dialog.Description className="mt-1 text-sm text-brand-text-muted">
-                {mode === 'create'
-                  ? 'Um ranking mensal só entre você e seus amigos.'
-                  : 'Atualize o nome e a descrição do grupo.'}
+                {mode === "create"
+                  ? "Um ranking mensal só entre você e seus amigos."
+                  : "Atualize o nome e a descrição do grupo."}
               </Dialog.Description>
             </div>
             <Dialog.Close
@@ -87,7 +89,9 @@ export default function GroupFormDialog({
             <label className="flex flex-col gap-1.5">
               <span className="flex items-center justify-between text-xs uppercase tracking-[0.25em] text-brand-text-muted">
                 Nome
-                <span className="tracking-normal">{trimmedName.length}/{NAME_MAX}</span>
+                <span className="tracking-normal">
+                  {trimmedName.length}/{NAME_MAX}
+                </span>
               </span>
               <input
                 value={name}
@@ -103,7 +107,9 @@ export default function GroupFormDialog({
             <label className="flex flex-col gap-1.5">
               <span className="flex items-center justify-between text-xs uppercase tracking-[0.25em] text-brand-text-muted">
                 Descrição
-                <span className="tracking-normal">{description.length}/{DESCRIPTION_MAX}</span>
+                <span className="tracking-normal">
+                  {description.length}/{DESCRIPTION_MAX}
+                </span>
               </span>
               <textarea
                 value={description}
@@ -116,7 +122,10 @@ export default function GroupFormDialog({
             </label>
 
             {error && (
-              <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+              <p
+                role="alert"
+                className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300"
+              >
                 {error}
               </p>
             )}
@@ -131,7 +140,7 @@ export default function GroupFormDialog({
                 className="inline-flex items-center gap-2 rounded-xl bg-brand-gold px-5 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-brand-bg transition hover:opacity-90 active:scale-95 disabled:pointer-events-none disabled:opacity-50"
               >
                 {isPending && <Loader2 size={14} className="animate-spin" />}
-                {mode === 'create' ? 'Criar' : 'Salvar'}
+                {mode === "create" ? "Criar" : "Salvar"}
               </button>
             </div>
           </form>

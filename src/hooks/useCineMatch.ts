@@ -1,6 +1,6 @@
-import { useMutation } from '@tanstack/react-query';
-import { getCineMatchSuggestion } from '../lib/appData';
-import type { CineMatchMode } from '../types/app';
+import { useMutation } from "@tanstack/react-query";
+import { getCineMatchSuggestion } from "../service/appData";
+import type { CineMatchMode } from "../types";
 
 export function useCineMatch() {
   return useMutation({

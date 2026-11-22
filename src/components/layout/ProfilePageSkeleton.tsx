@@ -1,5 +1,10 @@
 function SkeletonBlock({ className }: { className: string }) {
-  return <div aria-hidden="true" className={`animate-pulse rounded bg-[#151b28] ${className}`} />;
+  return (
+    <div
+      aria-hidden="true"
+      className={`animate-pulse rounded bg-[#151b28] ${className}`}
+    />
+  );
 }
 
 export default function ProfilePageSkeleton() {
@@ -36,7 +41,10 @@ export default function ProfilePageSkeleton() {
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3, 4, 5, 6].map((item) => (
-            <div key={item} className="rounded-2xl border border-[#151b28] bg-[#0b0f17] p-5">
+            <div
+              key={item}
+              className="rounded-2xl border border-[#151b28] bg-[#0b0f17] p-5"
+            >
               <SkeletonBlock className="h-3 w-24" />
               <SkeletonBlock className="mt-4 h-7 w-36" />
               <SkeletonBlock className="mt-3 h-3 w-full" />

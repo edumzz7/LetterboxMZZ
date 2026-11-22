@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import * as Dialog from '@radix-ui/react-dialog';
-import { Loader2 } from 'lucide-react';
+import { useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { Loader2 } from "lucide-react";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -30,7 +30,11 @@ export default function ConfirmDialog({
       await onConfirm();
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Não foi possível concluir a ação.');
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível concluir a ação.",
+      );
     } finally {
       setIsPending(false);
     }
@@ -54,7 +58,10 @@ export default function ConfirmDialog({
             {description}
           </Dialog.Description>
           {error && (
-            <p role="alert" className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+            <p
+              role="alert"
+              className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300"
+            >
               {error}
             </p>
           )}

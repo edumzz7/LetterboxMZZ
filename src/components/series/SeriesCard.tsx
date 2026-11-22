@@ -1,14 +1,25 @@
-import { useEffect, useRef, useState } from 'react';
-import * as Dialog from '@radix-ui/react-dialog';
-import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { Eye, EyeOff, Loader2, Trash2, Tv, X, Pencil, MessageSquare, MoreVertical, BookOpen } from 'lucide-react';
-import { useLocation } from 'wouter';
-import ReviewModal from '../ui/ReviewModal';
-import SynopsisModal from '../ui/SynopsisModal';
-import clsx from 'clsx';
-import { generateImagePath } from '../../lib/imageUtils';
-import TmdbImage from '../ui/TmdbImage';
-import type { Series } from '../../hooks/useSeries';
+import { useEffect, useRef, useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import {
+  Eye,
+  EyeOff,
+  Loader2,
+  Trash2,
+  Tv,
+  X,
+  Pencil,
+  MessageSquare,
+  MoreVertical,
+  BookOpen,
+} from "lucide-react";
+import { useLocation } from "wouter";
+import ReviewModal from "../ui/ReviewModal";
+import SynopsisModal from "../ui/SynopsisModal";
+import clsx from "clsx";
+import { generateImagePath } from "../../utils/image";
+import TmdbImage from "../ui/TmdbImage";
+import type { Series } from "../../hooks/useSeries";
 import {
   getTvDetails,
   getTvSeasonEpisodes,
@@ -16,9 +27,9 @@ import {
   searchSeries,
   type TMDBSeasonEpisode,
   type TMDBTvSeasonMeta,
-} from '../../lib/tmdb';
-import { updateSeriesStreaming } from '../../lib/appData';
-import StarRatingInput from '../ui/StarRatingInput';
+} from "../../service/tmdb";
+import { updateSeriesStreaming } from "../../service/appData";
+import StarRatingInput from "../ui/StarRatingInput";
 
 interface SeriesCardProps {
   series: Series;
@@ -29,11 +40,15 @@ interface SeriesCardProps {
     episodios_vistos?: number;
     temporada?: number;
     total_episodios?: number;
-    status?: 'watchlist' | 'watching' | 'watched';
+    status?: "watchlist" | "watching" | "watched";
     plataforma_slug?: string;
   }) => Promise<unknown>;
   onDelete: (id: string) => void;
-  onRate: (seriesId: string, stars: number, review?: string | null) => Promise<unknown>;
+  onRate: (
+    seriesId: string,
+    stars: number,
+    review?: string | null,
+  ) => Promise<unknown>;
 }
 
 export default function SeriesCard({
@@ -67,21 +82,35 @@ export default function SeriesCard({
 
   const [open, setOpen] = useState(false);
   const [localEps, setLocalEps] = useState(series.episodios_vistos.toString());
-  const [localTemporada, setLocalTemporada] = useState((series.temporada || 1).toString());
-  const [localTotalEps, setLocalTotalEps] = useState((series.total_episodios || 0).toString());
+  const [localTemporada, setLocalTemporada] = useState(
+    (series.temporada || 1).toString(),
+  );
+  const [localTotalEps, setLocalTotalEps] = useState(
+    (series.total_episodios || 0).toString(),
+  );
   const [showProviders, setShowProviders] = useState(false);
   const [providersLoading, setProvidersLoading] = useState(false);
-  const [providers, setProviders] = useState<Array<{ provider_id?: number; provider_name?: string; logo_path?: string | null }>>([]);
+  const [providers, setProviders] = useState<
+    Array<{
+      provider_id?: number;
+      provider_name?: string;
+      logo_path?: string | null;
+    }>
+  >([]);
   const [tmdbSeriesId, setTmdbSeriesId] = useState<number | null>(null);
   const [seasonMeta, setSeasonMeta] = useState<TMDBTvSeasonMeta[]>([]);
   const [seasonEpisodes, setSeasonEpisodes] = useState<TMDBSeasonEpisode[]>([]);
   const [episodesLoading, setEpisodesLoading] = useState(false);
-  const [episodesCache, setEpisodesCache] = useState<Record<number, TMDBSeasonEpisode[]>>({});
+  const [episodesCache, setEpisodesCache] = useState<
+    Record<number, TMDBSeasonEpisode[]>
+  >({});
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [ratingPending, setRatingPending] = useState<number | null>(null);
   const [ratingError, setRatingError] = useState<string | null>(null);
-  const [localRating, setLocalRating] = useState(Number(series.rating ?? series.avaliacao) || 0);
+  const [localRating, setLocalRating] = useState(
+    Number(series.rating ?? series.avaliacao) || 0,
+  );
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [pendingRating, setPendingRating] = useState<number>(localRating);
   const [synopsisModalOpen, setSynopsisModalOpen] = useState(false);
@@ -108,7 +137,10 @@ export default function SeriesCard({
     setLocalTotalEps((series.total_episodios || 0).toString());
   };
 
-  const loadSeasonEpisodes = async (seriesId: number, seasonNumberArg: number | string) => {
+  const loadSeasonEpisodes = async (
+    seriesId: number,
+    seasonNumberArg: number | string,
+  ) => {
     const seasonNumber = Number(seasonNumberArg);
     if (episodesCache[seasonNumber]) {
       setSeasonEpisodes(episodesCache[seasonNumber]);
@@ -143,7 +175,9 @@ export default function SeriesCard({
       const details = await getTvDetails(currentId);
       if (details) {
         setSeasonMeta(details.seasons);
-        const activeSeason = details.seasons.find((item) => Number(item.season_number) === seasonNumber);
+        const activeSeason = details.seasons.find(
+          (item) => Number(item.season_number) === seasonNumber,
+        );
         if (activeSeason?.episode_count && activeSeason.episode_count > 0) {
           setLocalTotalEps(String(activeSeason.episode_count));
         }
@@ -155,7 +189,9 @@ export default function SeriesCard({
 
   const limit = parseInt(localTotalEps, 10) || 1;
   const progressPercent =
-    limit > 0 ? Math.min(100, Math.round((series.episodios_vistos / limit) * 100)) : 0;
+    limit > 0
+      ? Math.min(100, Math.round((series.episodios_vistos / limit) * 100))
+      : 0;
 
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -163,7 +199,11 @@ export default function SeriesCard({
     const temporada = parseInt(localTemporada, 10);
     const totalEpisodios = parseInt(localTotalEps, 10);
 
-    if (Number.isNaN(episodiosVistos) || Number.isNaN(temporada) || Number.isNaN(totalEpisodios)) {
+    if (
+      Number.isNaN(episodiosVistos) ||
+      Number.isNaN(temporada) ||
+      Number.isNaN(totalEpisodios)
+    ) {
       return;
     }
 
@@ -175,15 +215,15 @@ export default function SeriesCard({
         .sort((a, b) => a.season_number - b.season_number);
       const lastSeason = regularSeasons[regularSeasons.length - 1];
       const completedEntireSeries = Boolean(
-        lastSeason
-        && temporada === lastSeason.season_number
-        && episodiosVistos >= totalEpisodios,
+        lastSeason &&
+        temporada === lastSeason.season_number &&
+        episodiosVistos >= totalEpisodios,
       );
       const status = completedEntireSeries
-        ? 'watched'
-        : episodiosVistos > 0 || series.status !== 'watchlist'
-          ? 'watching'
-          : 'watchlist';
+        ? "watched"
+        : episodiosVistos > 0 || series.status !== "watchlist"
+          ? "watching"
+          : "watchlist";
 
       await onSaveProgress({
         id: series.id,
@@ -194,7 +234,9 @@ export default function SeriesCard({
       });
       setOpen(false);
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : 'Falha ao salvar progresso.');
+      setSaveError(
+        error instanceof Error ? error.message : "Falha ao salvar progresso.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -203,12 +245,12 @@ export default function SeriesCard({
   const toggleStatus = async (event?: React.MouseEvent | Event) => {
     if (event) {
       event.preventDefault();
-      if ('stopPropagation' in event) event.stopPropagation();
+      if ("stopPropagation" in event) event.stopPropagation();
     }
     if (!canEdit) return;
-    const nextStatus = series.status === 'watched' ? 'watchlist' : 'watched';
+    const nextStatus = series.status === "watched" ? "watchlist" : "watched";
 
-    if (nextStatus === 'watchlist') {
+    if (nextStatus === "watchlist") {
       await onSaveProgress({
         id: series.id,
         status: nextStatus,
@@ -238,7 +280,10 @@ export default function SeriesCard({
       .sort((a, b) => a.season_number - b.season_number);
     const lastSeason = regularSeasons[regularSeasons.length - 1];
     const temporada = lastSeason?.season_number || series.temporada || 1;
-    const totalEpisodios = Math.max(lastSeason?.episode_count || series.total_episodios, 1);
+    const totalEpisodios = Math.max(
+      lastSeason?.episode_count || series.total_episodios,
+      1,
+    );
 
     await onSaveProgress({
       id: series.id,
@@ -252,7 +297,7 @@ export default function SeriesCard({
   const handleDelete = (event?: React.MouseEvent | Event) => {
     if (event) {
       event.preventDefault();
-      if ('stopPropagation' in event) event.stopPropagation();
+      if ("stopPropagation" in event) event.stopPropagation();
     }
     if (!canEdit) return;
     if (confirm(`Deseja remover a serie "${series.titulo}"?`)) {
@@ -261,12 +306,10 @@ export default function SeriesCard({
   };
 
   const imageSrc = generateImagePath(series.titulo, series.capa_url);
-  const isWatched = series.status === 'watched';
+  const isWatched = series.status === "watched";
   const isFriendCard = series.user_id !== currentUserId;
   const canRate = canEdit && !isFriendCard && isWatched;
   const showRating = isWatched && (canRate || localRating > 0);
-
-
 
   useEffect(() => {
     if (series.total_episodios > 0 || !series.source_movie_id) return;
@@ -286,7 +329,9 @@ export default function SeriesCard({
       setSeasonMeta(details.seasons);
     };
     void fetchTotal();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [series.source_movie_id, series.total_episodios, series.temporada]);
 
   useEffect(() => {
@@ -308,12 +353,15 @@ export default function SeriesCard({
 
   useEffect(() => {
     const onClickOutside = (event: MouseEvent) => {
-      if (providersRef.current && !providersRef.current.contains(event.target as Node)) {
+      if (
+        providersRef.current &&
+        !providersRef.current.contains(event.target as Node)
+      ) {
         setShowProviders(false);
       }
     };
-    document.addEventListener('mousedown', onClickOutside);
-    return () => document.removeEventListener('mousedown', onClickOutside);
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
   const resolveProviders = async () => {
@@ -326,7 +374,7 @@ export default function SeriesCard({
         setProviders([]);
         return;
       }
-      const nextProviders = await getTvWatchProviders(picked.id, 'BR');
+      const nextProviders = await getTvWatchProviders(picked.id, "BR");
       setProviders(nextProviders);
       await updateSeriesStreaming(series.id, JSON.stringify(nextProviders));
     } finally {
@@ -343,7 +391,9 @@ export default function SeriesCard({
       await onRate(series.id, stars, review);
     } catch (error) {
       setLocalRating(previousRating);
-      setRatingError(error instanceof Error ? error.message : 'Falha ao salvar avaliacao.');
+      setRatingError(
+        error instanceof Error ? error.message : "Falha ao salvar avaliacao.",
+      );
     } finally {
       setRatingPending(null);
     }
@@ -363,163 +413,195 @@ export default function SeriesCard({
         }}
       >
         <div className="group relative flex min-w-0 w-full flex-row gap-3 rounded-2xl border border-[#151b28] bg-[#06080d] p-2 md:flex-col md:gap-3 md:rounded-none md:border-0 md:bg-transparent md:p-0">
-            <div
-              onClick={handleCardClick}
-              className={clsx(
-                'static h-32 w-20 shrink-0 overflow-hidden rounded-md border border-[#222] bg-brand-card transition-all md:relative md:h-auto md:w-full md:aspect-[2/3]',
-                canEdit && 'hover:border-brand-gold-alt hover:shadow-[0_0_15px_rgba(212,175,55,0.15)] cursor-pointer',
-                isFriendCard && 'cursor-pointer',
-              )}
-            >
-              <TmdbImage
-                src={imageSrc}
-                alt={series.titulo}
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                loading="lazy"
-                sizes="(max-width: 767px) 80px, 20vw"
-                onError={(event) => {
-                  event.currentTarget.parentElement?.nextElementSibling?.classList.remove('hidden');
-                }}
-              />
-              <div className="hidden absolute inset-0 w-full h-full flex flex-col items-center justify-center p-4 text-center bg-brand-card">
-                <Tv size={24} className="text-[#333] mb-2" />
-                <span className="text-xs text-brand-text-muted">{series.titulo}</span>
-              </div>
+          <div
+            onClick={handleCardClick}
+            className={clsx(
+              "static h-32 w-20 shrink-0 overflow-hidden rounded-md border border-[#222] bg-brand-card transition-all md:relative md:h-auto md:w-full md:aspect-[2/3]",
+              canEdit &&
+                "hover:border-brand-gold-alt hover:shadow-[0_0_15px_rgba(212,175,55,0.15)] cursor-pointer",
+              isFriendCard && "cursor-pointer",
+            )}
+          >
+            <TmdbImage
+              src={imageSrc}
+              alt={series.titulo}
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+              loading="lazy"
+              sizes="(max-width: 767px) 80px, 20vw"
+              onError={(event) => {
+                event.currentTarget.parentElement?.nextElementSibling?.classList.remove(
+                  "hidden",
+                );
+              }}
+            />
+            <div className="hidden absolute inset-0 w-full h-full flex flex-col items-center justify-center p-4 text-center bg-brand-card">
+              <Tv size={24} className="text-[#333] mb-2" />
+              <span className="text-xs text-brand-text-muted">
+                {series.titulo}
+              </span>
+            </div>
 
-              <div className="absolute top-2 right-2 z-10">
-                <DropdownMenu.Root>
-                  <DropdownMenu.Trigger asChild>
-                    <button
-                      type="button"
-                      className="p-1.5 rounded-full bg-brand-bg/80 backdrop-blur-sm border border-[#333]/50 text-brand-text-muted hover:text-brand-text hover:bg-brand-bg hover:border-brand-gold/50 transition-all outline-none"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <MoreVertical size={14} />
-                    </button>
-                  </DropdownMenu.Trigger>
-                  <DropdownMenu.Portal>
-                    <DropdownMenu.Content
-                      side="bottom"
-                      align="end"
-                      onClick={(e) => e.stopPropagation()}
-                      onPointerDown={(e) => e.stopPropagation()}
-                      className="min-w-[180px] bg-[#0a0f1e]/95 backdrop-blur-md border border-[#222] rounded-xl p-1.5 shadow-xl shadow-black/50 z-20 animate-in fade-in zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:zoom-out-95"
-                    >
-                      {isFriendCard && (
-                        <>
-                          <div className="px-2 py-1.5 text-xs text-brand-text-muted font-medium">Reagir</div>
-                          <div className="flex items-center justify-around px-2 py-1 mb-1">
-                            {(['❤️', '🔥', '😂', '👎'] as const).map((emoji) => (
-                              <DropdownMenu.Item
-                                key={emoji}
-                                onSelect={() => { }}
-                                className="w-8 h-8 rounded-full flex items-center justify-center text-sm outline-none cursor-pointer hover:bg-brand-gold/20 hover:scale-110 transition-all focus:bg-brand-gold/20 focus:scale-110"
-                              >
-                                {emoji}
-                              </DropdownMenu.Item>
-                            ))}
-                          </div>
-                          <DropdownMenu.Separator className="h-[1px] bg-[#222] my-1" />
-                        </>
-                      )}
+            <div className="absolute top-2 right-2 z-10">
+              <DropdownMenu.Root>
+                <DropdownMenu.Trigger asChild>
+                  <button
+                    type="button"
+                    className="p-1.5 rounded-full bg-brand-bg/80 backdrop-blur-sm border border-[#333]/50 text-brand-text-muted hover:text-brand-text hover:bg-brand-bg hover:border-brand-gold/50 transition-all outline-none"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <MoreVertical size={14} />
+                  </button>
+                </DropdownMenu.Trigger>
+                <DropdownMenu.Portal>
+                  <DropdownMenu.Content
+                    side="bottom"
+                    align="end"
+                    onClick={(e) => e.stopPropagation()}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    className="min-w-[180px] bg-[#0a0f1e]/95 backdrop-blur-md border border-[#222] rounded-xl p-1.5 shadow-xl shadow-black/50 z-20 animate-in fade-in zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:zoom-out-95"
+                  >
+                    {isFriendCard && (
+                      <>
+                        <div className="px-2 py-1.5 text-xs text-brand-text-muted font-medium">
+                          Reagir
+                        </div>
+                        <div className="flex items-center justify-around px-2 py-1 mb-1">
+                          {(["❤️", "🔥", "😂", "👎"] as const).map((emoji) => (
+                            <DropdownMenu.Item
+                              key={emoji}
+                              onSelect={() => {}}
+                              className="w-8 h-8 rounded-full flex items-center justify-center text-sm outline-none cursor-pointer hover:bg-brand-gold/20 hover:scale-110 transition-all focus:bg-brand-gold/20 focus:scale-110"
+                            >
+                              {emoji}
+                            </DropdownMenu.Item>
+                          ))}
+                        </div>
+                        <DropdownMenu.Separator className="h-[1px] bg-[#222] my-1" />
+                      </>
+                    )}
 
+                    <DropdownMenu.Item
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        setTimeout(() => handleOpenSynopsis(), 50);
+                      }}
+                      className="flex items-center gap-2 px-2 py-2 text-xs text-brand-text rounded-md cursor-pointer outline-none hover:bg-brand-gold/10 hover:text-brand-gold transition-colors focus:bg-brand-gold/10 focus:text-brand-gold"
+                    >
+                      <BookOpen size={14} />
+                      Ver Sinopse
+                    </DropdownMenu.Item>
+
+                    {canEdit && (
                       <DropdownMenu.Item
                         onSelect={(e) => {
                           e.preventDefault();
-                          setTimeout(() => handleOpenSynopsis(), 50);
+                          syncLocalState();
+                          setSaveError(null);
+                          void hydrateSeriesContext(
+                            Number(series.temporada) || 1,
+                          );
+                          setOpen(true);
                         }}
                         className="flex items-center gap-2 px-2 py-2 text-xs text-brand-text rounded-md cursor-pointer outline-none hover:bg-brand-gold/10 hover:text-brand-gold transition-colors focus:bg-brand-gold/10 focus:text-brand-gold"
                       >
-                        <BookOpen size={14} />
-                        Ver Sinopse
+                        <Pencil size={14} />
+                        Editar Progresso
                       </DropdownMenu.Item>
+                    )}
 
-                      {canEdit && (
+                    {canEdit && (
+                      <DropdownMenu.Item
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          void toggleStatus(e);
+                        }}
+                        className="flex items-center gap-2 px-2 py-2 text-xs text-brand-text rounded-md cursor-pointer outline-none hover:bg-brand-gold/10 hover:text-brand-gold transition-colors focus:bg-brand-gold/10 focus:text-brand-gold"
+                      >
+                        {isWatched ? <Eye size={14} /> : <EyeOff size={14} />}
+                        {isWatched
+                          ? "Mudar para Watchlist"
+                          : "Marcar como visto"}
+                      </DropdownMenu.Item>
+                    )}
+
+                    {canEdit && (
+                      <>
+                        <DropdownMenu.Separator className="h-[1px] bg-[#222] my-1" />
                         <DropdownMenu.Item
                           onSelect={(e) => {
                             e.preventDefault();
-                            syncLocalState();
-                            setSaveError(null);
-                            void hydrateSeriesContext(Number(series.temporada) || 1);
-                            setOpen(true);
+                            handleDelete(e);
                           }}
-                          className="flex items-center gap-2 px-2 py-2 text-xs text-brand-text rounded-md cursor-pointer outline-none hover:bg-brand-gold/10 hover:text-brand-gold transition-colors focus:bg-brand-gold/10 focus:text-brand-gold"
+                          className="flex items-center gap-2 px-2 py-2 text-xs text-red-400 rounded-md cursor-pointer outline-none hover:bg-red-500/10 hover:text-red-500 transition-colors focus:bg-red-500/10 focus:text-red-500"
                         >
-                          <Pencil size={14} />
-                          Editar Progresso
+                          <Trash2 size={14} />
+                          Remover da Lista
                         </DropdownMenu.Item>
-                      )}
+                      </>
+                    )}
+                  </DropdownMenu.Content>
+                </DropdownMenu.Portal>
+              </DropdownMenu.Root>
+            </div>
+          </div>
 
-                      {canEdit && (
-                        <DropdownMenu.Item
-                          onSelect={(e) => {
-                            e.preventDefault();
-                            void toggleStatus(e);
-                          }}
-                          className="flex items-center gap-2 px-2 py-2 text-xs text-brand-text rounded-md cursor-pointer outline-none hover:bg-brand-gold/10 hover:text-brand-gold transition-colors focus:bg-brand-gold/10 focus:text-brand-gold"
-                        >
-                          {isWatched ? <Eye size={14} /> : <EyeOff size={14} />}
-                          {isWatched ? 'Mudar para Watchlist' : 'Marcar como visto'}
-                        </DropdownMenu.Item>
-                      )}
+          <div className="flex min-w-0 flex-1 flex-col gap-2 pr-6 md:px-0 md:pr-0">
+            <h3
+              onClick={handleCardClick}
+              className="max-md:order-1 text-sm font-medium text-brand-text line-clamp-1 hover:text-brand-gold cursor-pointer transition-colors"
+              title={series.titulo}
+            >
+              {series.titulo}
+            </h3>
 
-                      {canEdit && (
-                        <>
-                          <DropdownMenu.Separator className="h-[1px] bg-[#222] my-1" />
-                          <DropdownMenu.Item
-                            onSelect={(e) => {
-                              e.preventDefault();
-                              handleDelete(e);
-                            }}
-                            className="flex items-center gap-2 px-2 py-2 text-xs text-red-400 rounded-md cursor-pointer outline-none hover:bg-red-500/10 hover:text-red-500 transition-colors focus:bg-red-500/10 focus:text-red-500"
-                          >
-                            <Trash2 size={14} />
-                            Remover da Lista
-                          </DropdownMenu.Item>
-                        </>
-                      )}
-                    </DropdownMenu.Content>
-                  </DropdownMenu.Portal>
-                </DropdownMenu.Root>
-              </div>
+            <div className="max-md:order-2 flex items-center justify-between mt-1 text-[10px] tracking-wider font-light uppercase">
+              <span className="text-brand-text-muted">
+                T{series.temporada || 1} {"\u2022"} {series.episodios_vistos} /{" "}
+                {limit > 0 ? limit : "?"} EPS
+              </span>
+              <span className="text-brand-gold">{progressPercent}%</span>
+            </div>
+            <div className="max-md:order-3 w-full h-1 bg-[#0a0f1e] overflow-hidden rounded-full border border-[#222] mt-0.5">
+              <div
+                className="h-full bg-gradient-to-r from-brand-gold-alt to-brand-gold rounded-full transition-all duration-500"
+                style={{ width: `${progressPercent}%` }}
+              />
             </div>
 
-            <div className="flex min-w-0 flex-1 flex-col gap-2 pr-6 md:px-0 md:pr-0">
-              <h3 
-                onClick={handleCardClick}
-                className="max-md:order-1 text-sm font-medium text-brand-text line-clamp-1 hover:text-brand-gold cursor-pointer transition-colors"
-                title={series.titulo}
-              >
-                {series.titulo}
-              </h3>
-
-              <div className="max-md:order-2 flex items-center justify-between mt-1 text-[10px] tracking-wider font-light uppercase">
-                <span className="text-brand-text-muted">
-                  T{series.temporada || 1} {'\u2022'} {series.episodios_vistos} / {limit > 0 ? limit : '?'} EPS
-                </span>
-                <span className="text-brand-gold">{progressPercent}%</span>
-              </div>
-              <div className="max-md:order-3 w-full h-1 bg-[#0a0f1e] overflow-hidden rounded-full border border-[#222] mt-0.5">
+            {showRating ? (
+              <div className="flex flex-col gap-1 max-md:order-4">
                 <div
-                  className="h-full bg-gradient-to-r from-brand-gold-alt to-brand-gold rounded-full transition-all duration-500"
-                  style={{ width: `${progressPercent}%` }}
-                />
-              </div>
-
-              {showRating ? (
-                <div className="flex flex-col gap-1 max-md:order-4">
-                  <div className="flex items-center gap-2 group/stars" onClick={(e) => e.stopPropagation()}>
-                    <StarRatingInput
-                      value={localRating}
-                      onChange={(stars) => {
-                        if (canRate) {
-                          setPendingRating(stars);
-                          setIsReviewModalOpen(true);
-                        }
+                  className="flex items-center gap-2 group/stars"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <StarRatingInput
+                    value={localRating}
+                    onChange={(stars) => {
+                      if (canRate) {
+                        setPendingRating(stars);
+                        setIsReviewModalOpen(true);
+                      }
+                    }}
+                    disabled={!canRate}
+                  />
+                  {canRate ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPendingRating(localRating);
+                        setIsReviewModalOpen(true);
                       }}
-                      disabled={!canRate}
-                    />
-                    {canRate ? (
+                      className="p-1 text-brand-text-muted hover:text-brand-gold transition-colors"
+                      title="Escrever Resenha"
+                    >
+                      <Pencil
+                        size={12}
+                        className={clsx(series.review && "text-brand-gold-alt")}
+                      />
+                    </button>
+                  ) : (
+                    series.review && (
                       <button
                         type="button"
                         onClick={(e) => {
@@ -527,78 +609,77 @@ export default function SeriesCard({
                           setPendingRating(localRating);
                           setIsReviewModalOpen(true);
                         }}
-                        className="p-1 text-brand-text-muted hover:text-brand-gold transition-colors"
-                        title="Escrever Resenha"
+                        className="p-1 text-brand-gold-alt hover:text-brand-gold transition-colors animate-pulse"
+                        title="Ver Resenha"
                       >
-                        <Pencil size={12} className={clsx(series.review && "text-brand-gold-alt")} />
+                        <MessageSquare size={12} />
                       </button>
-                    ) : (
-                      series.review && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setPendingRating(localRating);
-                            setIsReviewModalOpen(true);
-                          }}
-                          className="p-1 text-brand-gold-alt hover:text-brand-gold transition-colors animate-pulse"
-                          title="Ver Resenha"
-                        >
-                          <MessageSquare size={12} />
-                        </button>
-                      )
-                    )}
-                    {canRate && ratingPending ? <Loader2 size={12} className="animate-spin text-brand-gold ml-1" /> : null}
-                  </div>
-                  {ratingError ? <p className="text-[10px] leading-relaxed text-red-300">{ratingError}</p> : null}
+                    )
+                  )}
+                  {canRate && ratingPending ? (
+                    <Loader2
+                      size={12}
+                      className="animate-spin text-brand-gold ml-1"
+                    />
+                  ) : null}
                 </div>
-              ) : null}
-
-              <div className="relative max-md:order-5" ref={providersRef}>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    const next = !showProviders;
-                    setShowProviders(next);
-                    if (next) void resolveProviders();
-                  }}
-                  className="text-[11px] uppercase tracking-[0.12em] text-brand-gold-alt hover:text-brand-gold"
-                >
-                  Onde assistir?
-                </button>
-                {showProviders ? (
-                  <div className="absolute left-0 top-[110%] z-20 min-w-[180px] border border-[#222] rounded-md bg-[#0a0f1e] p-2">
-                    {providersLoading ? (
-                      <div className="flex items-center gap-2 text-xs text-brand-text-muted">
-                        <Loader2 size={12} className="animate-spin" /> Carregando...
-                      </div>
-                    ) : providers.length > 0 ? (
-                      <ul className="flex flex-col gap-1">
-                        {providers.map((provider) => (
-                          <li key={provider.provider_id ?? provider.provider_name} className="text-xs text-brand-text flex items-center gap-2">
-                            {provider.logo_path ? (
-                              <img
-                                src={`https://image.tmdb.org/t/p/w92${provider.logo_path}`}
-                                alt={provider.provider_name ?? 'provider'}
-                                className="w-5 h-5 rounded"
-                              />
-                            ) : null}
-                            <span>{provider.provider_name}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <span className="text-[10px] text-brand-text-muted uppercase tracking-[0.12em]">
-                        Sem stream BR
-                      </span>
-                    )}
-                  </div>
+                {ratingError ? (
+                  <p className="text-[10px] leading-relaxed text-red-300">
+                    {ratingError}
+                  </p>
                 ) : null}
               </div>
+            ) : null}
+
+            <div className="relative max-md:order-5" ref={providersRef}>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  const next = !showProviders;
+                  setShowProviders(next);
+                  if (next) void resolveProviders();
+                }}
+                className="text-[11px] uppercase tracking-[0.12em] text-brand-gold-alt hover:text-brand-gold"
+              >
+                Onde assistir?
+              </button>
+              {showProviders ? (
+                <div className="absolute left-0 top-[110%] z-20 min-w-[180px] border border-[#222] rounded-md bg-[#0a0f1e] p-2">
+                  {providersLoading ? (
+                    <div className="flex items-center gap-2 text-xs text-brand-text-muted">
+                      <Loader2 size={12} className="animate-spin" />{" "}
+                      Carregando...
+                    </div>
+                  ) : providers.length > 0 ? (
+                    <ul className="flex flex-col gap-1">
+                      {providers.map((provider) => (
+                        <li
+                          key={provider.provider_id ?? provider.provider_name}
+                          className="text-xs text-brand-text flex items-center gap-2"
+                        >
+                          {provider.logo_path ? (
+                            <img
+                              src={`https://image.tmdb.org/t/p/w92${provider.logo_path}`}
+                              alt={provider.provider_name ?? "provider"}
+                              className="w-5 h-5 rounded"
+                            />
+                          ) : null}
+                          <span>{provider.provider_name}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <span className="text-[10px] text-brand-text-muted uppercase tracking-[0.12em]">
+                      Sem stream BR
+                    </span>
+                  )}
+                </div>
+              ) : null}
             </div>
           </div>
+        </div>
 
         {canEdit ? (
           <Dialog.Portal>
@@ -615,7 +696,10 @@ export default function SeriesCard({
 
               <form onSubmit={handleSave} className="flex flex-col gap-4 mt-2">
                 <div className="flex items-center gap-4">
-                  <label htmlFor="temp" className="text-xs text-brand-text uppercase tracking-widest shrink-0 w-20">
+                  <label
+                    htmlFor="temp"
+                    className="text-xs text-brand-text uppercase tracking-widest shrink-0 w-20"
+                  >
                     Temp. Atual:
                   </label>
                   <input
@@ -627,9 +711,15 @@ export default function SeriesCard({
                       const next = event.target.value;
                       setLocalTemporada(next);
                       const seasonNumber = parseInt(next, 10);
-                      if (Number.isNaN(seasonNumber) || seasonNumber < 1) return;
-                      const selectedSeason = seasonMeta.find((item) => item.season_number === seasonNumber);
-                      if (selectedSeason?.episode_count && selectedSeason.episode_count > 0) {
+                      if (Number.isNaN(seasonNumber) || seasonNumber < 1)
+                        return;
+                      const selectedSeason = seasonMeta.find(
+                        (item) => item.season_number === seasonNumber,
+                      );
+                      if (
+                        selectedSeason?.episode_count &&
+                        selectedSeason.episode_count > 0
+                      ) {
                         setLocalTotalEps(String(selectedSeason.episode_count));
                         setLocalEps((current) =>
                           String(
@@ -651,7 +741,10 @@ export default function SeriesCard({
                 </div>
 
                 <div className="flex items-center gap-4">
-                  <label htmlFor="toteps" className="text-xs text-brand-text uppercase tracking-widest shrink-0 w-20">
+                  <label
+                    htmlFor="toteps"
+                    className="text-xs text-brand-text uppercase tracking-widest shrink-0 w-20"
+                  >
                     Total Eps da Temp.:
                   </label>
                   <input
@@ -665,7 +758,10 @@ export default function SeriesCard({
                 </div>
 
                 <div className="flex items-center gap-4">
-                  <label htmlFor="ep-select" className="text-xs text-brand-text uppercase tracking-widest shrink-0 w-20">
+                  <label
+                    htmlFor="ep-select"
+                    className="text-xs text-brand-text uppercase tracking-widest shrink-0 w-20"
+                  >
                     Ultimo Ep Visto
                   </label>
                   <select
@@ -676,7 +772,10 @@ export default function SeriesCard({
                   >
                     <option value="0">Nenhum</option>
                     {seasonEpisodes.map((episode) => (
-                      <option key={episode.episode_number} value={episode.episode_number}>
+                      <option
+                        key={episode.episode_number}
+                        value={episode.episode_number}
+                      >
                         E{episode.episode_number}: {episode.name}
                       </option>
                     ))}
@@ -684,10 +783,15 @@ export default function SeriesCard({
                 </div>
                 {episodesLoading ? (
                   <div className="text-[11px] text-brand-text-muted uppercase tracking-[0.12em] flex items-center gap-2">
-                    <Loader2 size={12} className="animate-spin" /> Carregando episodios...
+                    <Loader2 size={12} className="animate-spin" /> Carregando
+                    episodios...
                   </div>
                 ) : null}
-                {saveError ? <div className="text-[11px] text-red-300 leading-relaxed">{saveError}</div> : null}
+                {saveError ? (
+                  <div className="text-[11px] text-red-300 leading-relaxed">
+                    {saveError}
+                  </div>
+                ) : null}
 
                 <div className="flex gap-3 justify-end mt-4">
                   <Dialog.Close asChild>
@@ -703,7 +807,7 @@ export default function SeriesCard({
                     disabled={isSaving}
                     className="px-6 py-2 text-xs uppercase tracking-widest bg-brand-gold text-brand-bg font-medium rounded transition-all hover:bg-opacity-90 active:scale-95"
                   >
-                    {isSaving ? 'Salvando...' : 'Salvar'}
+                    {isSaving ? "Salvando..." : "Salvar"}
                   </button>
                 </div>
               </form>
@@ -726,7 +830,7 @@ export default function SeriesCard({
           title={series.titulo}
           coverUrl={series.capa_url}
           initialRating={pendingRating}
-          initialReview={series.review || ''}
+          initialReview={series.review || ""}
           isReadOnly={!canRate}
           onSave={async (stars, text) => {
             await handleRate(stars, text);
@@ -734,7 +838,7 @@ export default function SeriesCard({
           onSkip={async (stars) => {
             await handleRate(stars, series.review);
           }}
-          watchedAt={series.status === 'watched' ? series.created_at : null}
+          watchedAt={series.status === "watched" ? series.created_at : null}
           isRetroactive={Boolean(series.is_retroactive)}
         />
       )}

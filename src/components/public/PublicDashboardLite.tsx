@@ -1,7 +1,7 @@
 import { useState } from "react";
 import * as Icons from "lucide-react";
 import { useLocation } from "wouter";
-import type { RankedUser } from "../../types/app";
+import type { RankedUser } from "../../types";
 import AppHeader from "../layout/Header";
 import DashboardTab from "../layout/DashboardTab";
 import AvatarDisplay from "../layout/AvatarDisplay";
@@ -11,7 +11,13 @@ import SeriesSection from "../series/SeriesSection";
 import ReviewsScreen from "../layout/ReviewsScreen";
 
 type PublicTab =
-  "home" | "dashboard" | "oscars" | "movies" | "series" | "reviews" | "personal";
+  | "home"
+  | "dashboard"
+  | "oscars"
+  | "movies"
+  | "series"
+  | "reviews"
+  | "personal";
 
 function LockedPanel({ title }: { title: string }) {
   const [, setLocation] = useLocation();
@@ -112,11 +118,7 @@ export default function PublicDashboardLite({ user }: { user: RankedUser }) {
                 publicReadOnly
               />
             ) : activeTab === "series" ? (
-              <SeriesSection
-                userId={user.id}
-                canEdit={false}
-                publicReadOnly
-              />
+              <SeriesSection userId={user.id} canEdit={false} publicReadOnly />
             ) : activeTab === "reviews" ? (
               <ReviewsScreen />
             ) : activeTab === "dashboard" ? (

@@ -1,13 +1,15 @@
-import { activityDestination } from '../../lib/activityNavigation';
-import type { ActivityEntry } from '../../types/app';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Bell, Loader2 } from 'lucide-react';
-import { useLocation } from 'wouter';
-import clsx from 'clsx';
-import { useUserActivity } from '../../hooks/useUserActivity';
-import { useSpecialNotifications } from '../../hooks/useSpecialNotifications';
-import SpecialNotificationsList from './SpecialNotificationsList';
-import { HEADER_MENU_OPEN_EVENT, notifyHeaderMenuOpen } from '../../lib/headerMenu';
+import type { ActivityEntry } from "../../types";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Bell, Loader2 } from "lucide-react";
+import { useLocation } from "wouter";
+import clsx from "clsx";
+import { useUserActivity } from "../../hooks/useUserActivity";
+import { useSpecialNotifications } from "../../hooks/useSpecialNotifications";
+import SpecialNotificationsList from "./SpecialNotificationsList";
+import { formatTimestamp } from "../../utils/datetime";
+import { activityDestination } from "../../navigation";
+import { HEADER_MENU_OPEN_EVENT } from "../../utils/constants";
+import { notifyHeaderMenuOpen } from "../../utils/functions";
 
 interface UserEventBellProps {
   currentUserId: string;
@@ -16,26 +18,15 @@ interface UserEventBellProps {
   friendIds?: string[];
 }
 
-const SEEN_KEY_PREFIX = 'letterboxmzz_seen_notifications_v1_';
-
-function formatTimestamp(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return new Intl.DateTimeFormat('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-}
+const SEEN_KEY_PREFIX = "letterboxmzz_seen_notifications_v1_";
 
 function readSeenTimestamp(userId: string) {
-  if (typeof window === 'undefined') return '';
-  return localStorage.getItem(`${SEEN_KEY_PREFIX}${userId}`) ?? '';
+  if (typeof window === "undefined") return "";
+  return localStorage.getItem(`${SEEN_KEY_PREFIX}${userId}`) ?? "";
 }
 
 function writeSeenTimestamp(userId: string, timestamp: string) {
-  if (typeof window === 'undefined') return;
+  if (typeof window === "undefined") return;
   localStorage.setItem(`${SEEN_KEY_PREFIX}${userId}`, timestamp);
 }
 
@@ -46,10 +37,12 @@ export default function UserEventBell({
   friendIds = [],
 }: UserEventBellProps) {
   const [open, setOpen] = useState(false);
-  const [seenTimestamp, setSeenTimestamp] = useState(() => readSeenTimestamp(currentUserId));
+  const [seenTimestamp, setSeenTimestamp] = useState(() =>
+    readSeenTimestamp(currentUserId),
+  );
   const activityUserIds = useMemo(() => {
     if (isOwnDashboard) {
-      return [currentUserId, 'global', ...friendIds];
+      return [currentUserId, "global", ...friendIds];
     } else {
       return [viewedUserId];
     }
@@ -73,21 +66,25 @@ export default function UserEventBell({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
         setOpen(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   useEffect(() => {
     const handleOtherHeaderMenu = (event: Event) => {
-      if ((event as CustomEvent<string>).detail !== 'activity') setOpen(false);
+      if ((event as CustomEvent<string>).detail !== "activity") setOpen(false);
     };
     window.addEventListener(HEADER_MENU_OPEN_EVENT, handleOtherHeaderMenu);
-    return () => window.removeEventListener(HEADER_MENU_OPEN_EVENT, handleOtherHeaderMenu);
+    return () =>
+      window.removeEventListener(HEADER_MENU_OPEN_EVENT, handleOtherHeaderMenu);
   }, []);
 
   const items = useMemo(() => {
@@ -95,7 +92,7 @@ export default function UserEventBell({
     const seenBroadcasts = new Set<string>();
 
     return rawItems.filter((item) => {
-      if (!item.message.startsWith('Novo membro!')) {
+      if (!item.message.startsWith("Novo membro!")) {
         return true;
       }
 
@@ -115,7 +112,8 @@ export default function UserEventBell({
     if (!seenTimestamp) return Math.min(items.length, 9);
     const seenTime = new Date(seenTimestamp).getTime();
     return Math.min(
-      items.filter((item) => new Date(item.created_at).getTime() > seenTime).length,
+      items.filter((item) => new Date(item.created_at).getTime() > seenTime)
+        .length,
       9,
     );
   }, [isOwnDashboard, items, seenTimestamp]);
@@ -123,16 +121,16 @@ export default function UserEventBell({
   // Special notifications belong to the logged user, so they count on any profile.
   const badgeCount = Math.min(unseenCount + special.unreadCount, 9);
 
-  const title = 'Atividade';
-  const buttonLabel = 'Atividade';
-  const emptyLabel = 'Nenhuma atividade recente por enquanto.';
+  const title = "Atividade";
+  const buttonLabel = "Atividade";
+  const emptyLabel = "Nenhuma atividade recente por enquanto.";
 
   return (
-    <div ref={containerRef} className={clsx('relative', open && 'z-[100]')}>
+    <div ref={containerRef} className={clsx("relative", open && "z-100")}>
       <button
         type="button"
         onClick={() => {
-          if (window.matchMedia('(max-width: 1023px)').matches) {
+          if (window.matchMedia("(max-width: 1023px)").matches) {
             if (isOwnDashboard && items.length > 0) {
               const latest = items[0]?.created_at;
               if (latest) {
@@ -140,10 +138,10 @@ export default function UserEventBell({
                 setSeenTimestamp(latest);
               }
             }
-            setLocation('/atividades');
+            setLocation("/atividades");
             return;
           }
-          if (!open) notifyHeaderMenuOpen('activity');
+          if (!open) notifyHeaderMenuOpen("activity");
           setOpen((current) => {
             const next = !current;
             if (next && isOwnDashboard && items.length > 0) {
@@ -170,13 +168,11 @@ export default function UserEventBell({
 
       {open ? (
         <>
-          {/* Mobile overlay backdrop */}
           <div
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 sm:hidden"
             onClick={() => setOpen(false)}
           />
-          {/* Panel: centered on mobile, dropdown on desktop */}
-          <div className="fixed inset-x-4 top-[50%] z-[110] w-auto max-h-[80vh] -translate-y-[50%] overflow-y-auto rounded-2xl border border-[#151b28] bg-[#06080d] shadow-[0_18px_60px_rgba(0,0,0,0.55)] sm:absolute sm:inset-x-auto sm:right-0 sm:top-[calc(100%+10px)] sm:w-[min(92vw,360px)] sm:max-h-[min(80vh,640px)] sm:translate-y-0">
+          <div className="fixed inset-x-4 top-[50%] z-110 w-auto max-h-[80vh] -translate-y-[50%] overflow-y-auto rounded-2xl border border-[#151b28] bg-[#06080d] shadow-[0_18px_60px_rgba(0,0,0,0.55)] sm:absolute sm:inset-x-auto sm:right-0 sm:top-[calc(100%+10px)] sm:w-[min(92vw,360px)] sm:max-h-[min(80vh,640px)] sm:translate-y-0">
             <SpecialNotificationsList
               notifications={special.notifications}
               unreadCount={special.unreadCount}
@@ -201,12 +197,22 @@ export default function UserEventBell({
                 {items.map((item) => {
                   const destination = activityDestination(item);
                   return (
-                    <li key={item.id} className="border-b border-[#121212] last:border-b-0">
-                      <button type="button" disabled={!destination} onClick={() => handleNotificationClick(item)} className="w-full px-4 py-3 text-left transition-colors enabled:hover:bg-white/5">
-                      <p className="text-sm leading-relaxed text-brand-text">{item.message}</p>
-                      <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-brand-text-muted">
-                        {formatTimestamp(item.created_at)}
-                      </p>
+                    <li
+                      key={item.id}
+                      className="border-b border-[#121212] last:border-b-0"
+                    >
+                      <button
+                        type="button"
+                        disabled={!destination}
+                        onClick={() => handleNotificationClick(item)}
+                        className="w-full px-4 py-3 text-left transition-colors enabled:hover:bg-white/5"
+                      >
+                        <p className="text-sm leading-relaxed text-brand-text">
+                          {item.message}
+                        </p>
+                        <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-brand-text-muted">
+                          {formatTimestamp(item.created_at)}
+                        </p>
                       </button>
                     </li>
                   );

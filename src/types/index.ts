@@ -1,5 +1,5 @@
-export type MovieStatus = 'watchlist' | 'watched';
-export type SeriesStatus = 'watchlist' | 'watching' | 'watched';
+export type MovieStatus = "watchlist" | "watched";
+export type SeriesStatus = "watchlist" | "watching" | "watched";
 
 export interface AppUser {
   id: string;
@@ -16,7 +16,7 @@ export interface UserMetadata {
   favorite_movie_2?: string;
   favorite_genre?: string;
   favorite_series?: string;
-  watch_preference?: 'home' | 'cinema';
+  watch_preference?: "home" | "cinema";
 }
 
 export interface RankedUser extends AppUser, UserMetadata {
@@ -38,6 +38,7 @@ export interface OscarMovieWithStatus extends OscarMovie {
   status: MovieStatus;
 }
 
+// TODO: translate all types to english
 export interface PersonalMovie {
   id: string;
   user_id: string;
@@ -46,7 +47,7 @@ export interface PersonalMovie {
   capa_url: string | null;
   plataforma_slug: string | null;
   status: MovieStatus;
-  source: 'manual' | 'oscar';
+  source: "manual" | "oscar";
   source_movie_id: string | null;
   indicado_por_user_id?: string | null;
   diretor?: string | null;
@@ -98,7 +99,7 @@ export interface UserFavorite {
   ownerUserId?: string;
 }
 
-export type FavoritePersonDepartment = 'Acting' | 'Directing';
+export type FavoritePersonDepartment = "Acting" | "Directing";
 
 export interface UserFavoritePerson {
   id: string;
@@ -109,7 +110,7 @@ export interface UserFavoritePerson {
   createdAt: string;
 }
 
-export type CineMatchMode = 'geral' | 'oscar';
+export type CineMatchMode = "geral" | "oscar";
 
 export interface CineMatchSuggestion {
   titulo: string;
@@ -118,7 +119,7 @@ export interface CineMatchSuggestion {
   reason: string;
 }
 
-export type WatchPartyMediaType = 'movie' | 'series';
+export type WatchPartyMediaType = "movie" | "series";
 
 export interface WatchParty {
   id: string;
@@ -129,7 +130,7 @@ export interface WatchParty {
   title: string;
   posterPath: string | null;
   genreId: number | null;
-  status: 'planned' | 'completed';
+  status: "planned" | "completed";
   progressSeason: number | null;
   progressEpisode: number | null;
   creatorPoints: number;
@@ -151,7 +152,7 @@ export interface TrendingMovie {
   userCount: number;
   lastWatchedAt: string;
   tmdbId?: string | null;
-  mediaType?: 'movie' | 'tv';
+  mediaType?: "movie" | "tv";
   userIds: string[];
 }
 
@@ -160,7 +161,7 @@ export interface AnticipatedMovie {
   coverUrl: string | null;
   userCount: number;
   tmdbId?: string | null;
-  mediaType?: 'movie' | 'tv';
+  mediaType?: "movie" | "tv";
   userIds: string[];
 }
 
@@ -174,8 +175,9 @@ export interface UserOscarPrediction {
   created_at: string;
 }
 
-export type GroupMemberRole = 'admin' | 'member';
-export type GroupViewerStatus = 'admin' | 'member' | 'invited' | 'requested' | 'none';
+export type GroupMemberRole = "admin" | "member";
+export type GroupViewerStatus =
+  "admin" | "member" | "invited" | "requested" | "none";
 
 export interface GroupProfile {
   id: string;
@@ -264,14 +266,14 @@ export interface GroupPendingRequests {
   requests: GroupPendingItem[];
 }
 
-export type GroupRequestAction = 'accept' | 'decline' | 'cancel';
+export type GroupRequestAction = "accept" | "decline" | "cancel";
 
 export type SpecialNotificationType =
-  | 'group_invite'
-  | 'group_join_request'
-  | 'group_request_accepted'
-  | 'group_invite_accepted'
-  | 'group_admin_transferred';
+  | "group_invite"
+  | "group_join_request"
+  | "group_request_accepted"
+  | "group_invite_accepted"
+  | "group_admin_transferred";
 
 export interface SpecialNotification {
   id: string;
@@ -289,3 +291,13 @@ export interface SpecialNotificationsResponse {
   items: SpecialNotification[];
   unreadCount: number;
 }
+
+export interface FavoriteGenreOption {
+  key: string;
+  label: string;
+  movieGenreIds: number[];
+  tvGenreIds: number[];
+  match: "direct" | "approximate";
+}
+
+export type HeaderMenuId = "info" | "profile" | "activity" | "cineMatch";

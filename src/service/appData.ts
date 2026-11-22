@@ -1,5 +1,5 @@
 import * as localData from "./localData";
-import apiClient from "./apiClient";
+import apiClient from "./api";
 import { getTvDetailsWithCache } from "./tmdbCache";
 import type {
   ActivityEntry,
@@ -15,7 +15,7 @@ import type {
   TrendingMovie,
   UserOscarPrediction,
   AnticipatedMovie,
-} from "../types/app";
+} from "../types";
 
 const AVATAR_IDS = [
   "avatar_clapper",
@@ -71,14 +71,21 @@ function fallbackAvatar(userId: string) {
   return AVATAR_IDS[index];
 }
 
-export function normalizeAvatarPath(avatarPath: string | null | undefined, userId: string, displayName: string | null | undefined) {
+export function normalizeAvatarPath(
+  avatarPath: string | null | undefined,
+  userId: string,
+  displayName: string | null | undefined,
+) {
   let avatarId = avatarPath || fallbackAvatar(userId);
   let normalizedDisplayName = displayName ?? undefined;
 
   // Older profiles stored the avatar id and display name together in avatar_path.
-  if (avatarId.startsWith('{')) {
+  if (avatarId.startsWith("{")) {
     try {
-      const parsed = JSON.parse(avatarId) as { avatarId?: string; displayName?: string | null };
+      const parsed = JSON.parse(avatarId) as {
+        avatarId?: string;
+        displayName?: string | null;
+      };
       avatarId = parsed.avatarId || fallbackAvatar(userId);
       normalizedDisplayName = parsed.displayName ?? normalizedDisplayName;
     } catch {
@@ -273,7 +280,9 @@ export async function removeFavorite(favoriteId: string): Promise<void> {
 // Favorite people (atores e diretores)
 // ==========================================
 
-export async function listFavoritePeople(userId: string): Promise<UserFavoritePerson[]> {
+export async function listFavoritePeople(
+  userId: string,
+): Promise<UserFavoritePerson[]> {
   const response = await apiClient.get<UserFavoritePerson[]>(
     `/users/${userId}/favorite-people`,
   );
@@ -281,7 +290,10 @@ export async function listFavoritePeople(userId: string): Promise<UserFavoritePe
 }
 
 export async function addFavoritePerson(
-  person: Pick<UserFavoritePerson, "tmdbPersonId" | "name" | "profilePath" | "department">,
+  person: Pick<
+    UserFavoritePerson,
+    "tmdbPersonId" | "name" | "profilePath" | "department"
+  >,
 ): Promise<UserFavoritePerson> {
   const response = await apiClient.post<UserFavoritePerson>(
     "/users/me/favorite-people",
@@ -290,7 +302,9 @@ export async function addFavoritePerson(
   return response.data;
 }
 
-export async function removeFavoritePerson(tmdbPersonId: number): Promise<void> {
+export async function removeFavoritePerson(
+  tmdbPersonId: number,
+): Promise<void> {
   await apiClient.delete(`/users/me/favorite-people/${tmdbPersonId}`);
 }
 
@@ -441,8 +455,16 @@ export interface PublicRankingEntry {
 export async function listPublicRanking() {
   const response = await apiClient.get<PublicRankingEntry[]>("/users/ranking");
   return response.data.map((user) => {
-    const normalized = normalizeAvatarPath(user.avatarPath, user.id, user.displayName);
-    return { ...user, avatarPath: normalized.avatarId, displayName: normalized.displayName ?? null };
+    const normalized = normalizeAvatarPath(
+      user.avatarPath,
+      user.id,
+      user.displayName,
+    );
+    return {
+      ...user,
+      avatarPath: normalized.avatarId,
+      displayName: normalized.displayName ?? null,
+    };
   });
 }
 
@@ -552,10 +574,18 @@ function activityMessage(a: ApiActivity): string {
     case "liked_review":
     case "disliked_review":
     case "commented_review": {
-      const action = a.type === 'liked_review' ? 'concordou com a' : a.type === 'disliked_review' ? 'discordou da' : 'comentou na';
-      const actor = username ? `@${username}` : 'Alguém';
-      const author = typeof meta.authorUsername === 'string' ? ` de @${meta.authorUsername}` : '';
-      return `${actor} ${action} resenha${author}${title ? ` sobre ${title}` : ''}.`;
+      const action =
+        a.type === "liked_review"
+          ? "concordou com a"
+          : a.type === "disliked_review"
+            ? "discordou da"
+            : "comentou na";
+      const actor = username ? `@${username}` : "Alguém";
+      const author =
+        typeof meta.authorUsername === "string"
+          ? ` de @${meta.authorUsername}`
+          : "";
+      return `${actor} ${action} resenha${author}${title ? ` sobre ${title}` : ""}.`;
     }
     case "added_to_watchlist":
       if (username && title)
@@ -2030,7 +2060,7 @@ export async function listUserReviews(userId: string) {
   );
 }
 
-export type ReviewReaction = 'like' | 'dislike';
+export type ReviewReaction = "like" | "dislike";
 
 export type ReviewReactionSummary = {
   likes: number;
@@ -2038,10 +2068,19 @@ export type ReviewReactionSummary = {
   myReaction: ReviewReaction | null;
 };
 
-export async function setReviewReaction(reviewId: string, reaction: ReviewReaction | null) {
-  const { data } = reaction === null
-    ? await apiClient.delete<ReviewReactionSummary>(`/reviews/${reviewId}/reaction`)
-    : await apiClient.put<ReviewReactionSummary>(`/reviews/${reviewId}/reaction`, { reaction });
+export async function setReviewReaction(
+  reviewId: string,
+  reaction: ReviewReaction | null,
+) {
+  const { data } =
+    reaction === null
+      ? await apiClient.delete<ReviewReactionSummary>(
+          `/reviews/${reviewId}/reaction`,
+        )
+      : await apiClient.put<ReviewReactionSummary>(
+          `/reviews/${reviewId}/reaction`,
+          { reaction },
+        );
   return data;
 }
 
@@ -2059,17 +2098,24 @@ export type ReviewCommentsPage = {
   nextCursor: string | null;
 };
 
-export async function listReviewComments(reviewId: string, cursor: string | null) {
-  const { data } = await apiClient.get<ReviewCommentsPage>(`/reviews/${reviewId}/comments`, {
-    params: cursor ? { cursor } : {},
-  });
+export async function listReviewComments(
+  reviewId: string,
+  cursor: string | null,
+) {
+  const { data } = await apiClient.get<ReviewCommentsPage>(
+    `/reviews/${reviewId}/comments`,
+    {
+      params: cursor ? { cursor } : {},
+    },
+  );
   return data;
 }
 
 export async function createReviewComment(reviewId: string, content: string) {
-  const { data } = await apiClient.post<{ comment: ReviewComment; commentCount: number }>(
-    `/reviews/${reviewId}/comments`, { content },
-  );
+  const { data } = await apiClient.post<{
+    comment: ReviewComment;
+    commentCount: number;
+  }>(`/reviews/${reviewId}/comments`, { content });
   return data;
 }
 
@@ -2109,7 +2155,7 @@ export async function listPublicReviews(
           limit,
           offset,
           withReview: true,
-          ...(authorIds?.length ? { authorIds: authorIds.join(',') } : {}),
+          ...(authorIds?.length ? { authorIds: authorIds.join(",") } : {}),
         },
       });
       return data;
@@ -2430,14 +2476,15 @@ export async function getAnticipatedMovies(): Promise<AnticipatedMovie[]> {
 }
 
 // Data import API
-export type DataImportPlatform = 'tv_time' | 'letterboxd';
+export type DataImportPlatform = "tv_time" | "letterboxd";
 // API returns data in camelCase format
 export interface DataImport {
   id: string;
   userId?: string;
   platform: DataImportPlatform;
   errorCount?: number;
-  status: 'pending' | 'importing_movies' | 'importing_series' | 'done' | 'failed';
+  status:
+    "pending" | "importing_movies" | "importing_series" | "done" | "failed";
   lastStatus?: string | null;
   errorMessage?: string | null;
   createdAt?: string;
@@ -2457,18 +2504,24 @@ export interface ImportError {
   episodeNumber?: number;
 }
 
-export async function uploadDataImport(file: File, platform: DataImportPlatform): Promise<Pick<DataImport, 'id' | 'status'>> {
+export async function uploadDataImport(
+  file: File,
+  platform: DataImportPlatform,
+): Promise<Pick<DataImport, "id" | "status">> {
   const formData = new FormData();
   // Keep the File selected by the browser. Reconstructing it with `new File()`
   // is unnecessary and fails in some mobile WebViews and older browsers.
-  formData.append('file', file, file.name);
-  formData.append('platform', platform);
-  const response = await apiClient.post<Pick<DataImport, 'id' | 'status'>>('/users/data-imports', formData);
+  formData.append("file", file, file.name);
+  formData.append("platform", platform);
+  const response = await apiClient.post<Pick<DataImport, "id" | "status">>(
+    "/users/data-imports",
+    formData,
+  );
   return response.data;
 }
 
 export async function uploadTvTimeImport(file: File): Promise<DataImport> {
-  return { ...await uploadDataImport(file, 'tv_time'), platform: 'tv_time' };
+  return { ...(await uploadDataImport(file, "tv_time")), platform: "tv_time" };
 }
 
 export async function listUserImports(): Promise<DataImport[]> {

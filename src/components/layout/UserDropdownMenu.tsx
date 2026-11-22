@@ -1,14 +1,24 @@
-import { useState, useEffect } from 'react';
-import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { useLocation } from 'wouter';
-import { KeyRound, LogOut, Plus, Shield, Settings, Upload, Image as ImageIcon, UserRound } from 'lucide-react';
-import type { SessionUser, RankedUser } from '../../types/app';
-import ProfileAvatarModal from './ProfileAvatarModal';
-import SuggestMovieModal from './SuggestMovieModal';
-import ChangePasswordModal from './ChangePasswordModal';
-import AdminPanel from './AdminPanel';
-import ShareReviewModal from './ShareReviewModal';
-import { HEADER_MENU_OPEN_EVENT, notifyHeaderMenuOpen } from '../../lib/headerMenu';
+import { useState, useEffect } from "react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { useLocation } from "wouter";
+import {
+  KeyRound,
+  LogOut,
+  Plus,
+  Shield,
+  Settings,
+  Upload,
+  Image as ImageIcon,
+  UserRound,
+} from "lucide-react";
+import type { SessionUser, RankedUser } from "../../types";
+import ProfileAvatarModal from "./ProfileAvatarModal";
+import SuggestMovieModal from "./SuggestMovieModal";
+import ChangePasswordModal from "./ChangePasswordModal";
+import AdminPanel from "./AdminPanel";
+import ShareReviewModal from "./ShareReviewModal";
+import { HEADER_MENU_OPEN_EVENT } from "../../utils/constants";
+import { notifyHeaderMenuOpen } from "../../utils/functions";
 
 interface UserDropdownMenuProps {
   session: SessionUser;
@@ -21,7 +31,11 @@ interface UserDropdownMenuProps {
   onOpenPreferences: () => void;
   onDeleteProfile: (currentPassword: string) => Promise<void>;
   deleteProfilePending?: boolean;
-  onChangePassword: (userId: string, current: string, next: string) => Promise<void>;
+  onChangePassword: (
+    userId: string,
+    current: string,
+    next: string,
+  ) => Promise<void>;
   onAdminReset: (targetUsername: string, newPassword: string) => Promise<void>;
   adminUsername?: string;
 }
@@ -42,76 +56,99 @@ export default function UserDropdownMenu({
 }: UserDropdownMenuProps) {
   const [, setLocation] = useLocation();
   const [activeModal, setActiveModal] = useState<
-    'avatar' | 'suggest' | 'changePassword' | 'adminPanel' | 'shareReview' | null
+    | "avatar"
+    | "suggest"
+    | "changePassword"
+    | "adminPanel"
+    | "shareReview"
+    | null
   >(null);
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     const handleOtherHeaderMenu = (event: Event) => {
-      if ((event as CustomEvent<string>).detail !== 'profile') setMenuOpen(false);
+      if ((event as CustomEvent<string>).detail !== "profile")
+        setMenuOpen(false);
     };
     window.addEventListener(HEADER_MENU_OPEN_EVENT, handleOtherHeaderMenu);
-    return () => window.removeEventListener(HEADER_MENU_OPEN_EVENT, handleOtherHeaderMenu);
+    return () =>
+      window.removeEventListener(HEADER_MENU_OPEN_EVENT, handleOtherHeaderMenu);
   }, []);
 
   const isAdmin = adminUsername && session.username === adminUsername;
 
   return (
     <>
-      <DropdownMenu.Root open={menuOpen} onOpenChange={(open) => { if (open) notifyHeaderMenuOpen('profile'); setMenuOpen(open); }}>
-        <DropdownMenu.Trigger aria-label="Abrir opções do perfil" className="inline-flex h-11 w-11 items-center justify-center rounded-full text-white outline-none transition hover:bg-white/5 hover:text-brand-gold focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0">
+      <DropdownMenu.Root
+        open={menuOpen}
+        onOpenChange={(open) => {
+          if (open) notifyHeaderMenuOpen("profile");
+          setMenuOpen(open);
+        }}
+      >
+        <DropdownMenu.Trigger
+          aria-label="Abrir opções do perfil"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-full text-white outline-none transition hover:bg-white/5 hover:text-brand-gold focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0"
+        >
           <Settings size={20} />
         </DropdownMenu.Trigger>
 
         <DropdownMenu.Portal>
           <DropdownMenu.Content
-            className="z-50 min-w-[200px] bg-[#06080d] border border-[#151b28] rounded-md shadow-xl p-1 text-sm text-brand-text"
+            className="z-50 min-w-50 bg-[#06080d] border border-[#151b28] rounded-md shadow-xl p-1 text-sm text-brand-text"
             sideOffset={8}
             align="end"
           >
-            <div 
+            <div
               onClick={() => {
                 setLocation(`/${session.username}`);
               }}
               className="px-2 py-2 mb-1 border-b border-[#151b28] cursor-pointer hover:bg-brand-gold/10 hover:text-brand-gold transition rounded"
               title="Ir para minha dashboard"
             >
-              <p className="font-semibold">{currentRankedUser?.display_name || session.username}</p>
+              <p className="font-semibold">
+                {currentRankedUser?.display_name || session.username}
+              </p>
               <p className="text-xs text-brand-text-muted mt-0.5 opacity-70">
                 @{session.username} • {currentRankedUser?.mcoins || 0} MCoins
               </p>
             </div>
 
+            {/* TODO: componentizar esse menu item pra nao repetir */}
             <DropdownMenu.Item
-              onSelect={() => setTimeout(() => setActiveModal('avatar'), 50)}
+              onSelect={() => setTimeout(() => setActiveModal("avatar"), 50)}
               className="flex items-center gap-2 px-2 py-2 outline-none cursor-pointer rounded hover:bg-brand-gold/10 hover:text-brand-gold transition"
             >
               <UserRound size={16} /> Editar Perfil
             </DropdownMenu.Item>
 
             <DropdownMenu.Item
-              onSelect={() => setTimeout(() => setActiveModal('shareReview'), 50)}
+              onSelect={() =>
+                setTimeout(() => setActiveModal("shareReview"), 50)
+              }
               className="flex items-center gap-2 px-2 py-2 outline-none cursor-pointer rounded hover:bg-brand-gold/10 hover:text-brand-gold transition"
             >
               <ImageIcon size={16} /> Compartilhar Resenha
             </DropdownMenu.Item>
 
             <DropdownMenu.Item
-              onSelect={() => setTimeout(() => setActiveModal('changePassword'), 50)}
+              onSelect={() =>
+                setTimeout(() => setActiveModal("changePassword"), 50)
+              }
               className="flex items-center gap-2 px-2 py-2 outline-none cursor-pointer rounded hover:bg-brand-gold/10 hover:text-brand-gold transition"
             >
               <KeyRound size={16} /> Alterar Senha
             </DropdownMenu.Item>
 
             <DropdownMenu.Item
-              onSelect={() => setTimeout(() => setActiveModal('suggest'), 50)}
+              onSelect={() => setTimeout(() => setActiveModal("suggest"), 50)}
               className="flex items-center gap-2 px-2 py-2 outline-none cursor-pointer rounded hover:bg-brand-gold/10 hover:text-brand-gold transition"
             >
               <Plus size={16} /> Indicar Filme
             </DropdownMenu.Item>
 
             <DropdownMenu.Item
-              onSelect={() => setTimeout(() => setLocation('/imports'), 50)}
+              onSelect={() => setTimeout(() => setLocation("/imports"), 50)}
               className="flex items-center gap-2 px-2 py-2 outline-none cursor-pointer rounded hover:bg-brand-gold/10 hover:text-brand-gold transition"
             >
               <Upload size={16} /> Importar dados
@@ -119,9 +156,11 @@ export default function UserDropdownMenu({
 
             {isAdmin && (
               <>
-                <DropdownMenu.Separator className="h-[1px] bg-[#151b28] my-1" />
+                <DropdownMenu.Separator className="h-px bg-[#151b28] my-1" />
                 <DropdownMenu.Item
-                  onSelect={() => setTimeout(() => setActiveModal('adminPanel'), 50)}
+                  onSelect={() =>
+                    setTimeout(() => setActiveModal("adminPanel"), 50)
+                  }
                   className="flex items-center gap-2 px-2 py-2 outline-none cursor-pointer rounded hover:bg-brand-gold/10 hover:text-brand-gold transition"
                 >
                   <Shield size={16} /> Painel Admin
@@ -129,7 +168,7 @@ export default function UserDropdownMenu({
               </>
             )}
 
-            <DropdownMenu.Separator className="h-[1px] bg-[#151b28] my-1" />
+            <DropdownMenu.Separator className="h-px bg-[#151b28] my-1" />
 
             <DropdownMenu.Item
               onSelect={onLogout}
@@ -150,38 +189,38 @@ export default function UserDropdownMenu({
           onOpenPreferences={onOpenPreferences}
           onDeleteProfile={onDeleteProfile}
           isDeleting={deleteProfilePending}
-          open={activeModal === 'avatar'}
-          onOpenChange={(open) => setActiveModal(open ? 'avatar' : null)}
+          open={activeModal === "avatar"}
+          onOpenChange={(open) => setActiveModal(open ? "avatar" : null)}
         />
       )}
 
       <ChangePasswordModal
         userId={session.id}
-        open={activeModal === 'changePassword'}
-        onOpenChange={(open) => setActiveModal(open ? 'changePassword' : null)}
+        open={activeModal === "changePassword"}
+        onOpenChange={(open) => setActiveModal(open ? "changePassword" : null)}
         onChangePassword={onChangePassword}
       />
 
       <ShareReviewModal
         currentUserId={session.id}
         currentDisplayName={currentRankedUser?.display_name || session.username}
-        open={activeModal === 'shareReview'}
-        onOpenChange={(open) => setActiveModal(open ? 'shareReview' : null)}
+        open={activeModal === "shareReview"}
+        onOpenChange={(open) => setActiveModal(open ? "shareReview" : null)}
       />
 
       <SuggestMovieModal
         currentUserId={session.id}
         users={users}
-        open={activeModal === 'suggest'}
-        onOpenChange={(open) => setActiveModal(open ? 'suggest' : null)}
+        open={activeModal === "suggest"}
+        onOpenChange={(open) => setActiveModal(open ? "suggest" : null)}
       />
 
       {isAdmin && (
         <AdminPanel
           users={users}
           currentUserId={session.id}
-          open={activeModal === 'adminPanel'}
-          onOpenChange={(open) => setActiveModal(open ? 'adminPanel' : null)}
+          open={activeModal === "adminPanel"}
+          onOpenChange={(open) => setActiveModal(open ? "adminPanel" : null)}
           onAdminReset={onAdminReset}
         />
       )}

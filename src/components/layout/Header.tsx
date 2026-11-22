@@ -1,18 +1,8 @@
-import clsx from 'clsx';
-import { House } from 'lucide-react';
-import { cloneElement, isValidElement, useState } from 'react';
-import type { ReactElement, ReactNode } from 'react';
-
-export type AppTab = 'home' | 'dashboard' | 'oscars' | 'movies' | 'series' | 'reviews' | 'personal';
-
-export const APP_NAVIGATION_TABS: Array<{ id: AppTab; label: string; show?: boolean }> = [
-  { id: 'home', label: 'Home' },
-  { id: 'movies', label: 'Filmes' },
-  { id: 'series', label: 'Séries' },
-  { id: 'reviews', label: 'Comunidade' },
-  { id: 'oscars', label: 'Oscar 2027' },
-  { id: 'dashboard', label: 'Perfil' },
-];
+import clsx from "clsx";
+import { House } from "lucide-react";
+import { cloneElement, isValidElement, useState } from "react";
+import type { ReactElement, ReactNode } from "react";
+import { APP_NAVIGATION_TABS, type AppTab } from "../../utils/navigation";
 
 interface HeaderProps {
   activeTab: AppTab;
@@ -32,52 +22,143 @@ interface HeaderProps {
   subSlot?: ReactNode;
 }
 
-const Header = ({ activeTab, onTabChange, canAccessOscars, canAccessHome, onGoHome, onGoDashboard, searchSlot, rightSlot, hideTabs, hideTabsOnDesktop, onBack }: HeaderProps) => {
+const Header = ({
+  activeTab,
+  onTabChange,
+  canAccessOscars,
+  canAccessHome,
+  onGoHome,
+  onGoDashboard,
+  searchSlot,
+  rightSlot,
+  hideTabs,
+  hideTabsOnDesktop,
+  onBack,
+}: HeaderProps) => {
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const tabs = APP_NAVIGATION_TABS.map((tab) => ({
     ...tab,
-    show: tab.id === 'home' ? canAccessHome : tab.id === 'oscars' ? canAccessOscars : true,
+    show:
+      tab.id === "home"
+        ? canAccessHome
+        : tab.id === "oscars"
+          ? canAccessOscars
+          : true,
   }));
 
   return (
     <>
       <header className="fixed inset-x-0 top-0 z-40 w-screen overflow-visible border-b border-[#151b28] bg-[#06080d] shadow-[0_12px_36px_rgba(0,0,0,0.2)]">
-      <div className="mx-auto grid w-full max-w-[1700px] grid-cols-1 items-center gap-3 border-b border-white/5 px-4 py-3 sm:px-6 lg:grid-cols-[auto_1fr_auto] lg:gap-5 lg:px-8">
-        {/* text-box trims the font's extra ascent so the caps share the icons' vertical center. */}
-        <div className="flex items-center gap-3 justify-self-center lg:justify-self-start">
-          <button type="button" onClick={onGoHome} aria-label="Ir para a página inicial" className="text-xl font-semibold tracking-[0.12em] uppercase text-brand-text transition hover:opacity-80 sm:text-2xl lg:[text-box:trim-both_cap_alphabetic]">
-            <span className="text-brand-gold">C</span>ine<span className="text-brand-gold">R</span>ats
-          </button>
-          {onGoDashboard && (
+        <div className="mx-auto grid w-full max-w-425 grid-cols-1 items-center gap-3 border-b border-white/5 px-4 py-3 sm:px-6 lg:grid-cols-[auto_1fr_auto] lg:gap-5 lg:px-8">
+          {/* text-box trims the font's extra ascent so the caps share the icons' vertical center. */}
+          <div className="flex items-center gap-3 justify-self-center lg:justify-self-start">
             <button
               type="button"
-              onClick={onGoDashboard}
-              aria-label="Ir para a minha dashboard"
-              title="Minha dashboard"
-              className="hidden h-11 w-11 items-center justify-center rounded-full text-white transition hover:bg-white/5 hover:text-brand-gold lg:inline-flex"
+              onClick={onGoHome}
+              aria-label="Ir para a página inicial"
+              className="text-xl font-semibold tracking-[0.12em] uppercase text-brand-text transition hover:opacity-80 sm:text-2xl lg:[text-box:trim-both_cap_alphabetic]"
             >
-              <House size={20} />
+              <span className="text-brand-gold">C</span>ine
+              <span className="text-brand-gold">R</span>ats
             </button>
-          )}
+            {onGoDashboard && (
+              <button
+                type="button"
+                onClick={onGoDashboard}
+                aria-label="Ir para a minha dashboard"
+                title="Minha dashboard"
+                className="hidden h-11 w-11 items-center justify-center rounded-full text-white transition hover:bg-white/5 hover:text-brand-gold lg:inline-flex"
+              >
+                <House size={20} />
+              </button>
+            )}
+          </div>
+          <div className="flex w-full min-w-0 justify-center">
+            {isValidElement(searchSlot)
+              ? cloneElement(
+                  searchSlot as ReactElement<{
+                    mobileOpen?: boolean;
+                    mobileAlwaysExpanded?: boolean;
+                    onMobileOpenChange?: (open: boolean) => void;
+                  }>,
+                  {
+                    mobileOpen: mobileSearchOpen,
+                    mobileAlwaysExpanded: true,
+                    onMobileOpenChange: setMobileSearchOpen,
+                  },
+                )
+              : searchSlot}
+          </div>
+          <div className="hidden items-center justify-end gap-2 lg:flex">
+            {rightSlot}
+          </div>
         </div>
-        <div className="flex w-full min-w-0 justify-center">
-          {isValidElement(searchSlot) ? cloneElement(searchSlot as ReactElement<{ mobileOpen?: boolean; mobileAlwaysExpanded?: boolean; onMobileOpenChange?: (open: boolean) => void }>, { mobileOpen: mobileSearchOpen, mobileAlwaysExpanded: true, onMobileOpenChange: setMobileSearchOpen }) : searchSlot}
-        </div>
-        <div className="hidden items-center justify-end gap-2 lg:flex">{rightSlot}</div>
-      </div>
 
-      {!hideTabs && (
-        <nav className={clsx("mx-auto flex min-h-14 w-full max-w-[1700px] items-center justify-center gap-0 overflow-x-auto px-4 sm:px-6 lg:px-8", hideTabsOnDesktop && "lg:hidden")}>
-          {onBack && <button onClick={onBack} className="p-2 text-brand-gold hover:bg-white/5 rounded-lg transition" aria-label="Voltar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>}
-          {tabs.filter((tab) => tab.show !== false).map((tab) => (
-            <button key={tab.id} type="button" onClick={() => onTabChange(tab.id)} className={clsx('whitespace-nowrap border-r border-white/10 px-3 py-1.5 text-[10px] uppercase tracking-[0.12em] transition last:border-r-0 sm:px-5 sm:text-xs', activeTab === tab.id ? 'text-brand-gold font-semibold border-b-2 border-b-brand-gold' : 'text-brand-text-muted hover:text-brand-text')}>
-              {tab.id === 'oscars' ? <><span className="sm:hidden">Oscar</span><span className="hidden sm:inline">Oscar 2027</span></> : tab.label}
-            </button>
-          ))}
-        </nav>
-      )}
+        {!hideTabs && (
+          <nav
+            className={clsx(
+              "mx-auto flex min-h-14 w-full max-w-425 items-center justify-center gap-0 overflow-x-auto px-4 sm:px-6 lg:px-8",
+              hideTabsOnDesktop && "lg:hidden",
+            )}
+          >
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="p-2 text-brand-gold hover:bg-white/5 rounded-lg transition"
+                aria-label="Voltar"
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="m15 18-6-6 6-6" />
+                </svg>
+              </button>
+            )}
+            {tabs
+              .filter((tab) => tab.show !== false)
+              .map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => onTabChange(tab.id)}
+                  className={clsx(
+                    "whitespace-nowrap border-r border-white/10 px-3 py-1.5 text-[10px] uppercase tracking-[0.12em] transition last:border-r-0 sm:px-5 sm:text-xs",
+                    activeTab === tab.id
+                      ? "text-brand-gold font-semibold border-b-2 border-b-brand-gold"
+                      : "text-brand-text-muted hover:text-brand-text",
+                  )}
+                >
+                  {tab.id === "oscars" ? (
+                    <>
+                      <span className="sm:hidden">Oscar</span>
+                      <span className="hidden sm:inline">Oscar 2027</span>
+                    </>
+                  ) : (
+                    tab.label
+                  )}
+                </button>
+              ))}
+          </nav>
+        )}
       </header>
-      <div aria-hidden="true" className={clsx("shrink-0", hideTabs ? "h-[68px]" : hideTabsOnDesktop ? "h-[124px] lg:h-[68px]" : "h-[124px]")} />
+      <div
+        aria-hidden="true"
+        className={clsx(
+          "shrink-0",
+          hideTabs
+            ? "h-17"
+            : hideTabsOnDesktop
+              ? "h-31 lg:h-17"
+              : "h-31",
+        )}
+      />
     </>
   );
 };

@@ -1,41 +1,68 @@
-import { useEffect, useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Tv, Eye, Plus, Trash2, Edit3, Star, ArrowLeft, Play, Video, Lock, ChevronDown } from 'lucide-react';
-import { useLocation } from 'wouter';
-import { useSeries } from '../../hooks/useSeries';
-import { useUsers } from '../../hooks/useUsers';
-import { getTvDetailsRawWithFallback, getTvCredits, getTvSimilarWithFallback, getTvWatchProviders, getTvSeasonEpisodes, getTvYouTubeTrailer, isGenericEpisodeName, isReleaseDateUpcoming, type TMDBTvSeasonMeta } from '../../lib/tmdb';
-import { getSeriesCineratsStats } from '../../lib/appData';
-import StarRatingInput from '../ui/StarRatingInput';
-import ReviewModal from '../ui/ReviewModal';
-import AvatarDisplay from '../layout/AvatarDisplay';
-import { generateImagePath } from '../../lib/imageUtils';
-import clsx from 'clsx';
-import SimilarMediaSection from '../ui/SimilarMediaSection';
-import WatchedTimingDialog from '../movies/WatchedTimingDialog';
-import TmdbImage from '../ui/TmdbImage';
-import { DetailPageSkeleton } from '../ui/LoadingSkeleton';
-import { Skeleton } from '../ui/LoadingSkeleton';
+import { useEffect, useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import {
+  Tv,
+  Eye,
+  Plus,
+  Trash2,
+  Edit3,
+  Star,
+  ArrowLeft,
+  Play,
+  Video,
+  Lock,
+  ChevronDown,
+} from "lucide-react";
+import { useLocation } from "wouter";
+import { useSeries } from "../../hooks/useSeries";
+import { useUsers } from "../../hooks/useUsers";
+import {
+  getTvDetailsRawWithFallback,
+  getTvCredits,
+  getTvSimilarWithFallback,
+  getTvWatchProviders,
+  getTvSeasonEpisodes,
+  getTvYouTubeTrailer,
+  isGenericEpisodeName,
+  isReleaseDateUpcoming,
+  type TMDBTvSeasonMeta,
+} from "../../service/tmdb";
+import { getSeriesCineratsStats } from "../../service/appData";
+import StarRatingInput from "../ui/StarRatingInput";
+import ReviewModal from "../ui/ReviewModal";
+import AvatarDisplay from "../layout/AvatarDisplay";
+import { generateImagePath } from "../../utils/image";
+import clsx from "clsx";
+import SimilarMediaSection from "../ui/SimilarMediaSection";
+import WatchedTimingDialog from "../movies/WatchedTimingDialog";
+import TmdbImage from "../ui/TmdbImage";
+import { DetailPageSkeleton } from "../ui/LoadingSkeleton";
+import { Skeleton } from "../ui/LoadingSkeleton";
 
 interface SeriesDetailScreenProps {
   id: string;
   currentUserId: string | null;
 }
 
-export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailScreenProps) {
+export default function SeriesDetailScreen({
+  id,
+  currentUserId,
+}: SeriesDetailScreenProps) {
   const [, setLocation] = useLocation();
   const handleBack = () => {
     if (window.history.length > 1) {
       window.history.back();
       return;
     }
-    setLocation('/');
+    setLocation("/");
   };
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [selectedSeason, setSelectedSeason] = useState(1);
   const [isUpdatingProgress, setIsUpdatingProgress] = useState(false);
   const [isWatchedTimingOpen, setIsWatchedTimingOpen] = useState(false);
-  const [expandedEpisodes, setExpandedEpisodes] = useState<Set<number>>(new Set());
+  const [expandedEpisodes, setExpandedEpisodes] = useState<Set<number>>(
+    new Set(),
+  );
   const isGuest = !currentUserId;
 
   const toggleEpisodeExpanded = (episodeNumber: number) => {
@@ -59,14 +86,14 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
 
   // 1. Fetch TMDB TV Details (Raw)
   const seriesQuery = useQuery({
-    queryKey: ['tmdb-tv-details', id],
+    queryKey: ["tmdb-tv-details", id],
     queryFn: () => getTvDetailsRawWithFallback(Number(id)),
     staleTime: 1000 * 60 * 10, // 10 minutes
   });
 
   // 2. Fetch TMDB TV Credits
   const creditsQuery = useQuery({
-    queryKey: ['tmdb-tv-credits', id],
+    queryKey: ["tmdb-tv-credits", id],
     queryFn: () => getTvCredits(id),
     staleTime: 1000 * 60 * 10,
     enabled: !!seriesQuery.data,
@@ -74,60 +101,72 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
 
   // 3. Fetch TMDB TV Watch Providers
   const providersQuery = useQuery({
-    queryKey: ['tmdb-tv-providers', id],
+    queryKey: ["tmdb-tv-providers", id],
     queryFn: () => getTvWatchProviders(Number(id)),
     staleTime: 1000 * 60 * 10,
     enabled: !!seriesQuery.data,
   });
 
   const trailerQuery = useQuery({
-    queryKey: ['tmdb-tv-trailer', id],
+    queryKey: ["tmdb-tv-trailer", id],
     queryFn: () => getTvYouTubeTrailer(id),
     staleTime: 1000 * 60 * 60 * 24,
     enabled: !!seriesQuery.data,
   });
 
   const similarQuery = useQuery({
-    queryKey: ['tmdb-tv-similar', id],
-    queryFn: () => getTvSimilarWithFallback(
-      Number(id),
-      (seriesQuery.data?.genres || []).map((genre: { id: number }) => genre.id),
-    ),
+    queryKey: ["tmdb-tv-similar", id],
+    queryFn: () =>
+      getTvSimilarWithFallback(
+        Number(id),
+        (seriesQuery.data?.genres || []).map(
+          (genre: { id: number }) => genre.id,
+        ),
+      ),
     staleTime: 1000 * 60 * 60,
     enabled: !!seriesQuery.data,
   });
 
   // 4. Fetch CineRats Stats for this series
   const cineratsQuery = useQuery({
-    queryKey: ['cinerats-series-stats', id],
-    queryFn: () => getSeriesCineratsStats(id, seriesQuery.data?.name || ''),
+    queryKey: ["cinerats-series-stats", id],
+    queryFn: () => getSeriesCineratsStats(id, seriesQuery.data?.name || ""),
     enabled: !!seriesQuery.data,
   });
 
   // 5. Fetch episodes of selected season
   const episodesQuery = useQuery({
-    queryKey: ['tmdb-tv-episodes', id, selectedSeason],
+    queryKey: ["tmdb-tv-episodes", id, selectedSeason],
     queryFn: () => getTvSeasonEpisodes(Number(id), selectedSeason),
     enabled: !!seriesQuery.data && selectedSeason > 0,
     staleTime: 1000 * 60 * 10,
   });
 
   // 6. Hook into series mutations and users
-  const { seriesQuery: userSeriesQuery, addSeriesMutation, updateProgressMutation, deleteSeriesMutation, rateSeriesMutation } = useSeries(currentUserId);
+  const {
+    seriesQuery: userSeriesQuery,
+    addSeriesMutation,
+    updateProgressMutation,
+    deleteSeriesMutation,
+    rateSeriesMutation,
+  } = useSeries(currentUserId);
   const usersQuery = useUsers();
 
   const series = seriesQuery.data;
   const credits = creditsQuery.data;
   const providers = providersQuery.data || [];
   const cineratsStats = cineratsQuery.data;
-  const userSeriesList = useMemo(() => userSeriesQuery.data || [], [userSeriesQuery.data]);
+  const userSeriesList = useMemo(
+    () => userSeriesQuery.data || [],
+    [userSeriesQuery.data],
+  );
   const users = usersQuery.data || [];
 
   // Match current user's local series document
   const userSeriesDoc = useMemo(() => {
     if (!series) return null;
     return userSeriesList.find(
-      (s) => s.titulo.toLowerCase().trim() === series.name.toLowerCase().trim()
+      (s) => s.titulo.toLowerCase().trim() === series.name.toLowerCase().trim(),
     );
   }, [userSeriesList, series]);
   const canEditUserReview = Boolean(
@@ -141,23 +180,31 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
     }
   }, [userSeriesDoc]);
 
-  const startYear = series?.first_air_date ? series.first_air_date.split('-')[0] : null;
+  const startYear = series?.first_air_date
+    ? series.first_air_date.split("-")[0]
+    : null;
   const isUpcoming = isReleaseDateUpcoming(series?.first_air_date);
-  const creators: Array<{ id: number; name: string }> = series?.created_by || [];
+  const creators: Array<{ id: number; name: string }> =
+    series?.created_by || [];
   const cast = credits?.cast?.slice(0, 6) || [];
-  const genres = series?.genres?.map((genre: { name: string }) => genre.name).join(', ') || '';
+  const genres =
+    series?.genres?.map((genre: { name: string }) => genre.name).join(", ") ||
+    "";
   const seasonsList = useMemo<TMDBTvSeasonMeta[]>(
     () => series?.seasons || [],
     [series?.seasons],
   );
 
   const activeSeasonMeta = useMemo(() => {
-    return seasonsList.find((season) => season.season_number === selectedSeason);
+    return seasonsList.find(
+      (season) => season.season_number === selectedSeason,
+    );
   }, [seasonsList, selectedSeason]);
   const regularSeasons = useMemo(
-    () => seasonsList
-      .filter((season) => season.season_number > 0)
-      .sort((a, b) => a.season_number - b.season_number),
+    () =>
+      seasonsList
+        .filter((season) => season.season_number > 0)
+        .sort((a, b) => a.season_number - b.season_number),
     [seasonsList],
   );
   const lastSeasonMeta = regularSeasons[regularSeasons.length - 1];
@@ -182,19 +229,21 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
           temporada: firstSeasonNumber,
           total_episodios: firstSeasonTotal,
           episodios_vistos: 1,
-          status: 'watching',
+          status: "watching",
         });
         return;
       }
 
       await addSeriesMutation.mutateAsync({
         titulo: series.name,
-        capa_url: series.poster_path ? `https://image.tmdb.org/t/p/w500${series.poster_path}` : null,
-        status: 'watching',
+        capa_url: series.poster_path
+          ? `https://image.tmdb.org/t/p/w500${series.poster_path}`
+          : null,
+        status: "watching",
         temporada: firstSeasonNumber,
         total_episodios: firstSeasonTotal,
         episodios_vistos: 1,
-        plataforma_slug: 'stremio',
+        plataforma_slug: "stremio",
         source_movie_id: String(series.id),
         rating: null,
         streaming_data: JSON.stringify(providers),
@@ -203,32 +252,39 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
       setSelectedSeason(firstSeasonNumber);
       await cineratsQuery.refetch();
     } catch (error) {
-      console.error('Falha ao acompanhar série', error);
+      console.error("Falha ao acompanhar série", error);
     }
   };
 
-  const handleAddSeries = async (status: 'watchlist' | 'watching' | 'watched', isRetroactive = false) => {
-    if (isGuest || !series || (isUpcoming && status !== 'watchlist')) return;
+  const handleAddSeries = async (
+    status: "watchlist" | "watching" | "watched",
+    isRetroactive = false,
+  ) => {
+    if (isGuest || !series || (isUpcoming && status !== "watchlist")) return;
     const totalEpsOfSeason = activeSeasonMeta?.episode_count || 1;
-    const targetSeason = status === 'watched'
-      ? (lastSeasonMeta?.season_number || selectedSeason)
-      : selectedSeason;
-    const targetSeasonEpisodes = status === 'watched'
-      ? (lastSeasonMeta?.episode_count || totalEpsOfSeason)
-      : totalEpsOfSeason;
+    const targetSeason =
+      status === "watched"
+        ? lastSeasonMeta?.season_number || selectedSeason
+        : selectedSeason;
+    const targetSeasonEpisodes =
+      status === "watched"
+        ? lastSeasonMeta?.episode_count || totalEpsOfSeason
+        : totalEpsOfSeason;
 
     await addSeriesMutation.mutateAsync({
       titulo: series.name,
-      capa_url: series.poster_path ? `https://image.tmdb.org/t/p/w500${series.poster_path}` : null,
+      capa_url: series.poster_path
+        ? `https://image.tmdb.org/t/p/w500${series.poster_path}`
+        : null,
       status,
       temporada: targetSeason,
       total_episodios: targetSeasonEpisodes,
-      episodios_vistos: status === 'watched' ? targetSeasonEpisodes : 0,
-      plataforma_slug: 'stremio',
+      episodios_vistos: status === "watched" ? targetSeasonEpisodes : 0,
+      plataforma_slug: "stremio",
       source_movie_id: String(series.id),
       rating: null,
       streaming_data: JSON.stringify(providers),
-      is_retroactive: status === 'watched' ? isRetroactive : false,
+      is_retroactive: status === "watched" ? isRetroactive : false,
     });
     await cineratsQuery.refetch();
   };
@@ -239,7 +295,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
       temporada: number;
       total_episodios: number;
       episodios_vistos: number;
-      status: 'watchlist' | 'watching' | 'watched';
+      status: "watchlist" | "watching" | "watched";
     },
     isRetroactive = false,
   ) => {
@@ -255,15 +311,15 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
     if (!userSeriesDoc) return;
     const totalEpsOfSeason = activeSeasonMeta?.episode_count || 1;
     const completedSeries = Boolean(
-      lastSeasonMeta
-      && selectedSeason === lastSeasonMeta.season_number
-      && episodeNumber >= totalEpsOfSeason,
+      lastSeasonMeta &&
+      selectedSeason === lastSeasonMeta.season_number &&
+      episodeNumber >= totalEpsOfSeason,
     );
     const nextStatus = completedSeries
-      ? 'watched'
-      : episodeNumber > 0 || userSeriesDoc.status !== 'watchlist'
-        ? 'watching'
-        : 'watchlist';
+      ? "watched"
+      : episodeNumber > 0 || userSeriesDoc.status !== "watchlist"
+        ? "watching"
+        : "watchlist";
 
     if (completedSeries) {
       setPendingSeriesCompletion({
@@ -297,7 +353,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
         {
           id: userSeriesDoc.id,
           ...pendingSeriesCompletion,
-          status: 'watched',
+          status: "watched",
         },
         isRetroactive,
       );
@@ -306,21 +362,22 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
     }
 
     if (userSeriesDoc) {
-      const totalEpsOfSeries = lastSeasonMeta?.episode_count || activeSeasonMeta?.episode_count || 1;
+      const totalEpsOfSeries =
+        lastSeasonMeta?.episode_count || activeSeasonMeta?.episode_count || 1;
       await saveSeriesProgress(
         {
           id: userSeriesDoc.id,
           temporada: lastSeasonMeta?.season_number || selectedSeason,
           total_episodios: totalEpsOfSeries,
           episodios_vistos: totalEpsOfSeries,
-          status: 'watched',
+          status: "watched",
         },
         isRetroactive,
       );
       return;
     }
 
-    await handleAddSeries('watched', isRetroactive);
+    await handleAddSeries("watched", isRetroactive);
   };
 
   const handleWatchedTimingOpenChange = (open: boolean) => {
@@ -331,12 +388,12 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
   const handleToggleWatchlistOnly = async () => {
     if (isGuest || !series) return;
     if (userSeriesDoc) {
-      if (userSeriesDoc.status === 'watchlist') {
+      if (userSeriesDoc.status === "watchlist") {
         await deleteSeriesMutation.mutateAsync(userSeriesDoc.id);
       } else {
         await updateProgressMutation.mutateAsync({
           id: userSeriesDoc.id,
-          status: 'watchlist',
+          status: "watchlist",
           temporada: userSeriesDoc.temporada,
           total_episodios: userSeriesDoc.total_episodios,
           episodios_vistos: 0,
@@ -344,7 +401,7 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
       }
       cineratsQuery.refetch();
     } else {
-      await handleAddSeries('watchlist');
+      await handleAddSeries("watchlist");
     }
   };
 
@@ -367,7 +424,9 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center gap-4">
         <span className="text-4xl">📺</span>
-        <h2 className="text-lg uppercase tracking-widest text-red-400">Série não encontrada</h2>
+        <h2 className="text-lg uppercase tracking-widest text-red-400">
+          Série não encontrada
+        </h2>
         <button
           onClick={handleBack}
           className="text-xs uppercase tracking-widest text-brand-gold hover:underline flex items-center gap-2 mt-2"
@@ -378,12 +437,26 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
     );
   }
 
-  const imageSrc = generateImagePath(series.name, series.poster_path ? `https://image.tmdb.org/t/p/w500${series.poster_path}` : null);
-  const backdropUrl = series.backdrop_path ? `https://image.tmdb.org/t/p/original${series.backdrop_path}` : '';
+  const imageSrc = generateImagePath(
+    series.name,
+    series.poster_path
+      ? `https://image.tmdb.org/t/p/w500${series.poster_path}`
+      : null,
+  );
+  const backdropUrl = series.backdrop_path
+    ? `https://image.tmdb.org/t/p/original${series.backdrop_path}`
+    : "";
   const tmdbRating = Number(series.vote_average ?? 0) / 2;
-  const progressPercent = userSeriesDoc && userSeriesDoc.total_episodios > 0
-    ? Math.min(100, Math.round((userSeriesDoc.episodios_vistos / userSeriesDoc.total_episodios) * 100))
-    : 0;
+  const progressPercent =
+    userSeriesDoc && userSeriesDoc.total_episodios > 0
+      ? Math.min(
+          100,
+          Math.round(
+            (userSeriesDoc.episodios_vistos / userSeriesDoc.total_episodios) *
+              100,
+          ),
+        )
+      : 0;
 
   return (
     <div className="flex-1 min-w-0 animate-in fade-in duration-500">
@@ -413,17 +486,33 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
       <div className="relative z-10 px-0 sm:px-4 -mt-24 sm:-mt-32 md:-mt-40 flex flex-col md:flex-row gap-8 items-start">
         {/* Left Side: Poster */}
         <div className="w-48 sm:w-56 md:w-64 aspect-[2/3] shrink-0 rounded-2xl overflow-hidden border border-[#222] bg-[#050811] shadow-2xl shadow-black/80 mx-auto md:mx-0">
-          <TmdbImage src={imageSrc} alt={series.name} sizes="(max-width: 639px) 192px, 256px" className="w-full h-full object-cover" />
+          <TmdbImage
+            src={imageSrc}
+            alt={series.name}
+            sizes="(max-width: 639px) 192px, 256px"
+            className="w-full h-full object-cover"
+          />
         </div>
 
         {/* Right Side: Information */}
         <div className="flex-1 min-w-0 flex flex-col gap-6 text-center md:text-left">
           <div className="space-y-2">
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-extralight tracking-wide text-brand-text break-words uppercase">
-              {series.name} {startYear && <span className="text-brand-gold-alt font-light text-2xl">({startYear})</span>}
+              {series.name}{" "}
+              {startYear && (
+                <span className="text-brand-gold-alt font-light text-2xl">
+                  ({startYear})
+                </span>
+              )}
             </h1>
             <p className="text-xs uppercase tracking-widest text-brand-text-muted font-light">
-              {genres} {series.number_of_seasons ? `• ${series.number_of_seasons} temp.` : ''} {series.number_of_episodes ? `• ${series.number_of_episodes} eps.` : ''}
+              {genres}{" "}
+              {series.number_of_seasons
+                ? `• ${series.number_of_seasons} temp.`
+                : ""}{" "}
+              {series.number_of_episodes
+                ? `• ${series.number_of_episodes} eps.`
+                : ""}
             </p>
           </div>
 
@@ -432,35 +521,55 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
             <button
               onClick={handleToggleWatchlistOnly}
               disabled={isPending || isGuest}
-              title={isGuest ? 'Entre para usar a watchlist' : undefined}
+              title={isGuest ? "Entre para usar a watchlist" : undefined}
               className={clsx(
-                'flex items-center gap-2 py-3 px-6 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all active:scale-95 border disabled:opacity-50',
-                userSeriesDoc?.status === 'watchlist'
-                  ? 'bg-brand-gold text-brand-bg border-brand-gold font-bold'
-                  : 'bg-black/45 border-[#222] text-brand-text hover:border-brand-gold/35 hover:text-brand-gold'
+                "flex items-center gap-2 py-3 px-6 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all active:scale-95 border disabled:opacity-50",
+                userSeriesDoc?.status === "watchlist"
+                  ? "bg-brand-gold text-brand-bg border-brand-gold font-bold"
+                  : "bg-black/45 border-[#222] text-brand-text hover:border-brand-gold/35 hover:text-brand-gold",
               )}
             >
-              {isGuest ? <Lock size={14} /> : userSeriesDoc?.status === 'watchlist' ? <Trash2 size={14} /> : <Plus size={14} />}
-              {isGuest ? 'Watchlist' : userSeriesDoc?.status === 'watchlist' ? 'Na Watchlist' : 'Watchlist'}
+              {isGuest ? (
+                <Lock size={14} />
+              ) : userSeriesDoc?.status === "watchlist" ? (
+                <Trash2 size={14} />
+              ) : (
+                <Plus size={14} />
+              )}
+              {isGuest
+                ? "Watchlist"
+                : userSeriesDoc?.status === "watchlist"
+                  ? "Na Watchlist"
+                  : "Watchlist"}
             </button>
 
-            {!isUpcoming && (!userSeriesDoc || userSeriesDoc.status === 'watchlist') && (
-              <button
-                onClick={handleStartWatching}
-                disabled={isPending || isGuest}
-                title={isGuest ? 'Entre para acompanhar esta serie' : undefined}
-                className="flex items-center gap-2 py-3 px-6 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all active:scale-95 border bg-black/45 border-[#222] text-brand-text hover:border-brand-gold/35 hover:text-brand-gold disabled:opacity-50"
-              >
-                {isGuest ? <Lock size={14} /> : <Play size={12} className="fill-brand-text text-brand-text" />}
-                Acompanhar
-              </button>
-            )}
+            {!isUpcoming &&
+              (!userSeriesDoc || userSeriesDoc.status === "watchlist") && (
+                <button
+                  onClick={handleStartWatching}
+                  disabled={isPending || isGuest}
+                  title={
+                    isGuest ? "Entre para acompanhar esta serie" : undefined
+                  }
+                  className="flex items-center gap-2 py-3 px-6 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all active:scale-95 border bg-black/45 border-[#222] text-brand-text hover:border-brand-gold/35 hover:text-brand-gold disabled:opacity-50"
+                >
+                  {isGuest ? (
+                    <Lock size={14} />
+                  ) : (
+                    <Play
+                      size={12}
+                      className="fill-brand-text text-brand-text"
+                    />
+                  )}
+                  Acompanhar
+                </button>
+              )}
 
-            {!isUpcoming && userSeriesDoc?.status !== 'watched' && (
+            {!isUpcoming && userSeriesDoc?.status !== "watched" && (
               <button
                 onClick={() => setIsWatchedTimingOpen(true)}
                 disabled={isPending || isGuest}
-                title={isGuest ? 'Entre para marcar como vista' : undefined}
+                title={isGuest ? "Entre para marcar como vista" : undefined}
                 className="flex items-center gap-2 py-3 px-6 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all active:scale-95 border bg-black/45 border-[#222] text-brand-text hover:border-brand-gold/35 hover:text-brand-gold disabled:opacity-50"
               >
                 {isGuest ? <Lock size={14} /> : <Eye size={14} />}
@@ -468,40 +577,50 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
               </button>
             )}
 
-            {canEditUserReview && userSeriesDoc?.status === 'watched' && (
+            {canEditUserReview && userSeriesDoc?.status === "watched" && (
               <button
                 onClick={() => setIsReviewOpen(true)}
                 className="flex items-center gap-2 py-3 px-6 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all active:scale-95 border bg-black/45 border-[#222] text-brand-gold-alt hover:border-brand-gold hover:text-brand-gold"
               >
                 <Edit3 size={14} />
-                {userSeriesDoc.review ? 'Editar Resenha' : 'Escrever Resenha'}
+                {userSeriesDoc.review ? "Editar Resenha" : "Escrever Resenha"}
               </button>
             )}
           </div>
 
           {/* Interactive Rating Input if watched */}
-          {canEditUserReview && userSeriesDoc?.status === 'watched' && (
+          {canEditUserReview && userSeriesDoc?.status === "watched" && (
             <div className="flex items-center justify-center md:justify-start gap-4 p-4 rounded-2xl bg-black/20 border border-[#151515] w-fit">
-              <span className="text-xs uppercase tracking-wider text-brand-text-muted font-light">Sua avaliação:</span>
+              <span className="text-xs uppercase tracking-wider text-brand-text-muted font-light">
+                Sua avaliação:
+              </span>
               <StarRatingInput
                 value={userSeriesDoc?.rating ?? userSeriesDoc?.avaliacao ?? 0}
-                onChange={(val) => handleSaveRatingAndReview(val, userSeriesDoc?.review || '')}
+                onChange={(val) =>
+                  handleSaveRatingAndReview(val, userSeriesDoc?.review || "")
+                }
                 disabled={isPending}
               />
               <span className="text-xs font-bold text-brand-gold">
-                {(userSeriesDoc?.rating || userSeriesDoc?.avaliacao) ? `${Number(userSeriesDoc.rating ?? userSeriesDoc.avaliacao ?? 0).toFixed(1)} / 5.0` : 'Sem nota'}
+                {userSeriesDoc?.rating || userSeriesDoc?.avaliacao
+                  ? `${Number(userSeriesDoc.rating ?? userSeriesDoc.avaliacao ?? 0).toFixed(1)} / 5.0`
+                  : "Sem nota"}
               </span>
             </div>
           )}
 
           {/* Progress Tracker (If watching or watched) */}
-          {userSeriesDoc && userSeriesDoc.status !== 'watchlist' && (
+          {userSeriesDoc && userSeriesDoc.status !== "watchlist" && (
             <div className="bg-black/20 border border-[#151515] rounded-2xl p-4 w-full sm:max-w-md space-y-2 text-left">
               <div className="flex items-center justify-between text-xs tracking-wider uppercase font-light">
                 <span className="text-brand-text-muted">
-                  Progresso: Temp. {userSeriesDoc.temporada || 1} • {userSeriesDoc.episodios_vistos} / {userSeriesDoc.total_episodios} eps
+                  Progresso: Temp. {userSeriesDoc.temporada || 1} •{" "}
+                  {userSeriesDoc.episodios_vistos} /{" "}
+                  {userSeriesDoc.total_episodios} eps
                 </span>
-                <span className="text-brand-gold font-semibold">{progressPercent}%</span>
+                <span className="text-brand-gold font-semibold">
+                  {progressPercent}%
+                </span>
               </div>
               <div className="w-full h-1.5 bg-[#0a0f1e] overflow-hidden rounded-full border border-[#222]">
                 <div
@@ -516,23 +635,38 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
           {cineratsStats && (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 bg-black/20 border border-[#151515] rounded-2xl p-4 w-full sm:max-w-lg mt-2">
               <div className="text-center border-r border-[#151515] pr-4">
-                <span className="text-[10px] uppercase tracking-widest text-brand-text-muted block">Média CineRats</span>
+                <span className="text-[10px] uppercase tracking-widest text-brand-text-muted block">
+                  Média CineRats
+                </span>
                 <span className="text-2xl font-bold text-brand-gold flex items-center justify-center gap-1.5 mt-1">
-                  <Star size={18} className="fill-brand-gold text-brand-gold shrink-0" />
-                  {cineratsStats.averageRating > 0 ? Number(cineratsStats.averageRating).toFixed(1) : '-'}
+                  <Star
+                    size={18}
+                    className="fill-brand-gold text-brand-gold shrink-0"
+                  />
+                  {cineratsStats.averageRating > 0
+                    ? Number(cineratsStats.averageRating).toFixed(1)
+                    : "-"}
                 </span>
               </div>
               <div className="text-center pl-4 flex flex-col justify-center">
-                <span className="text-[10px] uppercase tracking-widest text-brand-text-muted block">Média TMDB</span>
+                <span className="text-[10px] uppercase tracking-widest text-brand-text-muted block">
+                  Média TMDB
+                </span>
                 <span className="text-2xl font-bold text-brand-gold flex items-center justify-center gap-1.5 mt-1">
-                  <Star size={18} className="fill-brand-gold text-brand-gold shrink-0" />
-                  {tmdbRating > 0 ? tmdbRating.toFixed(1) : '-'}
+                  <Star
+                    size={18}
+                    className="fill-brand-gold text-brand-gold shrink-0"
+                  />
+                  {tmdbRating > 0 ? tmdbRating.toFixed(1) : "-"}
                 </span>
               </div>
               <div className="col-span-2 border-t border-[#151515] pt-3 text-center sm:col-span-1 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0 flex flex-col justify-center">
-                <span className="text-[10px] uppercase tracking-widest text-brand-text-muted block">Acompanham/Viram</span>
+                <span className="text-[10px] uppercase tracking-widest text-brand-text-muted block">
+                  Acompanham/Viram
+                </span>
                 <span className="text-xl font-light text-brand-text mt-1">
-                  {cineratsStats.watchersCount} {cineratsStats.watchersCount === 1 ? 'membro' : 'membros'}
+                  {cineratsStats.watchersCount}{" "}
+                  {cineratsStats.watchersCount === 1 ? "membro" : "membros"}
                 </span>
               </div>
             </div>
@@ -546,9 +680,15 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
         <div className="lg:col-span-2 space-y-10">
           {/* Synopsis */}
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold tracking-[0.25em] uppercase text-brand-gold">Sinopse</h3>
+            <h3 className="text-sm font-semibold tracking-[0.25em] uppercase text-brand-gold">
+              Sinopse
+            </h3>
             <p className="text-brand-text/90 font-light leading-relaxed text-sm">
-              {series.overview || <span className="italic text-brand-text-muted">Sinopse não disponível no momento.</span>}
+              {series.overview || (
+                <span className="italic text-brand-text-muted">
+                  Sinopse não disponível no momento.
+                </span>
+              )}
             </p>
           </div>
 
@@ -566,36 +706,75 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
 
           {/* Technical Info */}
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold tracking-[0.25em] uppercase text-brand-gold">Ficha Técnica & Elenco</h3>
+            <h3 className="text-sm font-semibold tracking-[0.25em] uppercase text-brand-gold">
+              Ficha Técnica & Elenco
+            </h3>
             <div className="bg-black/10 border border-[#151515] rounded-2xl p-5 space-y-4">
               <div className="text-sm">
-                <span className="font-semibold text-brand-text-muted uppercase text-xs tracking-wider">Criador:</span>{' '}
-                {creators.length ? creators.map((creator, index) => <span key={creator.id}>{index > 0 && ', '}<button type="button" onClick={() => setLocation(`/director/${creator.id}`)} className="cursor-pointer font-light text-brand-text transition hover:text-brand-gold hover:underline">{creator.name}</button></span>) : <span className="font-light text-brand-text">Não especificado</span>}
+                <span className="font-semibold text-brand-text-muted uppercase text-xs tracking-wider">
+                  Criador:
+                </span>{" "}
+                {creators.length ? (
+                  creators.map((creator, index) => (
+                    <span key={creator.id}>
+                      {index > 0 && ", "}
+                      <button
+                        type="button"
+                        onClick={() => setLocation(`/director/${creator.id}`)}
+                        className="cursor-pointer font-light text-brand-text transition hover:text-brand-gold hover:underline"
+                      >
+                        {creator.name}
+                      </button>
+                    </span>
+                  ))
+                ) : (
+                  <span className="font-light text-brand-text">
+                    Não especificado
+                  </span>
+                )}
               </div>
 
               {cast.length > 0 && (
                 <div>
-                  <span className="font-semibold text-brand-text-muted uppercase text-xs tracking-wider block mb-3">Elenco principal:</span>
+                  <span className="font-semibold text-brand-text-muted uppercase text-xs tracking-wider block mb-3">
+                    Elenco principal:
+                  </span>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    {cast.map((actor: { id: number; name: string; profile_path: string | null; character?: string }) => (
-                      <button key={actor.id} type="button" onClick={() => setLocation(`/actor/${actor.id}`)} className="flex min-w-0 cursor-pointer items-center gap-2 text-left transition hover:text-brand-gold">
-                        {actor.profile_path ? (
-                          <img
-                            src={`https://image.tmdb.org/t/p/w185${actor.profile_path}`}
-                            alt={actor.name}
-                            className="w-10 h-10 object-cover rounded-full border border-[#222] shrink-0"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full border border-[#222] bg-brand-card flex items-center justify-center shrink-0">
-                            <Tv size={14} className="text-[#333]" />
+                    {cast.map(
+                      (actor: {
+                        id: number;
+                        name: string;
+                        profile_path: string | null;
+                        character?: string;
+                      }) => (
+                        <button
+                          key={actor.id}
+                          type="button"
+                          onClick={() => setLocation(`/actor/${actor.id}`)}
+                          className="flex min-w-0 cursor-pointer items-center gap-2 text-left transition hover:text-brand-gold"
+                        >
+                          {actor.profile_path ? (
+                            <img
+                              src={`https://image.tmdb.org/t/p/w185${actor.profile_path}`}
+                              alt={actor.name}
+                              className="w-10 h-10 object-cover rounded-full border border-[#222] shrink-0"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full border border-[#222] bg-brand-card flex items-center justify-center shrink-0">
+                              <Tv size={14} className="text-[#333]" />
+                            </div>
+                          )}
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-xs truncate font-medium text-brand-text">
+                              {actor.name}
+                            </span>
+                            <span className="text-[10px] text-brand-text-muted truncate font-light">
+                              {actor.character}
+                            </span>
                           </div>
-                        )}
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-xs truncate font-medium text-brand-text">{actor.name}</span>
-                          <span className="text-[10px] text-brand-text-muted truncate font-light">{actor.character}</span>
-                        </div>
-                      </button>
-                    ))}
+                        </button>
+                      ),
+                    )}
                   </div>
                 </div>
               )}
@@ -603,15 +782,26 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
           </div>
 
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold tracking-[0.25em] uppercase text-brand-gold">Onde Assistir</h3>
+            <h3 className="text-sm font-semibold tracking-[0.25em] uppercase text-brand-gold">
+              Onde Assistir
+            </h3>
             {providersQuery.isLoading ? (
-              <p className="text-xs text-brand-text-muted">Consultando plataformas...</p>
+              <p className="text-xs text-brand-text-muted">
+                Consultando plataformas...
+              </p>
             ) : providers.length ? (
               <div className="flex items-center gap-3 flex-wrap">
                 {providers.map((provider) => (
-                  <div key={provider.provider_id} className="flex items-center gap-2 bg-black/35 border border-[#151515] px-3 py-1.5 rounded-xl text-xs font-light text-brand-text shrink-0">
+                  <div
+                    key={provider.provider_id}
+                    className="flex items-center gap-2 bg-black/35 border border-[#151515] px-3 py-1.5 rounded-xl text-xs font-light text-brand-text shrink-0"
+                  >
                     {provider.logo_path ? (
-                      <img src={`https://image.tmdb.org/t/p/w92${provider.logo_path}`} alt={provider.provider_name} className="w-5 h-5 rounded object-cover" />
+                      <img
+                        src={`https://image.tmdb.org/t/p/w92${provider.logo_path}`}
+                        alt={provider.provider_name}
+                        className="w-5 h-5 rounded object-cover"
+                      />
                     ) : (
                       <Tv size={12} className="text-brand-gold-alt" />
                     )}
@@ -620,17 +810,25 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-brand-text-muted">Nenhuma plataforma encontrada no Brasil.</p>
+              <p className="text-xs text-brand-text-muted">
+                Nenhuma plataforma encontrada no Brasil.
+              </p>
             )}
           </div>
 
-          <SimilarMediaSection items={similarQuery.data || []} type="series" isLoading={similarQuery.isLoading} />
+          <SimilarMediaSection
+            items={similarQuery.data || []}
+            type="series"
+            isLoading={similarQuery.isLoading}
+          />
 
           {/* Seasons and Episodes Selector */}
           {seasonsList.length > 0 && (
             <div className="space-y-6">
               <div className="flex items-center justify-between border-b border-[#151515] pb-3">
-                <h3 className="text-sm font-semibold tracking-[0.25em] uppercase text-brand-gold">Episódios por Temporada</h3>
+                <h3 className="text-sm font-semibold tracking-[0.25em] uppercase text-brand-gold">
+                  Episódios por Temporada
+                </h3>
 
                 {/* Season select */}
                 <select
@@ -641,8 +839,12 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
                   {seasonsList
                     .filter((season) => season.season_number > 0)
                     .map((season) => (
-                      <option key={season.season_number} value={season.season_number}>
-                        Temporada {season.season_number} ({season.episode_count} eps)
+                      <option
+                        key={season.season_number}
+                        value={season.season_number}
+                      >
+                        Temporada {season.season_number} ({season.episode_count}{" "}
+                        eps)
                       </option>
                     ))}
                 </select>
@@ -652,15 +854,35 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
               <div className="bg-black/15 border border-[#151515] rounded-2xl p-4">
                 {episodesQuery.isLoading ? (
                   <div className="flex items-center justify-center py-12 text-brand-text-muted text-xs uppercase tracking-widest gap-2">
-                    <div role="status" aria-label="Carregando episódios" className="space-y-2">{[0, 1, 2, 3].map((item) => <div key={item} className="flex items-center gap-3 rounded-xl border border-white/5 p-3"><Skeleton className="h-12 w-20 shrink-0 rounded" /><div className="flex-1 space-y-2"><Skeleton className="h-3 w-1/2" /><Skeleton className="h-2.5 w-4/5" /></div></div>)}</div>
+                    <div
+                      role="status"
+                      aria-label="Carregando episódios"
+                      className="space-y-2"
+                    >
+                      {[0, 1, 2, 3].map((item) => (
+                        <div
+                          key={item}
+                          className="flex items-center gap-3 rounded-xl border border-white/5 p-3"
+                        >
+                          <Skeleton className="h-12 w-20 shrink-0 rounded" />
+                          <div className="flex-1 space-y-2">
+                            <Skeleton className="h-3 w-1/2" />
+                            <Skeleton className="h-2.5 w-4/5" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ) : episodesQuery.data && episodesQuery.data.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 items-start gap-3 max-h-[50vh] overflow-y-auto pr-2">
                     {episodesQuery.data.map((ep) => {
-                      const isSeen = userSeriesDoc &&
+                      const isSeen =
+                        userSeriesDoc &&
                         userSeriesDoc.temporada === selectedSeason &&
                         userSeriesDoc.episodios_vistos >= ep.episode_number;
-                      const isExpanded = expandedEpisodes.has(ep.episode_number);
+                      const isExpanded = expandedEpisodes.has(
+                        ep.episode_number,
+                      );
                       const episodeLabel = isGenericEpisodeName(ep.name)
                         ? `Ep. ${ep.episode_number}`
                         : `Ep. ${ep.episode_number} - ${ep.name}`;
@@ -670,21 +892,23 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
                         <div
                           key={ep.episode_number}
                           className={clsx(
-                            'rounded-xl border transition-all',
+                            "rounded-xl border transition-all",
                             isSeen
-                              ? 'bg-brand-gold/5 border-brand-gold/20 text-brand-gold'
-                              : 'bg-black/20 border-[#151515] text-brand-text-muted'
+                              ? "bg-brand-gold/5 border-brand-gold/20 text-brand-gold"
+                              : "bg-black/20 border-[#151515] text-brand-text-muted",
                           )}
                         >
                           <div className="flex items-center justify-between gap-2 p-3">
                             <button
                               type="button"
-                              onClick={() => toggleEpisodeExpanded(ep.episode_number)}
+                              onClick={() =>
+                                toggleEpisodeExpanded(ep.episode_number)
+                              }
                               aria-expanded={isExpanded}
                               aria-controls={overviewId}
                               className={clsx(
-                                'min-w-0 flex-1 cursor-pointer text-left text-xs font-light transition-colors hover:text-brand-text',
-                                isExpanded ? 'whitespace-normal' : 'truncate'
+                                "min-w-0 flex-1 cursor-pointer text-left text-xs font-light transition-colors hover:text-brand-text",
+                                isExpanded ? "whitespace-normal" : "truncate",
                               )}
                             >
                               {episodeLabel}
@@ -698,17 +922,23 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
                                   onClick={() => {
                                     if (!isUpdatingProgress) {
                                       void handleUpdateEpisodeProgress(
-                                        isSeen ? ep.episode_number - 1 : ep.episode_number
+                                        isSeen
+                                          ? ep.episode_number - 1
+                                          : ep.episode_number,
                                       );
                                     }
                                   }}
-                                  aria-label={isSeen ? `Desmarcar ${episodeLabel} como visto` : `Marcar ${episodeLabel} como visto`}
+                                  aria-label={
+                                    isSeen
+                                      ? `Desmarcar ${episodeLabel} como visto`
+                                      : `Marcar ${episodeLabel} como visto`
+                                  }
                                   aria-pressed={Boolean(isSeen)}
                                   className={clsx(
-                                    'p-1 rounded-full border transition-colors cursor-pointer disabled:cursor-wait disabled:opacity-60',
+                                    "p-1 rounded-full border transition-colors cursor-pointer disabled:cursor-wait disabled:opacity-60",
                                     isSeen
-                                      ? 'border-brand-gold bg-brand-gold/25 text-brand-gold'
-                                      : 'border-[#222] text-[#333] hover:text-brand-text hover:border-brand-text'
+                                      ? "border-brand-gold bg-brand-gold/25 text-brand-gold"
+                                      : "border-[#222] text-[#333] hover:text-brand-text hover:border-brand-text",
                                   )}
                                 >
                                   <Eye size={12} />
@@ -716,20 +946,36 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
                               )}
                               <button
                                 type="button"
-                                onClick={() => toggleEpisodeExpanded(ep.episode_number)}
+                                onClick={() =>
+                                  toggleEpisodeExpanded(ep.episode_number)
+                                }
                                 aria-expanded={isExpanded}
                                 aria-controls={overviewId}
-                                aria-label={isExpanded ? 'Ocultar resumo do episódio' : 'Mostrar resumo do episódio'}
+                                aria-label={
+                                  isExpanded
+                                    ? "Ocultar resumo do episódio"
+                                    : "Mostrar resumo do episódio"
+                                }
                                 className="p-1 rounded-full cursor-pointer text-brand-text-muted transition-colors hover:text-brand-text"
                               >
-                                <ChevronDown size={14} className={clsx('transition-transform duration-200', isExpanded && 'rotate-180')} />
+                                <ChevronDown
+                                  size={14}
+                                  className={clsx(
+                                    "transition-transform duration-200",
+                                    isExpanded && "rotate-180",
+                                  )}
+                                />
                               </button>
                             </div>
                           </div>
 
                           {isExpanded && (
-                            <p id={overviewId} className="border-t border-white/5 px-3 pb-3 pt-2 text-xs font-light leading-relaxed text-brand-text-muted whitespace-pre-line">
-                              {ep.overview || 'Resumo não disponível para este episódio.'}
+                            <p
+                              id={overviewId}
+                              className="border-t border-white/5 px-3 pb-3 pt-2 text-xs font-light leading-relaxed text-brand-text-muted whitespace-pre-line"
+                            >
+                              {ep.overview ||
+                                "Resumo não disponível para este episódio."}
                             </p>
                           )}
                         </div>
@@ -748,25 +994,40 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
 
         {/* Reviews Section */}
         <div className="space-y-6">
-          <h3 className="text-sm font-semibold tracking-[0.25em] uppercase text-brand-gold">Resenhas CineRats</h3>
+          <h3 className="text-sm font-semibold tracking-[0.25em] uppercase text-brand-gold">
+            Resenhas CineRats
+          </h3>
 
           {cineratsStats?.reviews && cineratsStats.reviews.length > 0 ? (
             <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
               {cineratsStats.reviews.map((rev, idx) => {
                 const author = users.find((u) => u.id === rev.userId);
                 if (!author) return null;
-                const formattedDate = new Date(rev.createdAt).toLocaleDateString('pt-BR');
+                const formattedDate = new Date(
+                  rev.createdAt,
+                ).toLocaleDateString("pt-BR");
 
                 return (
-                  <div key={idx} className="bg-black/35 border border-[#151515] rounded-2xl p-4 space-y-3">
+                  <div
+                    key={idx}
+                    className="bg-black/35 border border-[#151515] rounded-2xl p-4 space-y-3"
+                  >
                     <div className="flex items-center justify-between gap-2">
-                      <a href={`/${author.username}`} className="flex items-center gap-2 group min-w-0">
-                        <AvatarDisplay avatarId={author.avatar_id} className="w-6 h-6 rounded-full overflow-hidden shrink-0 border border-[#222]" />
+                      <a
+                        href={`/${author.username}`}
+                        className="flex items-center gap-2 group min-w-0"
+                      >
+                        <AvatarDisplay
+                          avatarId={author.avatar_id}
+                          className="w-6 h-6 rounded-full overflow-hidden shrink-0 border border-[#222]"
+                        />
                         <span className="text-xs font-semibold text-brand-text group-hover:text-brand-gold transition-colors truncate">
                           {author.display_name || author.username}
                         </span>
                       </a>
-                      <span className="text-[9px] text-brand-text-muted tracking-wide shrink-0">{formattedDate}</span>
+                      <span className="text-[9px] text-brand-text-muted tracking-wide shrink-0">
+                        {formattedDate}
+                      </span>
                     </div>
 
                     {rev.rating !== null && rev.rating > 0 && (
@@ -777,14 +1038,16 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
                             size={10}
                             className={clsx(
                               rev.rating! >= star
-                                ? 'text-yellow-400 fill-yellow-400'
+                                ? "text-yellow-400 fill-yellow-400"
                                 : rev.rating! >= star - 0.5
-                                ? 'text-yellow-400 fill-yellow-400 overflow-hidden'
-                                : 'text-[#333]'
+                                  ? "text-yellow-400 fill-yellow-400 overflow-hidden"
+                                  : "text-[#333]",
                             )}
                           />
                         ))}
-                        <span className="text-[10px] text-brand-gold ml-1 font-light">{Number(rev.rating || 0).toFixed(1)}</span>
+                        <span className="text-[10px] text-brand-gold ml-1 font-light">
+                          {Number(rev.rating || 0).toFixed(1)}
+                        </span>
                       </div>
                     )}
 
@@ -809,17 +1072,23 @@ export default function SeriesDetailScreen({ id, currentUserId }: SeriesDetailSc
           isOpen={isReviewOpen}
           onOpenChange={setIsReviewOpen}
           title={series.name}
-          coverUrl={series.poster_path ? `https://image.tmdb.org/t/p/w500${series.poster_path}` : null}
+          coverUrl={
+            series.poster_path
+              ? `https://image.tmdb.org/t/p/w500${series.poster_path}`
+              : null
+          }
           initialRating={userSeriesDoc.rating ?? userSeriesDoc.avaliacao ?? 0}
-          initialReview={userSeriesDoc.review || ''}
+          initialReview={userSeriesDoc.review || ""}
           isReadOnly={false}
           onSave={async (stars, text) => {
             await handleSaveRatingAndReview(stars, text);
           }}
           onSkip={async (stars) => {
-            await handleSaveRatingAndReview(stars, userSeriesDoc.review || '');
+            await handleSaveRatingAndReview(stars, userSeriesDoc.review || "");
           }}
-          watchedAt={userSeriesDoc.status === 'watched' ? userSeriesDoc.created_at : null}
+          watchedAt={
+            userSeriesDoc.status === "watched" ? userSeriesDoc.created_at : null
+          }
           isRetroactive={Boolean(userSeriesDoc.is_retroactive)}
         />
       )}

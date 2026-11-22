@@ -2,7 +2,7 @@ import { useState } from "react";
 import clsx from "clsx";
 import { useLocation } from "wouter";
 import { useSeries } from "../../hooks/useSeries";
-import type { SeriesStatus } from "../../types/app";
+import type { SeriesStatus } from "../../types";
 import AddSeriesDialog from "./AddSeriesDialog";
 import SeriesCard from "./SeriesCard";
 import { PosterGridSkeleton } from "../ui/LoadingSkeleton";
@@ -137,7 +137,7 @@ export default function SeriesSection({
                 onDelete={(seriesId) => deleteSeriesMutation.mutate(seriesId)}
                 onRate={(seriesId, stars, review) =>
                   rateSeriesMutation.mutateAsync({
-                    actorUserId: currentUserId || '',
+                    actorUserId: currentUserId || "",
                     seriesId,
                     stars,
                     review,
@@ -179,7 +179,7 @@ export default function SeriesSection({
                 onDelete={(seriesId) => deleteSeriesMutation.mutate(seriesId)}
                 onRate={(seriesId, stars, review) =>
                   rateSeriesMutation.mutateAsync({
-                    actorUserId: currentUserId || '',
+                    actorUserId: currentUserId || "",
                     seriesId,
                     stars,
                     review,

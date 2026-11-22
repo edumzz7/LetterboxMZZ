@@ -1,11 +1,15 @@
-import { useState } from 'react';
-import { Film, Loader2, Lock, Mail, UserRound } from 'lucide-react';
+import { useState } from "react";
+import { Film, Loader2, Lock, Mail, UserRound } from "lucide-react";
 
-type Mode = 'login' | 'register';
+type Mode = "login" | "register";
 
 interface AuthScreenProps {
   onLogin: (identifier: string, password: string) => Promise<void>;
-  onRegister: (username: string, email: string, password: string) => Promise<void>;
+  onRegister: (
+    username: string,
+    email: string,
+    password: string,
+  ) => Promise<void>;
   error: string | null;
   isPending: boolean;
   onForgotPassword?: () => void;
@@ -18,20 +22,20 @@ export default function AuthScreen({
   error,
   isPending,
   onForgotPassword,
-  initialMode = 'login',
+  initialMode = "login",
 }: AuthScreenProps) {
   const [mode, setMode] = useState<Mode>(initialMode);
-  const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!username.trim() || !password.trim()) return;
 
-    if (mode === 'register' && !email.trim()) return;
+    if (mode === "register" && !email.trim()) return;
 
-    if (mode === 'login') {
+    if (mode === "login") {
       await onLogin(username, password);
       return;
     }
@@ -54,7 +58,9 @@ export default function AuthScreen({
                 SEU CLUBE DE CINEMA PARTICULAR.
               </h1>
               <p className="text-brand-text-muted leading-relaxed max-w-lg">
-                Monte sua biblioteca particular, compartilhe seu gosto com os amigos e ganhe pontos a cada filme ou série assistido. Seu hobby favorito ainda mais interessante!
+                Monte sua biblioteca particular, compartilhe seu gosto com os
+                amigos e ganhe pontos a cada filme ou série assistido. Seu hobby
+                favorito ainda mais interessante!
               </p>
             </div>
           </div>
@@ -74,22 +80,32 @@ export default function AuthScreen({
 
         <section className="p-8 md:p-12 flex flex-col justify-center">
           <div className="flex justify-center mb-10">
-            <img src="/logo-cn.png" alt="CineRats Logo" className="w-32 sm:w-40 drop-shadow-2xl opacity-90 hover:opacity-100 hover:scale-105 transition-all duration-300" />
+            <img
+              src="/logo-cn.png"
+              alt="CineRats Logo"
+              className="w-32 sm:w-40 drop-shadow-2xl opacity-90 hover:opacity-100 hover:scale-105 transition-all duration-300"
+            />
           </div>
 
           <div className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-brand-text-muted mb-6">
             <button
               type="button"
-              onClick={() => setMode('login')}
-              className={mode === 'login' ? 'text-brand-gold' : 'hover:text-brand-text'}
+              onClick={() => setMode("login")}
+              className={
+                mode === "login" ? "text-brand-gold" : "hover:text-brand-text"
+              }
             >
               Login
             </button>
             <span>/</span>
             <button
               type="button"
-              onClick={() => setMode('register')}
-              className={mode === 'register' ? 'text-brand-gold' : 'hover:text-brand-text'}
+              onClick={() => setMode("register")}
+              className={
+                mode === "register"
+                  ? "text-brand-gold"
+                  : "hover:text-brand-text"
+              }
             >
               Cadastro
             </button>
@@ -97,8 +113,11 @@ export default function AuthScreen({
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <label htmlFor="username" className="text-xs uppercase tracking-[0.25em] text-brand-text-muted">
-                {mode === 'login' ? 'Username ou E-mail' : 'Username'}
+              <label
+                htmlFor="username"
+                className="text-xs uppercase tracking-[0.25em] text-brand-text-muted"
+              >
+                {mode === "login" ? "Username ou E-mail" : "Username"}
               </label>
               <div className="flex items-center gap-3 border border-[#222] rounded-2xl px-4 py-3 bg-[#090d18]">
                 <UserRound size={16} className="text-brand-gold-alt shrink-0" />
@@ -107,15 +126,20 @@ export default function AuthScreen({
                   value={username}
                   onChange={(event) => setUsername(event.target.value)}
                   className="w-full bg-transparent outline-none"
-                  placeholder={mode === 'login' ? "seu_usuario ou email" : "seu_usuario"}
+                  placeholder={
+                    mode === "login" ? "seu_usuario ou email" : "seu_usuario"
+                  }
                   autoComplete="username"
                 />
               </div>
             </div>
 
-            {mode === 'register' && (
+            {mode === "register" && (
               <div className="space-y-2">
-                <label htmlFor="email" className="text-xs uppercase tracking-[0.25em] text-brand-text-muted">
+                <label
+                  htmlFor="email"
+                  className="text-xs uppercase tracking-[0.25em] text-brand-text-muted"
+                >
                   E-mail
                 </label>
                 <div className="flex items-center gap-3 border border-[#222] rounded-2xl px-4 py-3 bg-[#090d18]">
@@ -134,7 +158,10 @@ export default function AuthScreen({
             )}
 
             <div className="space-y-2">
-              <label htmlFor="password" className="text-xs uppercase tracking-[0.25em] text-brand-text-muted">
+              <label
+                htmlFor="password"
+                className="text-xs uppercase tracking-[0.25em] text-brand-text-muted"
+              >
                 Senha
               </label>
               <div className="flex items-center gap-3 border border-[#222] rounded-2xl px-4 py-3 bg-[#090d18]">
@@ -146,7 +173,9 @@ export default function AuthScreen({
                   onChange={(event) => setPassword(event.target.value)}
                   className="w-full bg-transparent outline-none"
                   placeholder="Sua senha"
-                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                  autoComplete={
+                    mode === "login" ? "current-password" : "new-password"
+                  }
                 />
               </div>
             </div>
@@ -167,14 +196,14 @@ export default function AuthScreen({
                   <Loader2 size={16} className="animate-spin" />
                   Processando
                 </span>
-              ) : mode === 'login' ? (
-                'Entrar'
+              ) : mode === "login" ? (
+                "Entrar"
               ) : (
-                'Criar conta'
+                "Criar conta"
               )}
             </button>
 
-            {mode === 'login' && onForgotPassword && (
+            {mode === "login" && onForgotPassword && (
               <button
                 type="button"
                 onClick={onForgotPassword}

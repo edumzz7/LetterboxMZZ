@@ -1,16 +1,16 @@
-import { useEffect, useMemo, useRef } from 'react';
-import { Clapperboard, Loader2, Star, Tv } from 'lucide-react';
-import { useLocation } from 'wouter';
-import AvatarDisplay from './AvatarDisplay';
-import ReviewInteractions from './ReviewInteractions';
-import { normalizeAvatarPath } from '../../lib/appData';
-import { usePublicReviews } from '../../hooks/useReviews';
-import { ListSkeleton, Skeleton } from '../ui/LoadingSkeleton';
-import TmdbImage from '../ui/TmdbImage';
+import { useEffect, useMemo, useRef } from "react";
+import { Clapperboard, Loader2, Star, Tv } from "lucide-react";
+import { useLocation } from "wouter";
+import AvatarDisplay from "./AvatarDisplay";
+import ReviewInteractions from "./ReviewInteractions";
+import { normalizeAvatarPath } from "../../service/appData";
+import { usePublicReviews } from "../../hooks/useReviews";
+import { ListSkeleton, Skeleton } from "../ui/LoadingSkeleton";
+import TmdbImage from "../ui/TmdbImage";
 
 function formatDate(value: string) {
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('pt-BR');
+  return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString("pt-BR");
 }
 
 export default function ReviewsScreen() {
@@ -40,14 +40,21 @@ export default function ReviewsScreen() {
           void fetchNextPage();
         }
       },
-      { rootMargin: '240px' },
+      { rootMargin: "240px" },
     );
     observer.observe(target);
     return () => observer.disconnect();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   if (isLoading) {
-    return <ListSkeleton count={6}><div className="flex gap-4 border-b border-white/10 pb-5"><Skeleton className="h-8 w-40" /><Skeleton className="h-8 w-24" /></div></ListSkeleton>;
+    return (
+      <ListSkeleton count={6}>
+        <div className="flex gap-4 border-b border-white/10 pb-5">
+          <Skeleton className="h-8 w-40" />
+          <Skeleton className="h-8 w-24" />
+        </div>
+      </ListSkeleton>
+    );
   }
 
   if (isError) {
@@ -61,9 +68,15 @@ export default function ReviewsScreen() {
   return (
     <section className="mx-auto min-w-0 max-w-5xl space-y-5 sm:space-y-7">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-brand-gold">Comunidade</p>
-        <h1 className="mt-2 text-3xl font-light text-brand-text sm:text-4xl">Resenhas</h1>
-        <p className="mt-2 max-w-lg text-sm leading-relaxed text-brand-text-muted">Veja o que a comunidade CineRats está assistindo e comentando.</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-brand-gold">
+          Comunidade
+        </p>
+        <h1 className="mt-2 text-3xl font-light text-brand-text sm:text-4xl">
+          Resenhas
+        </h1>
+        <p className="mt-2 max-w-lg text-sm leading-relaxed text-brand-text-muted">
+          Veja o que a comunidade CineRats está assistindo e comentando.
+        </p>
       </div>
 
       {reviews.length === 0 ? (
@@ -74,44 +87,83 @@ export default function ReviewsScreen() {
         <>
           <div className="space-y-4">
             {reviews.map((review) => {
-              const isMovie = review.type === 'movie';
-              const destination = `${isMovie ? '/filme' : '/serie'}/${review.providerExternalId}`;
+              const isMovie = review.type === "movie";
+              const destination = `${isMovie ? "/filme" : "/serie"}/${review.providerExternalId}`;
               const rating = Number(review.rating);
 
               return (
-                <article key={review.id} className="min-w-0 rounded-2xl border border-white/10 bg-[#06080d] p-3.5 transition-colors hover:border-brand-gold/30 sm:bg-[#111] sm:p-5">
-                  <button type="button" onClick={() => setLocation(`/${review.username}`)} className="group flex max-w-full items-center gap-3 text-left">
-                    <AvatarDisplay avatarId={normalizeAvatarPath(review.avatarPath, review.userId, null).avatarId} className="h-10 w-10 shrink-0 border border-[#292929]" emojiClassName="text-lg" />
+                <article
+                  key={review.id}
+                  className="min-w-0 rounded-2xl border border-white/10 bg-[#06080d] p-3.5 transition-colors hover:border-brand-gold/30 sm:bg-[#111] sm:p-5"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setLocation(`/${review.username}`)}
+                    className="group flex max-w-full items-center gap-3 text-left"
+                  >
+                    <AvatarDisplay
+                      avatarId={
+                        normalizeAvatarPath(
+                          review.avatarPath,
+                          review.userId,
+                          null,
+                        ).avatarId
+                      }
+                      className="h-10 w-10 shrink-0 border border-[#292929]"
+                      emojiClassName="text-lg"
+                    />
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold text-brand-text transition group-hover:text-brand-gold">{review.username}</span>
-                      <span className="mt-0.5 block text-[11px] text-brand-text-muted">resenhou em {formatDate(review.createdAt)}</span>
+                      <span className="block truncate text-sm font-semibold text-brand-text transition group-hover:text-brand-gold">
+                        {review.username}
+                      </span>
+                      <span className="mt-0.5 block text-[11px] text-brand-text-muted">
+                        resenhou em {formatDate(review.createdAt)}
+                      </span>
                     </span>
                   </button>
 
-                  <p className="mt-4 whitespace-pre-wrap break-words text-[15px] [overflow-wrap:anywhere] font-light leading-relaxed text-brand-text/90">
+                  <p className="mt-4 whitespace-pre-wrap text-[15px] wrap-anywhere font-light leading-relaxed text-brand-text/90">
                     {review.review}
                   </p>
 
                   <button
                     type="button"
                     onClick={() => setLocation(destination)}
-                    className="mt-5 flex w-full overflow-hidden rounded-xl border border-white/10 bg-black/25 text-left transition hover:border-brand-gold/40 hover:bg-brand-gold/[0.04]"
+                    className="mt-5 flex w-full overflow-hidden rounded-xl border border-white/10 bg-black/25 text-left transition hover:border-brand-gold/40 hover:bg-brand-gold/4"
                     aria-label={`Abrir ${review.title}`}
                   >
-                    <div className="h-24 w-[4.25rem] shrink-0 bg-[#151515] text-brand-text-muted sm:h-28 sm:w-20">
+                    <div className="h-24 w-17 shrink-0 bg-[#151515] text-brand-text-muted sm:h-28 sm:w-20">
                       {review.posterPath ? (
-                        <TmdbImage src={review.posterPath} alt={`Pôster de ${review.title}`} sizes="(max-width: 639px) 68px, 80px" className="h-full w-full object-cover" loading="lazy" />
+                        <TmdbImage
+                          src={review.posterPath}
+                          alt={`Pôster de ${review.title}`}
+                          sizes="(max-width: 639px) 68px, 80px"
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                        />
                       ) : (
-                        <span className="flex h-full items-center justify-center"><Clapperboard size={20} /></span>
+                        <span className="flex h-full items-center justify-center">
+                          <Clapperboard size={20} />
+                        </span>
                       )}
                     </div>
                     <span className="flex min-w-0 flex-1 flex-col justify-center px-3 py-3 sm:px-4">
                       <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-text-muted">
-                        {isMovie ? <Clapperboard size={12} /> : <Tv size={12} />}{isMovie ? 'Filme' : 'Série'}
+                        {isMovie ? (
+                          <Clapperboard size={12} />
+                        ) : (
+                          <Tv size={12} />
+                        )}
+                        {isMovie ? "Filme" : "Série"}
                       </span>
-                      <span className="mt-1 line-clamp-2 text-sm font-semibold text-brand-text sm:text-base">{review.title}</span>
+                      <span className="mt-1 line-clamp-2 text-sm font-semibold text-brand-text sm:text-base">
+                        {review.title}
+                      </span>
                       {Number.isFinite(rating) && rating > 0 && (
-                        <span className="mt-2 flex items-center gap-1.5 text-xs text-brand-gold-alt"><Star size={13} className="fill-brand-gold-alt" />{rating.toFixed(1)} / 5.0</span>
+                        <span className="mt-2 flex items-center gap-1.5 text-xs text-brand-gold-alt">
+                          <Star size={13} className="fill-brand-gold-alt" />
+                          {rating.toFixed(1)} / 5.0
+                        </span>
                       )}
                     </span>
                   </button>
@@ -122,8 +174,14 @@ export default function ReviewsScreen() {
             })}
           </div>
 
-          <div ref={loadMoreRef} className="flex h-12 items-center justify-center" aria-live="polite">
-            {isFetchingNextPage && <Loader2 className="animate-spin text-brand-gold" size={20} />}
+          <div
+            ref={loadMoreRef}
+            className="flex h-12 items-center justify-center"
+            aria-live="polite"
+          >
+            {isFetchingNextPage && (
+              <Loader2 className="animate-spin text-brand-gold" size={20} />
+            )}
           </div>
         </>
       )}

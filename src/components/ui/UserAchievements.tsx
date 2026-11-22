@@ -1,11 +1,18 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
-import * as Icons from 'lucide-react';
-import clsx from 'clsx';
-import { useQuery } from '@tanstack/react-query';
-import { ACHIEVEMENTS, getUnlockedAchievements, type Achievement } from '../../lib/achievements';
-import type { PersonalMovie, SeriesEntry, RankedUser } from '../../types/app';
-import { useOscarPredictions } from '../../hooks/useOscarPredictions';
-import { listUserAchievementIds, listUserActivity } from '../../lib/appData';
+import { useState, useRef, useEffect, useMemo } from "react";
+import * as Icons from "lucide-react";
+import clsx from "clsx";
+import { useQuery } from "@tanstack/react-query";
+import {
+  ACHIEVEMENTS,
+  getUnlockedAchievements,
+  type Achievement,
+} from "../../service/achievements";
+import type { PersonalMovie, SeriesEntry, RankedUser } from "../../types";
+import { useOscarPredictions } from "../../hooks/useOscarPredictions";
+import {
+  listUserAchievementIds,
+  listUserActivity,
+} from "../../service/appData";
 
 interface AchievementBadgeProps {
   achievement: Achievement;
@@ -14,52 +21,60 @@ interface AchievementBadgeProps {
 export function AchievementBadge({ achievement }: AchievementBadgeProps) {
   const [showTooltip, setShowTooltip] = useState(false);
   const iconComponents = Icons as unknown as Record<string, Icons.LucideIcon>;
-  const IconComponent = typeof achievement.icon === 'string' 
-    ? iconComponents[achievement.icon] || Icons.Award
-    : achievement.icon || Icons.Award;
+  const IconComponent =
+    typeof achievement.icon === "string"
+      ? iconComponents[achievement.icon] || Icons.Award
+      : achievement.icon || Icons.Award;
   const badgeRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: Event) => {
-      if (badgeRef.current && !badgeRef.current.contains(event.target as Node)) {
+      if (
+        badgeRef.current &&
+        !badgeRef.current.contains(event.target as Node)
+      ) {
         setShowTooltip(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('touchstart', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
     };
   }, []);
 
   // Determine styles and labels based on level/secrecy
-  let badgeClasses = "bg-brand-gold/10 border-brand-gold/30 text-brand-gold hover:border-brand-gold hover:shadow-[0_0_12px_rgba(212,175,55,0.25)]";
+  let badgeClasses =
+    "bg-brand-gold/10 border-brand-gold/30 text-brand-gold hover:border-brand-gold hover:shadow-[0_0_12px_rgba(212,175,55,0.25)]";
   let tooltipHeaderClass = "text-brand-gold";
   let levelLabel = "Épica";
 
   if (achievement.secret) {
-    badgeClasses = "bg-purple-950/20 border-purple-500/30 text-purple-400 hover:border-purple-400 hover:shadow-[0_0_12px_rgba(168,85,247,0.25)]";
+    badgeClasses =
+      "bg-purple-950/20 border-purple-500/30 text-purple-400 hover:border-purple-400 hover:shadow-[0_0_12px_rgba(168,85,247,0.25)]";
     tooltipHeaderClass = "text-purple-400";
     levelLabel = "Secreta";
   } else if (achievement.level === 1) {
-    badgeClasses = "bg-slate-800/20 border-slate-500/30 text-slate-100 hover:border-slate-300 hover:shadow-[0_0_12px_rgba(255,255,255,0.15)]";
+    badgeClasses =
+      "bg-slate-800/20 border-slate-500/30 text-slate-100 hover:border-slate-300 hover:shadow-[0_0_12px_rgba(255,255,255,0.15)]";
     tooltipHeaderClass = "text-slate-100";
     levelLabel = "Simples";
   } else if (achievement.level === 2) {
-    badgeClasses = "bg-sky-950/20 border-sky-500/30 text-sky-400 hover:border-sky-400 hover:shadow-[0_0_12px_rgba(56,189,248,0.25)]";
+    badgeClasses =
+      "bg-sky-950/20 border-sky-500/30 text-sky-400 hover:border-sky-400 hover:shadow-[0_0_12px_rgba(56,189,248,0.25)]";
     tooltipHeaderClass = "text-sky-300";
     levelLabel = "Rara";
   }
 
   const handleMouseEnter = () => {
-    if (window.matchMedia('(hover: hover)').matches) {
+    if (window.matchMedia("(hover: hover)").matches) {
       setShowTooltip(true);
     }
   };
 
   const handleMouseLeave = () => {
-    if (window.matchMedia('(hover: hover)').matches) {
+    if (window.matchMedia("(hover: hover)").matches) {
       setShowTooltip(false);
     }
   };
@@ -78,7 +93,7 @@ export function AchievementBadge({ achievement }: AchievementBadgeProps) {
       <div
         className={clsx(
           "w-8 h-8 rounded-full flex items-center justify-center transition-all border",
-          badgeClasses
+          badgeClasses,
         )}
         title={achievement.name}
       >
@@ -88,18 +103,29 @@ export function AchievementBadge({ achievement }: AchievementBadgeProps) {
       {/* Glassmorphic Tooltip */}
       {showTooltip && (
         <div className="absolute bottom-full mb-2.5 left-1/2 -translate-x-1/2 z-50 w-44 p-2.5 rounded-xl border border-brand-gold/10 bg-black/95 backdrop-blur-md text-center shadow-2xl animate-in fade-in zoom-in-95 duration-100 pointer-events-none">
-          <p className={clsx("text-[11px] font-semibold uppercase tracking-wider", tooltipHeaderClass)}>{achievement.name}</p>
-          <p className="text-[9px] text-brand-text mt-1 leading-normal font-light">{achievement.description}</p>
-          <span className={clsx(
-            "inline-block mt-1.5 text-[7px] uppercase tracking-widest px-1.5 py-0.5 rounded border",
-            achievement.secret 
-              ? "bg-purple-950/40 border-purple-500/25 text-purple-300"
-              : achievement.level === 1
-                ? "bg-slate-800/40 border-slate-500/25 text-slate-300"
-                : achievement.level === 2
-                  ? "bg-sky-950/40 border-sky-500/25 text-sky-300"
-                  : "bg-brand-gold/20 border-brand-gold/25 text-brand-gold"
-          )}>
+          <p
+            className={clsx(
+              "text-[11px] font-semibold uppercase tracking-wider",
+              tooltipHeaderClass,
+            )}
+          >
+            {achievement.name}
+          </p>
+          <p className="text-[9px] text-brand-text mt-1 leading-normal font-light">
+            {achievement.description}
+          </p>
+          <span
+            className={clsx(
+              "inline-block mt-1.5 text-[7px] uppercase tracking-widest px-1.5 py-0.5 rounded border",
+              achievement.secret
+                ? "bg-purple-950/40 border-purple-500/25 text-purple-300"
+                : achievement.level === 1
+                  ? "bg-slate-800/40 border-slate-500/25 text-slate-300"
+                  : achievement.level === 2
+                    ? "bg-sky-950/40 border-sky-500/25 text-sky-300"
+                    : "bg-brand-gold/20 border-brand-gold/25 text-brand-gold",
+            )}
+          >
             {levelLabel}
           </span>
           {/* Arrow */}
@@ -119,16 +145,16 @@ export function StoredAchievementBadges({
   emptyMessage: string;
 }) {
   const achievementIdsQuery = useQuery({
-    queryKey: ['public-achievement-ids', userId],
+    queryKey: ["public-achievement-ids", userId],
     queryFn: () => listUserAchievementIds(userId),
     enabled: Boolean(userId),
     staleTime: 60_000,
   });
   const badges = useMemo(() => {
     const ids = new Set(achievementIdsQuery.data || []);
-    return ACHIEVEMENTS
-      .filter((achievement) => ids.has(achievement.id))
-      .sort((a, b) => b.level - a.level);
+    return ACHIEVEMENTS.filter((achievement) => ids.has(achievement.id)).sort(
+      (a, b) => b.level - a.level,
+    );
   }, [achievementIdsQuery.data]);
 
   if (achievementIdsQuery.isLoading) {
@@ -136,7 +162,11 @@ export function StoredAchievementBadges({
   }
 
   if (!badges.length) {
-    return <p className="text-xs leading-relaxed text-brand-text-muted">{emptyMessage}</p>;
+    return (
+      <p className="text-xs leading-relaxed text-brand-text-muted">
+        {emptyMessage}
+      </p>
+    );
   }
 
   return (
@@ -170,22 +200,37 @@ export default function UserAchievements({
   const isPredictionsLoading = predictionsQuery.isLoading;
   const predictions = predictionsQuery.data || [];
 
-  const { data: userAchievementIds = [], isLoading: achievementsLoading } = useQuery({
-    queryKey: ['user_achievement_ids', userId],
-    queryFn: () => listUserAchievementIds(userId),
-    enabled: !!userId,
-  });
+  const { data: userAchievementIds = [], isLoading: achievementsLoading } =
+    useQuery({
+      queryKey: ["user_achievement_ids", userId],
+      queryFn: () => listUserAchievementIds(userId),
+      enabled: !!userId,
+    });
 
   const { data: userActivities = [], isLoading: activitiesLoading } = useQuery({
-    queryKey: ['user_activities_list', userId],
+    queryKey: ["user_activities_list", userId],
     queryFn: () => listUserActivity([userId], 100),
     enabled: !!userId,
   });
 
-  if (isLoading || isPredictionsLoading || achievementsLoading || activitiesLoading) {
+  if (
+    isLoading ||
+    isPredictionsLoading ||
+    achievementsLoading ||
+    activitiesLoading
+  ) {
     return (
-      <div role="status" aria-label="Carregando conquistas" className="flex flex-wrap gap-2 py-1">
-        {[0, 1, 2, 3].map((item) => <span key={item} className="h-8 w-8 animate-pulse rounded-full border border-[#222a3a] bg-[#151b28]" />)}
+      <div
+        role="status"
+        aria-label="Carregando conquistas"
+        className="flex flex-wrap gap-2 py-1"
+      >
+        {[0, 1, 2, 3].map((item) => (
+          <span
+            key={item}
+            className="h-8 w-8 animate-pulse rounded-full border border-[#222a3a] bg-[#151b28]"
+          />
+        ))}
       </div>
     );
   }
@@ -197,9 +242,9 @@ export default function UserAchievements({
     users,
     userId,
     predictions,
-    favoriteAchievementIds.has('vereador') ? 10 : 0,
-    favoriteAchievementIds.has('eleito') ? 10 : 0,
-    userActivities
+    favoriteAchievementIds.has("vereador") ? 10 : 0,
+    favoriteAchievementIds.has("eleito") ? 10 : 0,
+    userActivities,
   );
 
   if (unlocked.length === 0) return null;
@@ -207,7 +252,8 @@ export default function UserAchievements({
   // Sort by rarity: level 3 (Épica/Secreta) first, then level 2 (Rara), then level 1 (Simples)
   const sorted = [...unlocked].sort((a, b) => b.level - a.level);
 
-  const visibleAchievements = maxVisible && !showAll ? sorted.slice(0, maxVisible) : sorted;
+  const visibleAchievements =
+    maxVisible && !showAll ? sorted.slice(0, maxVisible) : sorted;
 
   return (
     <div className="flex flex-wrap items-center gap-2 py-1">
@@ -215,8 +261,12 @@ export default function UserAchievements({
         <AchievementBadge key={ach.id} achievement={ach} />
       ))}
       {maxVisible && sorted.length > maxVisible && (
-        <button type="button" onClick={() => setShowAll((current) => !current)} className="text-[9px] uppercase tracking-[0.12em] text-brand-gold-alt hover:text-brand-gold">
-          {showAll ? 'Mostrar menos' : `+${sorted.length - maxVisible} mais`}
+        <button
+          type="button"
+          onClick={() => setShowAll((current) => !current)}
+          className="text-[9px] uppercase tracking-[0.12em] text-brand-gold-alt hover:text-brand-gold"
+        >
+          {showAll ? "Mostrar menos" : `+${sorted.length - maxVisible} mais`}
         </button>
       )}
     </div>

@@ -1,8 +1,13 @@
-import { useState } from 'react';
-import { Film, Loader2, Lock, Mail, Hash } from 'lucide-react';
+import { useState } from "react";
+import { Film, Loader2, Lock, Mail, Hash } from "lucide-react";
 
 interface ConfirmPasswordResetScreenProps {
-  onSubmit: (email: string, code: string, password: string, confirmPassword: string) => Promise<void>;
+  onSubmit: (
+    email: string,
+    code: string,
+    password: string,
+    confirmPassword: string,
+  ) => Promise<void>;
   onBackToLogin: () => void;
   error: string | null;
   isPending: boolean;
@@ -15,17 +20,23 @@ export default function ConfirmPasswordResetScreen({
   onBackToLogin,
   error,
   isPending,
-  initialEmail = '',
-  initialCode = '',
+  initialEmail = "",
+  initialCode = "",
 }: ConfirmPasswordResetScreenProps) {
   const [email, setEmail] = useState(initialEmail);
   const [code, setCode] = useState(initialCode);
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!email.trim() || !code.trim() || !password.trim() || !confirmPassword.trim()) return;
+    if (
+      !email.trim() ||
+      !code.trim() ||
+      !password.trim() ||
+      !confirmPassword.trim()
+    )
+      return;
 
     if (password !== confirmPassword) {
       return;
@@ -34,7 +45,8 @@ export default function ConfirmPasswordResetScreen({
     await onSubmit(email, code, password, confirmPassword);
   };
 
-  const passwordsMatch = !password || !confirmPassword || password === confirmPassword;
+  const passwordsMatch =
+    !password || !confirmPassword || password === confirmPassword;
 
   return (
     <div className="min-h-screen bg-brand-bg text-brand-text flex items-center justify-center px-4 py-10">
@@ -51,7 +63,8 @@ export default function ConfirmPasswordResetScreen({
                 CONFIRMAR NOVA SENHA.
               </h1>
               <p className="text-brand-text-muted leading-relaxed max-w-lg">
-                Digite o código de 6 dígitos que você recebeu por e-mail e sua nova senha.
+                Digite o código de 6 dígitos que você recebeu por e-mail e sua
+                nova senha.
               </p>
             </div>
           </div>
@@ -71,7 +84,11 @@ export default function ConfirmPasswordResetScreen({
 
         <section className="p-8 md:p-12 flex flex-col justify-center">
           <div className="flex justify-center mb-10">
-            <img src="/logo-cn.png" alt="CineRats Logo" className="w-32 sm:w-40 drop-shadow-2xl opacity-90 hover:opacity-100 hover:scale-105 transition-all duration-300" />
+            <img
+              src="/logo-cn.png"
+              alt="CineRats Logo"
+              className="w-32 sm:w-40 drop-shadow-2xl opacity-90 hover:opacity-100 hover:scale-105 transition-all duration-300"
+            />
           </div>
 
           <div className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-brand-text-muted mb-6">
@@ -86,7 +103,10 @@ export default function ConfirmPasswordResetScreen({
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <label htmlFor="email" className="text-xs uppercase tracking-[0.25em] text-brand-text-muted">
+              <label
+                htmlFor="email"
+                className="text-xs uppercase tracking-[0.25em] text-brand-text-muted"
+              >
                 E-mail
               </label>
               <div className="flex items-center gap-3 border border-[#222] rounded-2xl px-4 py-3 bg-[#090d18]">
@@ -105,7 +125,10 @@ export default function ConfirmPasswordResetScreen({
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="code" className="text-xs uppercase tracking-[0.25em] text-brand-text-muted">
+              <label
+                htmlFor="code"
+                className="text-xs uppercase tracking-[0.25em] text-brand-text-muted"
+              >
                 Código
               </label>
               <div className="flex items-center gap-3 border border-[#222] rounded-2xl px-4 py-3 bg-[#090d18]">
@@ -125,7 +148,10 @@ export default function ConfirmPasswordResetScreen({
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="password" className="text-xs uppercase tracking-[0.25em] text-brand-text-muted">
+              <label
+                htmlFor="password"
+                className="text-xs uppercase tracking-[0.25em] text-brand-text-muted"
+              >
                 Nova Senha
               </label>
               <div className="flex items-center gap-3 border border-[#222] rounded-2xl px-4 py-3 bg-[#090d18]">
@@ -144,7 +170,10 @@ export default function ConfirmPasswordResetScreen({
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="confirmPassword" className="text-xs uppercase tracking-[0.25em] text-brand-text-muted">
+              <label
+                htmlFor="confirmPassword"
+                className="text-xs uppercase tracking-[0.25em] text-brand-text-muted"
+              >
                 Confirmar Senha
               </label>
               <div className="flex items-center gap-3 border border-[#222] rounded-2xl px-4 py-3 bg-[#090d18]">
@@ -185,7 +214,7 @@ export default function ConfirmPasswordResetScreen({
                   Processando
                 </span>
               ) : (
-                'Redefinir senha'
+                "Redefinir senha"
               )}
             </button>
           </form>

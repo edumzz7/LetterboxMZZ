@@ -1,6 +1,6 @@
-import { ChevronRight, Crown, Users } from 'lucide-react';
-import clsx from 'clsx';
-import type { GroupSummary, GroupMemberRole } from '../../types/app';
+import { ChevronRight, Crown, Users } from "lucide-react";
+import clsx from "clsx";
+import type { GroupSummary, GroupMemberRole } from "../../types";
 
 interface GroupCardProps {
   group: GroupSummary;
@@ -20,8 +20,10 @@ export default function GroupCard({ group, role, onOpen }: GroupCardProps) {
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex min-w-0 items-center gap-2">
-          <span className="truncate text-sm font-semibold text-brand-text">{group.name}</span>
-          {role === 'admin' && (
+          <span className="truncate text-sm font-semibold text-brand-text">
+            {group.name}
+          </span>
+          {role === "admin" && (
             <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-brand-gold/30 bg-brand-gold/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-brand-gold">
               <Crown size={10} /> Admin
             </span>
@@ -39,14 +41,17 @@ export default function GroupCard({ group, role, onOpen }: GroupCardProps) {
         )}
         <span
           className={clsx(
-            'mt-2 block text-[10px] font-semibold uppercase tracking-[0.14em]',
-            group.isFull ? 'text-brand-text-muted' : 'text-brand-gold-alt',
+            "mt-2 block text-[10px] font-semibold uppercase tracking-[0.14em]",
+            group.isFull ? "text-brand-text-muted" : "text-brand-gold-alt",
           )}
         >
           {group.memberCount}/{group.maxMembers} membros
         </span>
       </span>
-      <ChevronRight size={16} className="shrink-0 text-brand-text-muted transition group-hover:text-brand-gold" />
+      <ChevronRight
+        size={16}
+        className="shrink-0 text-brand-text-muted transition group-hover:text-brand-gold"
+      />
     </button>
   );
 }

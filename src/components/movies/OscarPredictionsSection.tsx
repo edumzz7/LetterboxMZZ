@@ -1,10 +1,24 @@
-import { useState, useEffect } from 'react';
-import type { ElementType } from 'react';
-import { useOscarPredictions } from '../../hooks/useOscarPredictions';
-import { searchMovies, searchPeople, type TMDBMovie, type TMDBPerson } from '../../lib/tmdb';
-import { Loader2, Search, RotateCcw, Film, User, Globe, FileText, Trophy } from 'lucide-react';
-import type { UserOscarPrediction } from '../../types/app';
-import { Skeleton } from '../ui/LoadingSkeleton';
+import { useState, useEffect } from "react";
+import type { ElementType } from "react";
+import { useOscarPredictions } from "../../hooks/useOscarPredictions";
+import {
+  searchMovies,
+  searchPeople,
+  type TMDBMovie,
+  type TMDBPerson,
+} from "../../service/tmdb";
+import {
+  Loader2,
+  Search,
+  RotateCcw,
+  Film,
+  User,
+  Globe,
+  FileText,
+  Trophy,
+} from "lucide-react";
+import type { UserOscarPrediction } from "../../types";
+import { Skeleton } from "../ui/LoadingSkeleton";
 
 interface OscarPredictionsSectionProps {
   userId: string;
@@ -14,7 +28,7 @@ interface OscarPredictionsSectionProps {
 interface CategoryConfig {
   id: string;
   name: string;
-  type: 'movie' | 'person';
+  type: "movie" | "person";
   placeholder: string;
   icon: ElementType;
 }
@@ -22,30 +36,67 @@ interface CategoryConfig {
 type PredictionSearchResult = TMDBMovie | TMDBPerson;
 
 const CATEGORIES: CategoryConfig[] = [
-  { id: 'melhor_filme', name: 'Melhor Filme', type: 'movie', placeholder: 'Pesquisar filme...', icon: Film },
-  { id: 'melhor_ator', name: 'Melhor Ator', type: 'person', placeholder: 'Pesquisar ator...', icon: User },
-  { id: 'melhor_atriz', name: 'Melhor Atriz', type: 'person', placeholder: 'Pesquisar atriz...', icon: User },
-  { id: 'melhor_internacional', name: 'Melhor Filme Internacional', type: 'movie', placeholder: 'Pesquisar filme estrangeiro...', icon: Globe },
-  { id: 'melhor_roteiro', name: 'Melhor Roteiro', type: 'movie', placeholder: 'Pesquisar roteiro...', icon: FileText },
+  {
+    id: "melhor_filme",
+    name: "Melhor Filme",
+    type: "movie",
+    placeholder: "Pesquisar filme...",
+    icon: Film,
+  },
+  {
+    id: "melhor_ator",
+    name: "Melhor Ator",
+    type: "person",
+    placeholder: "Pesquisar ator...",
+    icon: User,
+  },
+  {
+    id: "melhor_atriz",
+    name: "Melhor Atriz",
+    type: "person",
+    placeholder: "Pesquisar atriz...",
+    icon: User,
+  },
+  {
+    id: "melhor_internacional",
+    name: "Melhor Filme Internacional",
+    type: "movie",
+    placeholder: "Pesquisar filme estrangeiro...",
+    icon: Globe,
+  },
+  {
+    id: "melhor_roteiro",
+    name: "Melhor Roteiro",
+    type: "movie",
+    placeholder: "Pesquisar roteiro...",
+    icon: FileText,
+  },
 ];
 
-function getTmdbImageUrl(path: string | null | undefined, size: 'w185' | 'w300' | 'w500' = 'w185'): string {
+function getTmdbImageUrl(
+  path: string | null | undefined,
+  size: "w185" | "w300" | "w500" = "w185",
+): string {
   if (!path) {
-    return 'https://placehold.co/300x450/0b101d/ffffff/png?text=Sem+Foto';
+    return "https://placehold.co/300x450/0b101d/ffffff/png?text=Sem+Foto";
   }
-  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  if (path.startsWith("http://") || path.startsWith("https://")) return path;
   return `https://image.tmdb.org/t/p/${size}${path}`;
 }
 
-export default function OscarPredictionsSection({ userId, canEdit }: OscarPredictionsSectionProps) {
-  const { predictionsQuery, savePredictionMutation } = useOscarPredictions(userId);
+export default function OscarPredictionsSection({
+  userId,
+  canEdit,
+}: OscarPredictionsSectionProps) {
+  const { predictionsQuery, savePredictionMutation } =
+    useOscarPredictions(userId);
   const predictions = predictionsQuery.data || [];
 
   const handleSelectPrediction = async (
     category: string,
     tmdbId: string,
     title: string,
-    posterPath: string
+    posterPath: string,
   ) => {
     try {
       await savePredictionMutation.mutateAsync({
@@ -55,7 +106,7 @@ export default function OscarPredictionsSection({ userId, canEdit }: OscarPredic
         posterPath,
       });
     } catch (err) {
-      console.error('Erro ao salvar palpite:', err);
+      console.error("Erro ao salvar palpite:", err);
     }
   };
 
@@ -68,17 +119,31 @@ export default function OscarPredictionsSection({ userId, canEdit }: OscarPredic
             Palpites Oscar 2027
           </h2>
           <p className="text-sm text-brand-text-muted mt-1">
-            {canEdit 
-              ? 'Monte sua aposta para as principais categorias do Oscar 2027' 
-              : 'Visualize os palpites salvos deste usuário'}
+            {canEdit
+              ? "Monte sua aposta para as principais categorias do Oscar 2027"
+              : "Visualize os palpites salvos deste usuário"}
           </p>
         </div>
         <div className="ml-4 h-[1px] bg-[#222] flex-grow" />
       </div>
 
       {predictionsQuery.isLoading ? (
-        <div role="status" aria-label="Carregando palpites do Oscar" className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {CATEGORIES.map((category) => <div key={category.id} className="rounded-2xl border border-[#151b28] bg-[#06080d] p-5"><Skeleton className="h-3 w-1/2" /><Skeleton className="mt-5 aspect-[2/3] rounded-xl" /><Skeleton className="mt-4 h-3 w-3/4" /><Skeleton className="mt-2 h-3 w-1/2" /></div>)}
+        <div
+          role="status"
+          aria-label="Carregando palpites do Oscar"
+          className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3"
+        >
+          {CATEGORIES.map((category) => (
+            <div
+              key={category.id}
+              className="rounded-2xl border border-[#151b28] bg-[#06080d] p-5"
+            >
+              <Skeleton className="h-3 w-1/2" />
+              <Skeleton className="mt-5 aspect-[2/3] rounded-xl" />
+              <Skeleton className="mt-4 h-3 w-3/4" />
+              <Skeleton className="mt-2 h-3 w-1/2" />
+            </div>
+          ))}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -105,12 +170,23 @@ interface CategoryCardProps {
   config: CategoryConfig;
   prediction: UserOscarPrediction | undefined;
   canEdit: boolean;
-  onSelect: (category: string, tmdbId: string, title: string, posterPath: string) => Promise<void>;
+  onSelect: (
+    category: string,
+    tmdbId: string,
+    title: string,
+    posterPath: string,
+  ) => Promise<void>;
   isGlobalPending: boolean;
 }
 
-function CategoryCard({ config, prediction, canEdit, onSelect, isGlobalPending }: CategoryCardProps) {
-  const [query, setQuery] = useState('');
+function CategoryCard({
+  config,
+  prediction,
+  canEdit,
+  onSelect,
+  isGlobalPending,
+}: CategoryCardProps) {
+  const [query, setQuery] = useState("");
   const [results, setResults] = useState<PredictionSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [isChanging, setIsChanging] = useState(false);
@@ -127,11 +203,18 @@ function CategoryCard({ config, prediction, canEdit, onSelect, isGlobalPending }
     setLoading(true);
     const delayDebounce = setTimeout(async () => {
       try {
-        if (config.type === 'movie') {
+        if (config.type === "movie") {
           const res = await searchMovies(query);
-          if (config.id === 'melhor_internacional') {
+          if (config.id === "melhor_internacional") {
             // Filter non-English movies for international category
-            setResults(res.filter((movie) => movie.original_language && movie.original_language !== 'en').slice(0, 10));
+            setResults(
+              res
+                .filter(
+                  (movie) =>
+                    movie.original_language && movie.original_language !== "en",
+                )
+                .slice(0, 10),
+            );
           } else {
             setResults(res.slice(0, 10));
           }
@@ -140,7 +223,7 @@ function CategoryCard({ config, prediction, canEdit, onSelect, isGlobalPending }
           setResults(res.slice(0, 10));
         }
       } catch (err) {
-        console.error('Search failed:', err);
+        console.error("Search failed:", err);
       } finally {
         setLoading(false);
       }
@@ -160,14 +243,15 @@ function CategoryCard({ config, prediction, canEdit, onSelect, isGlobalPending }
 
     const idStr = String(item.id);
     setSelectingId(idStr);
-    
-    const title = 'title' in item ? item.title : item.name;
-    const poster = 'poster_path' in item ? item.poster_path || '' : item.profile_path || '';
-    
+
+    const title = "title" in item ? item.title : item.name;
+    const poster =
+      "poster_path" in item ? item.poster_path || "" : item.profile_path || "";
+
     await onSelect(config.id, idStr, title, poster);
     setIsChanging(false);
     setSelectingId(null);
-    setQuery('');
+    setQuery("");
     setResults([]);
   };
 
@@ -188,16 +272,20 @@ function CategoryCard({ config, prediction, canEdit, onSelect, isGlobalPending }
         <div className="flex gap-4 items-center animate-in fade-in duration-300 relative group">
           <div className="w-24 h-36 rounded-xl overflow-hidden shrink-0 border border-white/5 relative bg-[#0b101d]">
             <img
-              src={getTmdbImageUrl(prediction.poster_path, 'w185')}
+              src={getTmdbImageUrl(prediction.poster_path, "w185")}
               alt={prediction.title}
               className="w-full h-full object-cover"
               onError={(e) => {
-                (e.target as HTMLImageElement).src = 'https://placehold.co/300x450/0b101d/ffffff/png?text=Sem+Foto';
+                (e.target as HTMLImageElement).src =
+                  "https://placehold.co/300x450/0b101d/ffffff/png?text=Sem+Foto";
               }}
             />
           </div>
           <div className="flex-1 flex flex-col gap-2 min-w-0">
-            <h4 className="text-base font-medium text-brand-text truncate pr-2" title={prediction.title}>
+            <h4
+              className="text-base font-medium text-brand-text truncate pr-2"
+              title={prediction.title}
+            >
               {prediction.title}
             </h4>
             <span className="text-xs text-brand-gold tracking-widest uppercase font-light">
@@ -234,7 +322,7 @@ function CategoryCard({ config, prediction, canEdit, onSelect, isGlobalPending }
               </div>
 
               {/* Results area */}
-              {query.trim() !== '' && !loading && (
+              {query.trim() !== "" && !loading && (
                 <div className="flex flex-col gap-2">
                   <span className="text-xs text-brand-text-muted tracking-wider uppercase font-light">
                     Resultados:
@@ -244,8 +332,12 @@ function CategoryCard({ config, prediction, canEdit, onSelect, isGlobalPending }
                       {results.map((item) => {
                         const idStr = String(item.id);
                         const isThisSelecting = selectingId === idStr;
-                        const itemTitle = 'title' in item ? item.title : item.name;
-                        const itemImage = 'poster_path' in item ? item.poster_path : item.profile_path;
+                        const itemTitle =
+                          "title" in item ? item.title : item.name;
+                        const itemImage =
+                          "poster_path" in item
+                            ? item.poster_path
+                            : item.profile_path;
 
                         return (
                           <button
@@ -256,14 +348,16 @@ function CategoryCard({ config, prediction, canEdit, onSelect, isGlobalPending }
                           >
                             <div className="w-20 h-28 rounded-lg overflow-hidden border border-white/5 group-hover:border-brand-gold/60 transition-all relative bg-[#0b101d]">
                               <img
-                                src={getTmdbImageUrl(itemImage, 'w185')}
+                                src={getTmdbImageUrl(itemImage, "w185")}
                                 alt={itemTitle}
                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-350"
                                 onError={(e) => {
-                                  (e.target as HTMLImageElement).src = 'https://placehold.co/300x450/0b101d/ffffff/png?text=Sem+Foto';
+                                  (e.target as HTMLImageElement).src =
+                                    "https://placehold.co/300x450/0b101d/ffffff/png?text=Sem+Foto";
                                 }}
                               />
-                              {(isThisSelecting || (isGlobalPending && selectingId === idStr)) && (
+                              {(isThisSelecting ||
+                                (isGlobalPending && selectingId === idStr)) && (
                                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                                   <Loader2 className="w-5 h-5 text-brand-gold animate-spin" />
                                 </div>
@@ -283,8 +377,6 @@ function CategoryCard({ config, prediction, canEdit, onSelect, isGlobalPending }
                   )}
                 </div>
               )}
-
-
             </>
           ) : (
             /* Friend profile read-only placeholder */

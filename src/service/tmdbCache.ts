@@ -1,6 +1,6 @@
-import { getTvDetails, type TMDBTvDetails } from './tmdb';
+import { getTvDetails, type TMDBTvDetails } from "./tmdb";
 
-const CACHE_KEY = 'tmdb_tv_details_cache';
+const CACHE_KEY = "tmdb_tv_details_cache";
 const CACHE_DURATION = 1000 * 60 * 60 * 24 * 7; // 7 dias
 
 interface CachedTvDetails {
@@ -12,7 +12,9 @@ interface CachedTvDetails {
  * Busca detalhes de série do TMDB com cache de 7 dias no localStorage
  * Reduz drasticamente requisições ao TMDB para dados que não mudam
  */
-export async function getTvDetailsWithCache(tvId: number): Promise<TMDBTvDetails | null> {
+export async function getTvDetailsWithCache(
+  tvId: number,
+): Promise<TMDBTvDetails | null> {
   const cacheKey = `${CACHE_KEY}_${tvId}`;
 
   // 1. Verificar cache local
@@ -41,21 +43,27 @@ export async function getTvDetailsWithCache(tvId: number): Promise<TMDBTvDetails
   // 3. Salvar no cache
   if (data) {
     try {
-      localStorage.setItem(cacheKey, JSON.stringify({
-        data,
-        timestamp: Date.now()
-      } as CachedTvDetails));
+      localStorage.setItem(
+        cacheKey,
+        JSON.stringify({
+          data,
+          timestamp: Date.now(),
+        } as CachedTvDetails),
+      );
     } catch (error) {
       console.warn(`[TMDB Cache] Error saving cache for TV ${tvId}:`, error);
       // Se localStorage estiver cheio, limpar caches antigos
-      if (error instanceof Error && error.name === 'QuotaExceededError') {
+      if (error instanceof Error && error.name === "QuotaExceededError") {
         clearOldestCaches(10);
         // Tentar salvar novamente
         try {
-          localStorage.setItem(cacheKey, JSON.stringify({
-            data,
-            timestamp: Date.now()
-          } as CachedTvDetails));
+          localStorage.setItem(
+            cacheKey,
+            JSON.stringify({
+              data,
+              timestamp: Date.now(),
+            } as CachedTvDetails),
+          );
         } catch {
           // Ignorar se falhar novamente
         }
@@ -81,8 +89,8 @@ export function invalidateTvDetailsCache(tvId: number): void {
  */
 export function clearAllTvDetailsCache(): void {
   Object.keys(localStorage)
-    .filter(key => key.startsWith(CACHE_KEY))
-    .forEach(key => {
+    .filter((key) => key.startsWith(CACHE_KEY))
+    .forEach((key) => {
       localStorage.removeItem(key);
     });
 }
@@ -95,8 +103,8 @@ function clearOldestCaches(count: number): void {
 
   // Coletar todos os caches com timestamps
   Object.keys(localStorage)
-    .filter(key => key.startsWith(CACHE_KEY))
-    .forEach(key => {
+    .filter((key) => key.startsWith(CACHE_KEY))
+    .forEach((key) => {
       try {
         const data = JSON.parse(localStorage.getItem(key)!);
         caches.push({ key, timestamp: data.timestamp || 0 });
@@ -118,12 +126,16 @@ function clearOldestCaches(count: number): void {
 /**
  * Retorna estatísticas do cache
  */
-export function getCacheStats(): { count: number; oldestAge: number; newestAge: number } {
+export function getCacheStats(): {
+  count: number;
+  oldestAge: number;
+  newestAge: number;
+} {
   const caches: number[] = [];
 
   Object.keys(localStorage)
-    .filter(key => key.startsWith(CACHE_KEY))
-    .forEach(key => {
+    .filter((key) => key.startsWith(CACHE_KEY))
+    .forEach((key) => {
       try {
         const data = JSON.parse(localStorage.getItem(key)!);
         caches.push(data.timestamp || 0);
@@ -133,7 +145,7 @@ export function getCacheStats(): { count: number; oldestAge: number; newestAge: 
     });
 
   const now = Date.now();
-  const ages = caches.map(ts => now - ts);
+  const ages = caches.map((ts) => now - ts);
 
   return {
     count: caches.length,

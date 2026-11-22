@@ -1,12 +1,20 @@
-import React, { useEffect, useRef, useState } from 'react';
-import * as Dialog from '@radix-ui/react-dialog';
-import { Loader2, Plus, X } from 'lucide-react';
-import clsx from 'clsx';
-import { getTvDetails, getTvWatchProviders, searchSeries, type TMDBSeries, type TMDBTvSeasonMeta } from '../../lib/tmdb';
-import type { SeriesEntry, SeriesStatus } from '../../types/app';
+import React, { useEffect, useRef, useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { Loader2, Plus, X } from "lucide-react";
+import clsx from "clsx";
+import {
+  getTvDetails,
+  getTvWatchProviders,
+  searchSeries,
+  type TMDBSeries,
+  type TMDBTvSeasonMeta,
+} from "../../service/tmdb";
+import type { SeriesEntry, SeriesStatus } from "../../types";
 
 interface AddSeriesDialogProps {
-  onSubmit: (series: Omit<SeriesEntry, 'id' | 'user_id' | 'created_at'>) => Promise<unknown>;
+  onSubmit: (
+    series: Omit<SeriesEntry, "id" | "user_id" | "created_at">,
+  ) => Promise<unknown>;
   isPending: boolean;
   defaultStatus?: SeriesStatus;
 }
@@ -14,13 +22,13 @@ interface AddSeriesDialogProps {
 export default function AddSeriesDialog({
   onSubmit,
   isPending,
-  defaultStatus = 'watching',
+  defaultStatus = "watching",
 }: AddSeriesDialogProps) {
   const [open, setOpen] = useState(false);
-  const [titulo, setTitulo] = useState('');
-  const [capaUrl, setCapaUrl] = useState('');
-  const [temporada, setTemporada] = useState('1');
-  const [totalEps, setTotalEps] = useState('10');
+  const [titulo, setTitulo] = useState("");
+  const [capaUrl, setCapaUrl] = useState("");
+  const [temporada, setTemporada] = useState("1");
+  const [totalEps, setTotalEps] = useState("10");
   const [searchResults, setSearchResults] = useState<TMDBSeries[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -35,21 +43,24 @@ export default function AddSeriesDialog({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setShowDropdown(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const resetForm = () => {
     setOpen(false);
-    setTitulo('');
-    setCapaUrl('');
-    setTemporada('1');
-    setTotalEps('10');
+    setTitulo("");
+    setCapaUrl("");
+    setTemporada("1");
+    setTotalEps("10");
     setSearchResults([]);
     setShowDropdown(false);
     setSubmitError(null);
@@ -92,15 +103,17 @@ export default function AddSeriesDialog({
     setShowDropdown(false);
     void (async () => {
       const [providers, details] = await Promise.all([
-        getTvWatchProviders(series.id, 'BR'),
+        getTvWatchProviders(series.id, "BR"),
         getTvDetails(series.id),
       ]);
       setStreamingData(JSON.stringify(providers));
       if (details) {
         setSeasonMeta(details.seasons);
         setTotalSeasons(details.number_of_seasons || details.seasons.length);
-        setTemporada('1');
-        const seasonOneCount = details.seasons.find((item) => item.season_number === 1)?.episode_count;
+        setTemporada("1");
+        const seasonOneCount = details.seasons.find(
+          (item) => item.season_number === 1,
+        )?.episode_count;
         if (seasonOneCount && seasonOneCount > 0) {
           setTotalEps(String(seasonOneCount));
         } else if (details.number_of_episodes > 0) {
@@ -114,7 +127,9 @@ export default function AddSeriesDialog({
     setTemporada(value);
     const seasonNumber = parseInt(value, 10);
     if (Number.isNaN(seasonNumber)) return;
-    const currentSeason = seasonMeta.find((item) => item.season_number === seasonNumber);
+    const currentSeason = seasonMeta.find(
+      (item) => item.season_number === seasonNumber,
+    );
     if (currentSeason?.episode_count && currentSeason.episode_count > 0) {
       setTotalEps(String(currentSeason.episode_count));
     }
@@ -126,7 +141,11 @@ export default function AddSeriesDialog({
 
     const total = parseInt(totalEps, 10) || 0;
     const episodiosVistos =
-      defaultStatus === 'watched' ? total : defaultStatus === 'watching' ? Math.min(1, total) : 0;
+      defaultStatus === "watched"
+        ? total
+        : defaultStatus === "watching"
+          ? Math.min(1, total)
+          : 0;
     setSubmitError(null);
 
     try {
@@ -137,7 +156,7 @@ export default function AddSeriesDialog({
         total_episodios: total,
         episodios_vistos: episodiosVistos,
         status: defaultStatus,
-        plataforma_slug: 'stremio',
+        plataforma_slug: "stremio",
         source_movie_id: selectedTmdbId,
         rating: null,
         streaming_data: streamingData,
@@ -146,7 +165,9 @@ export default function AddSeriesDialog({
 
       resetForm();
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'Falha ao adicionar serie.');
+      setSubmitError(
+        error instanceof Error ? error.message : "Falha ao adicionar serie.",
+      );
     }
   };
 
@@ -154,7 +175,10 @@ export default function AddSeriesDialog({
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger asChild>
         <button className="flex h-32 min-w-0 w-full flex-row items-center justify-center gap-2 rounded-md border border-[#222] border-dashed bg-brand-bg text-xs uppercase tracking-widest text-brand-gold-alt transition-all hover:border-brand-gold hover:text-brand-gold md:h-auto md:min-h-[140px] md:flex-col md:aspect-[2/3] group snap-center">
-          <Plus size={24} className="group-hover:scale-110 transition-transform" />
+          <Plus
+            size={24}
+            className="group-hover:scale-110 transition-transform"
+          />
           <span>Add Serie</span>
         </button>
       </Dialog.Trigger>
@@ -173,7 +197,10 @@ export default function AddSeriesDialog({
 
           <form onSubmit={handleSave} className="flex flex-col gap-4 mt-2">
             <div className="flex flex-col gap-2 relative" ref={dropdownRef}>
-              <label htmlFor="titulo" className="text-xs text-brand-text uppercase tracking-widest">
+              <label
+                htmlFor="titulo"
+                className="text-xs text-brand-text uppercase tracking-widest"
+              >
                 Titulo da Serie *
               </label>
               <div className="relative">
@@ -183,7 +210,8 @@ export default function AddSeriesDialog({
                   value={titulo}
                   onChange={handleTitleChange}
                   onFocus={() => {
-                    if (titulo.trim() && searchResults.length > 0) setShowDropdown(true);
+                    if (titulo.trim() && searchResults.length > 0)
+                      setShowDropdown(true);
                   }}
                   className="w-full bg-[#0a0f1e] border border-[#222] text-brand-text p-2.5 rounded focus:outline-none focus:border-brand-gold font-light pr-10"
                   placeholder="Ex: Succession"
@@ -213,7 +241,9 @@ export default function AddSeriesDialog({
                             />
                           ) : (
                             <div className="w-8 h-12 bg-black flex items-center justify-center rounded border border-[#222]">
-                              <span className="text-[10px] text-brand-text-muted">N/A</span>
+                              <span className="text-[10px] text-brand-text-muted">
+                                N/A
+                              </span>
                             </div>
                           )}
                           <div className="flex flex-col">
@@ -221,13 +251,15 @@ export default function AddSeriesDialog({
                               {series.name}
                             </span>
                             <span className="text-xs text-brand-gold-alt">
-                              {series.first_air_date ? series.first_air_date.split('-')[0] : 'N/D'}
+                              {series.first_air_date
+                                ? series.first_air_date.split("-")[0]
+                                : "N/D"}
                             </span>
                           </div>
                         </li>
                       ))}
                     </ul>
-                  ) : titulo.trim() !== '' && !isSearching ? (
+                  ) : titulo.trim() !== "" && !isSearching ? (
                     <div className="p-4 text-center text-sm text-brand-text-muted font-light leading-relaxed">
                       Nenhuma serie encontrada no TMDB.
                     </div>
@@ -237,7 +269,10 @@ export default function AddSeriesDialog({
             </div>
 
             <div className="flex flex-col gap-2">
-              <label htmlFor="capa" className="text-xs text-brand-text uppercase tracking-widest">
+              <label
+                htmlFor="capa"
+                className="text-xs text-brand-text uppercase tracking-widest"
+              >
                 URL da Capa
               </label>
               <input
@@ -251,7 +286,10 @@ export default function AddSeriesDialog({
 
             <div className="flex gap-4">
               <div className="flex flex-col gap-2 w-full">
-                <label htmlFor="temp" className="text-xs text-brand-text uppercase tracking-widest">
+                <label
+                  htmlFor="temp"
+                  className="text-xs text-brand-text uppercase tracking-widest"
+                >
                   Temporada
                 </label>
                 <input
@@ -271,7 +309,10 @@ export default function AddSeriesDialog({
               </div>
 
               <div className="flex flex-col gap-2 w-full">
-                <label htmlFor="total" className="text-xs text-brand-text uppercase tracking-widest">
+                <label
+                  htmlFor="total"
+                  className="text-xs text-brand-text uppercase tracking-widest"
+                >
                   Episodios Totais
                 </label>
                 <input
@@ -287,29 +328,29 @@ export default function AddSeriesDialog({
               </div>
             </div>
 
-            {defaultStatus !== 'watchlist' ? (
+            {defaultStatus !== "watchlist" ? (
               <div className="flex flex-col gap-2">
                 <label className="text-xs text-brand-text uppercase tracking-widest">
                   Quando voce assistiu?
                 </label>
                 <div className="flex gap-4">
                   <label className="flex items-center gap-2 cursor-pointer text-sm font-light text-brand-text hover:text-brand-gold transition-colors">
-                    <input 
-                      type="radio" 
+                    <input
+                      type="radio"
                       name="retroactive_series"
-                      checked={!isRetroactive} 
-                      onChange={() => setIsRetroactive(false)} 
-                      className="accent-brand-gold" 
+                      checked={!isRetroactive}
+                      onChange={() => setIsRetroactive(false)}
+                      className="accent-brand-gold"
                     />
                     Recentemente (Ganha pontos)
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer text-sm font-light text-brand-text hover:text-brand-gold transition-colors">
-                    <input 
-                      type="radio" 
+                    <input
+                      type="radio"
                       name="retroactive_series"
-                      checked={isRetroactive} 
-                      onChange={() => setIsRetroactive(true)} 
-                      className="accent-brand-gold" 
+                      checked={isRetroactive}
+                      onChange={() => setIsRetroactive(true)}
+                      className="accent-brand-gold"
                     />
                     Há mais tempo (Sem pontos)
                   </label>
@@ -336,8 +377,8 @@ export default function AddSeriesDialog({
                 type="submit"
                 disabled={isPending || !titulo.trim()}
                 className={clsx(
-                  'px-6 py-2 text-xs uppercase tracking-widest bg-brand-gold text-brand-bg font-medium rounded transition-all',
-                  'hover:bg-opacity-90 active:scale-95 disabled:opacity-50 disabled:pointer-events-none',
+                  "px-6 py-2 text-xs uppercase tracking-widest bg-brand-gold text-brand-bg font-medium rounded transition-all",
+                  "hover:bg-opacity-90 active:scale-95 disabled:opacity-50 disabled:pointer-events-none",
                 )}
               >
                 Adicionar

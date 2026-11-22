@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
-import { HelpCircle } from 'lucide-react';
-import { ACHIEVEMENTS } from '../../lib/achievements';
-import { AchievementBadge } from './UserAchievements';
+import { useState, useRef, useEffect } from "react";
+import { HelpCircle } from "lucide-react";
+import { ACHIEVEMENTS } from "../../service/achievements";
+import { AchievementBadge } from "./UserAchievements";
 
 const LEVEL_ORDER: Record<number, number> = { 3: 0, 2: 1, 1: 2 };
 
@@ -12,31 +12,34 @@ export default function AllAchievements() {
 
   useEffect(() => {
     const handleClickOutside = (event: Event) => {
-      if (secretBadgeRef.current && !secretBadgeRef.current.contains(event.target as Node)) {
+      if (
+        secretBadgeRef.current &&
+        !secretBadgeRef.current.contains(event.target as Node)
+      ) {
         setShowSecretTooltip(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('touchstart', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
     };
   }, []);
 
   // Sort by difficulty: level 3 (Épica) → 2 (Rara) → 1 (Simples)
   const sorted = [...publicAchievements].sort(
-    (a, b) => (LEVEL_ORDER[a.level] ?? 99) - (LEVEL_ORDER[b.level] ?? 99)
+    (a, b) => (LEVEL_ORDER[a.level] ?? 99) - (LEVEL_ORDER[b.level] ?? 99),
   );
 
   const handleMouseEnter = () => {
-    if (window.matchMedia('(hover: hover)').matches) {
+    if (window.matchMedia("(hover: hover)").matches) {
       setShowSecretTooltip(true);
     }
   };
 
   const handleMouseLeave = () => {
-    if (window.matchMedia('(hover: hover)').matches) {
+    if (window.matchMedia("(hover: hover)").matches) {
       setShowSecretTooltip(false);
     }
   };
@@ -67,8 +70,12 @@ export default function AllAchievements() {
 
         {showSecretTooltip && (
           <div className="absolute bottom-full mb-2.5 left-1/2 -translate-x-1/2 z-50 w-44 p-2.5 rounded-xl border border-purple-500/20 bg-black/95 backdrop-blur-md text-center shadow-2xl animate-in fade-in zoom-in-95 duration-100 pointer-events-none">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-purple-400">???</p>
-            <p className="text-[9px] text-brand-text mt-1 leading-normal font-light">Existem conquistas secretas</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-purple-400">
+              ???
+            </p>
+            <p className="text-[9px] text-brand-text mt-1 leading-normal font-light">
+              Existem conquistas secretas
+            </p>
             <span className="inline-block mt-1.5 text-[7px] uppercase tracking-widest px-1.5 py-0.5 rounded border bg-purple-950/40 border-purple-500/25 text-purple-300">
               Secreta
             </span>

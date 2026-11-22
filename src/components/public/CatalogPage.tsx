@@ -359,7 +359,7 @@ export default function CatalogPage({ type, page }: CatalogPageProps) {
                         Deslize para ver a linha <ChevronRight size={13} />
                       </div>
                     )}
-                    <div className="touch-pan-x snap-x snap-mandatory overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    <div className="touch-pan-x snap-x snap-mandatory overflow-x-auto overscroll-x-contain pb-2 scrollbar-none [&::-webkit-scrollbar]:hidden">
                       <div className="flex w-max gap-2 pr-4">
                         {row.map((item) => (
                           <MediaCard
@@ -476,7 +476,7 @@ function MediaCard({
       }
       className="group w-[calc((100vw-5rem)/3.333)] flex-none snap-start text-left sm:w-auto sm:flex-auto sm:snap-none"
     >
-      <div className="aspect-[2/3] overflow-hidden rounded-lg border border-[#222] bg-brand-card transition duration-300 group-hover:-translate-y-1 group-hover:border-brand-gold sm:rounded-xl">
+      <div className="aspect-2/3 overflow-hidden rounded-lg border border-[#222] bg-brand-card transition duration-300 group-hover:-translate-y-1 group-hover:border-brand-gold sm:rounded-xl">
         {item.poster_path ? (
           <TmdbImage
             src={`https://image.tmdb.org/t/p/w500${item.poster_path}`}

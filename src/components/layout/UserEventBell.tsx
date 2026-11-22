@@ -172,7 +172,7 @@ export default function UserEventBell({
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 sm:hidden"
             onClick={() => setOpen(false)}
           />
-          <div className="fixed inset-x-4 top-[50%] z-110 w-auto max-h-[80vh] -translate-y-[50%] overflow-y-auto rounded-2xl border border-[#151b28] bg-[#06080d] shadow-[0_18px_60px_rgba(0,0,0,0.55)] sm:absolute sm:inset-x-auto sm:right-0 sm:top-[calc(100%+10px)] sm:w-[min(92vw,360px)] sm:max-h-[min(80vh,640px)] sm:translate-y-0">
+          <div className="fixed inset-x-4 top-[50%] z-110 w-auto max-h-[80vh] translate-y-[-50%] overflow-y-auto rounded-2xl border border-[#151b28] bg-[#06080d] shadow-[0_18px_60px_rgba(0,0,0,0.55)] sm:absolute sm:inset-x-auto sm:right-0 sm:top-[calc(100%+10px)] sm:w-[min(92vw,360px)] sm:max-h-[min(80vh,640px)] sm:translate-y-0">
             <SpecialNotificationsList
               notifications={special.notifications}
               unreadCount={special.unreadCount}

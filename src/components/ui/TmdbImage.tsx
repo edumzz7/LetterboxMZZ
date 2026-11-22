@@ -44,7 +44,7 @@ export default function TmdbImage({
       {!loaded && !failed && (
         <span
           aria-hidden="true"
-          className="absolute inset-0 animate-pulse bg-gradient-to-br from-[#101522] via-[#1a2130] to-[#101522]"
+          className="absolute inset-0 animate-pulse bg-linear-to-br from-[#101522] via-[#1a2130] to-[#101522]"
         />
       )}
       {!failed && src && (

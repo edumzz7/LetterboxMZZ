@@ -134,7 +134,7 @@ export default function ReviewModal({
         <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-[92vw] max-w-md translate-x-[-50%] translate-y-[-50%] border border-brand-gold/10 bg-[#050811] p-6 shadow-2xl rounded-2xl focus:outline-none">
           <div className="flex gap-4">
             {/* Media Cover */}
-            <div className="w-24 aspect-[2/3] rounded-lg overflow-hidden border border-[#222] shrink-0 bg-brand-card">
+            <div className="w-24 aspect-2/3 rounded-lg overflow-hidden border border-[#222] shrink-0 bg-brand-card">
               <img
                 src={imageSrc}
                 alt={title}
@@ -174,7 +174,7 @@ export default function ReviewModal({
 
           <form onSubmit={handleSave} className="mt-5 flex flex-col gap-4">
             {isReadOnly ? (
-              <div className="bg-[#0a0f1e]/60 border border-[#222] rounded-xl p-4 min-h-[100px] flex flex-col justify-between">
+              <div className="bg-brand-card/60 border border-[#222] rounded-xl p-4 min-h-25 flex flex-col justify-between">
                 <p
                   className={clsx(
                     "text-sm leading-relaxed whitespace-pre-wrap",
@@ -190,7 +190,7 @@ export default function ReviewModal({
                   value={review}
                   onChange={(e) => setReview(e.target.value)}
                   className={clsx(
-                    "w-full min-h-[120px] bg-[#0a0f1e] border text-brand-text p-3.5 rounded-xl focus:outline-none transition-colors text-sm placeholder-brand-text-muted resize-none",
+                    "w-full min-h-30 bg-brand-card border text-brand-text p-3.5 rounded-xl focus:outline-none transition-colors text-sm placeholder-brand-text-muted resize-none",
                     review && sanitizedLength < MIN_REVIEW_LENGTH
                       ? "border-red-400/50 focus:border-red-400"
                       : "border-[#222] focus:border-brand-gold",

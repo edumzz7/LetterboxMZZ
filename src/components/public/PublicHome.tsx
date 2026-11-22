@@ -87,8 +87,8 @@ function MediaRow({
           className="flex gap-4 overflow-hidden"
         >
           {Array.from({ length: 5 }, (_, index) => (
-            <div key={index} className="w-[166px] shrink-0">
-              <Skeleton className="aspect-[2/3] rounded-xl" />
+            <div key={index} className="w-41.5 shrink-0">
+              <Skeleton className="aspect-2/3 rounded-xl" />
               <Skeleton className="mt-2 h-3 w-4/5" />
               <Skeleton className="mt-2 h-2.5 w-2/5" />
             </div>
@@ -99,7 +99,7 @@ function MediaRow({
           <div
             ref={scrollerRef}
             onScroll={updateNavigation}
-            className="-my-1 flex gap-4 overflow-x-auto px-1 py-1 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="-my-1 flex gap-4 overflow-x-auto px-1 py-1 scroll-smooth scrollbar-none [&::-webkit-scrollbar]:hidden"
           >
             {items.slice(0, 10).map((item) => {
               const name = item.title || item.name || "Sem título";
@@ -114,9 +114,9 @@ function MediaRow({
                         : `/filme/${item.id}`,
                     )
                   }
-                  className="group w-[166px] shrink-0 text-left"
+                  className="group w-41.5 shrink-0 text-left"
                 >
-                  <div className="aspect-[2/3] overflow-hidden rounded-xl border border-[#222] bg-brand-card transition duration-300 group-hover:-translate-y-1 group-hover:border-brand-gold">
+                  <div className="aspect-2/3 overflow-hidden rounded-xl border border-[#222] bg-brand-card transition duration-300 group-hover:-translate-y-1 group-hover:border-brand-gold">
                     {item.poster_path ? (
                       <TmdbImage
                         src={`https://image.tmdb.org/t/p/w500${item.poster_path}`}
@@ -212,7 +212,7 @@ export default function PublicHome({
 
   return (
     <main className="mx-auto w-full max-w-[1700px] space-y-12 overflow-x-hidden px-3 py-7 sm:px-6 lg:px-8 lg:py-10">
-      <section className="relative left-1/2 min-h-[360px] w-screen -translate-x-1/2 overflow-hidden bg-[#06080d] sm:min-h-[430px]">
+      <section className="relative left-1/2 min-h-90 w-screen -translate-x-1/2 overflow-hidden bg-[#06080d] sm:min-h-107.5">
         <picture>
           <source media="(max-width: 639px)" srcSet={homeHeroMobile} />
           <img
@@ -222,10 +222,10 @@ export default function PublicHome({
             className="absolute inset-0 h-full w-full origin-[68%_32%] scale-[1.8] object-cover object-[68%_25%] sm:origin-center sm:scale-100 sm:object-[center_25%]"
           />
         </picture>
-        <div className="absolute inset-0 bg-gradient-to-r from-[#05080f] via-[#071326]/94 via-[52%] to-[#071326]/10" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#05080f]/40 via-transparent to-[#05080f]/20" />
+        <div className="absolute inset-0 bg-linear-to-r from-[#05080f] via-[#071326]/94 via-52% to-[#071326]/10" />
+        <div className="absolute inset-0 bg-linear-to-t from-[#05080f]/40 via-transparent to-[#05080f]/20" />
         <div className="absolute inset-0 [background:linear-gradient(to_right,#06080d_0%,transparent_15%,transparent_85%,#06080d_100%)]" />
-        <div className="relative z-10 mx-auto flex min-h-[360px] w-full max-w-[1700px] flex-col justify-center px-3 py-10 sm:min-h-[430px] sm:px-6 lg:px-8">
+        <div className="relative z-10 mx-auto flex min-h-90 w-full max-w-[1700px] flex-col justify-center px-3 py-10 sm:min-h-107.5 sm:px-6 lg:px-8">
           <div className="max-w-xl">
             <p className="text-xs uppercase tracking-[0.25em] text-brand-gold-alt">
               CineRats
@@ -370,7 +370,7 @@ export default function PublicHome({
                       {item.type === "movie" ? "Filme" : "Série"}
                     </span>
                   </div>
-                  <p className="mt-3 line-clamp-3 break-words border-l-2 border-brand-gold/30 pl-3 text-xs italic leading-relaxed text-brand-text/90">
+                  <p className="mt-3 line-clamp-3 wrap-break-word border-l-2 border-brand-gold/30 pl-3 text-xs italic leading-relaxed text-brand-text/90">
                     “{item.review}”
                   </p>
                   <button

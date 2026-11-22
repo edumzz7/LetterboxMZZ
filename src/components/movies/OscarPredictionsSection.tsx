@@ -124,7 +124,7 @@ export default function OscarPredictionsSection({
               : "Visualize os palpites salvos deste usuário"}
           </p>
         </div>
-        <div className="ml-4 h-[1px] bg-[#222] flex-grow" />
+        <div className="ml-4 h-px bg-[#222] grow" />
       </div>
 
       {predictionsQuery.isLoading ? (
@@ -139,7 +139,7 @@ export default function OscarPredictionsSection({
               className="rounded-2xl border border-[#151b28] bg-[#06080d] p-5"
             >
               <Skeleton className="h-3 w-1/2" />
-              <Skeleton className="mt-5 aspect-[2/3] rounded-xl" />
+              <Skeleton className="mt-5 aspect-2/3 rounded-xl" />
               <Skeleton className="mt-4 h-3 w-3/4" />
               <Skeleton className="mt-2 h-3 w-1/2" />
             </div>
@@ -258,7 +258,7 @@ function CategoryCard({
   const showSelection = prediction && !isChanging;
 
   return (
-    <div className="flex flex-col gap-4 p-5 rounded-2xl border border-white/5 bg-brand-card/20 backdrop-blur-md hover:border-brand-gold/10 transition-all flex-grow">
+    <div className="flex flex-col gap-4 p-5 rounded-2xl border border-white/5 bg-brand-card/20 backdrop-blur-md hover:border-brand-gold/10 transition-all grow">
       {/* Category header */}
       <div className="flex items-center gap-3 border-b border-white/5 pb-3">
         <IconComponent className="text-brand-gold w-5 h-5 shrink-0" />
@@ -303,7 +303,7 @@ function CategoryCard({
         </div>
       ) : (
         /* Search and select area */
-        <div className="flex flex-col gap-3 min-h-[144px] justify-center">
+        <div className="flex flex-col gap-3 min-h-36 justify-center">
           {canEdit ? (
             <>
               {/* Search Input */}
@@ -344,7 +344,7 @@ function CategoryCard({
                             key={item.id}
                             onClick={() => handleSelect(item)}
                             disabled={isGlobalPending || selectingId !== null}
-                            className="w-20 snap-start flex-shrink-0 flex flex-col gap-1.5 text-left group relative focus:outline-none"
+                            className="w-20 snap-start shrink-0 flex flex-col gap-1.5 text-left group relative focus:outline-none"
                           >
                             <div className="w-20 h-28 rounded-lg overflow-hidden border border-white/5 group-hover:border-brand-gold/60 transition-all relative bg-[#0b101d]">
                               <img

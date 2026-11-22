@@ -54,7 +54,7 @@ export default function EnterCodeScreen({
     // Tela de digitação de código
     return (
       <div className="min-h-screen bg-brand-bg text-brand-text flex items-center justify-center px-4 py-10">
-        <div className="w-full max-w-5xl grid lg:grid-cols-[1.15fr_0.85fr] border border-[#171717] rounded-[28px] overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(212,175,55,0.08),_transparent_35%),linear-gradient(135deg,_rgba(10,15,30,0.92),_rgba(0,0,0,0.98))] shadow-[0_30px_80px_rgba(0,0,0,0.55)]">
+        <div className="w-full max-w-5xl grid lg:grid-cols-[1.15fr_0.85fr] border border-[#171717] rounded-[28px] overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(212,175,55,0.08),transparent_35%),linear-gradient(135deg,rgba(10,15,30,0.92),rgba(0,0,0,0.98))] shadow-[0_30px_80px_rgba(0,0,0,0.55)]">
           <section className="p-8 md:p-12 lg:p-14 border-b lg:border-b-0 lg:border-r border-[#171717] flex flex-col justify-between gap-10">
             <div className="space-y-6">
               <div className="inline-flex items-center gap-3 text-brand-gold uppercase tracking-[0.35em] text-xs">
@@ -155,7 +155,7 @@ export default function EnterCodeScreen({
   // Tela de definição de senha (quando já tem o código)
   return (
     <div className="min-h-screen bg-brand-bg text-brand-text flex items-center justify-center px-4 py-10">
-      <div className="w-full max-w-5xl grid lg:grid-cols-[1.15fr_0.85fr] border border-[#171717] rounded-[28px] overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(212,175,55,0.08),_transparent_35%),linear-gradient(135deg,_rgba(10,15,30,0.92),_rgba(0,0,0,0.98))] shadow-[0_30px_80px_rgba(0,0,0,0.55)]">
+      <div className="w-full max-w-5xl grid lg:grid-cols-[1.15fr_0.85fr] border border-[#171717] rounded-[28px] overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(212,175,55,0.08),transparent_35%),linear-gradient(135deg,rgba(10,15,30,0.92),rgba(0,0,0,0.98))] shadow-[0_30px_80px_rgba(0,0,0,0.55)]">
         <section className="p-8 md:p-12 lg:p-14 border-b lg:border-b-0 lg:border-r border-[#171717] flex flex-col justify-between gap-10">
           <div className="space-y-6">
             <div className="inline-flex items-center gap-3 text-brand-gold uppercase tracking-[0.35em] text-xs">

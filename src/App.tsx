@@ -610,7 +610,7 @@ function App() {
           page={Math.max(1, Number(seriesPageParams?.page || 1))}
         />
       ) : matchMovie ? (
-        <main className="mx-auto w-full max-w-[1700px] px-3 py-8 sm:px-6 lg:py-12">
+        <main className="mx-auto w-full max-w-425 px-3 py-8 sm:px-6 lg:py-12">
           <section className="overflow-hidden rounded-3xl border border-[#151b28] bg-[#06080d] p-4 sm:p-7 lg:p-9">
             <MovieDetailScreen
               id={movieParams.id}
@@ -619,7 +619,7 @@ function App() {
           </section>
         </main>
       ) : matchSerie ? (
-        <main className="mx-auto w-full max-w-[1700px] px-3 py-8 sm:px-6 lg:py-12">
+        <main className="mx-auto w-full max-w-425 px-3 py-8 sm:px-6 lg:py-12">
           <section className="overflow-hidden rounded-3xl border border-[#151b28] bg-[#06080d] p-4 sm:p-7 lg:p-9">
             <SeriesDetailScreen
               id={serieParams.id}
@@ -628,13 +628,13 @@ function App() {
           </section>
         </main>
       ) : matchActor ? (
-        <main className="mx-auto w-full max-w-[1700px] px-3 py-8 sm:px-6 lg:py-12">
+        <main className="mx-auto w-full max-w-425 px-3 py-8 sm:px-6 lg:py-12">
           <section className="overflow-hidden rounded-3xl border border-[#151b28] bg-[#06080d] p-4 sm:p-7 lg:p-9">
             <PersonDetailScreen id={actorParams.id} mode="actor" />
           </section>
         </main>
       ) : matchDirector ? (
-        <main className="mx-auto w-full max-w-[1700px] px-3 py-8 sm:px-6 lg:py-12">
+        <main className="mx-auto w-full max-w-425 px-3 py-8 sm:px-6 lg:py-12">
           <section className="overflow-hidden rounded-3xl border border-[#151b28] bg-[#06080d] p-4 sm:p-7 lg:p-9">
             <PersonDetailScreen id={directorParams.id} mode="director" />
           </section>
@@ -667,7 +667,7 @@ function App() {
       ) : matchTerms ? (
         <LegalPage document={TERMS_OF_USE} />
       ) : matchFaq ? (
-        <main className="mx-auto w-full max-w-[1700px] px-3 py-8 sm:px-6">
+        <main className="mx-auto w-full max-w-425 px-3 py-8 sm:px-6">
           <section className="rounded-3xl border border-[#151b28] bg-[#06080d] p-4 sm:p-7">
             <FaqScreen />
           </section>
@@ -768,7 +768,7 @@ function App() {
   };
   return (
     <div className="min-h-screen overflow-x-clip bg-brand-bg text-brand-text">
-      <div className="mx-auto flex w-full max-w-[1700px] flex-col gap-6 px-3 pb-24 pt-0 sm:px-6 lg:px-8 lg:pb-6 lg:pt-0">
+      <div className="mx-auto flex w-full max-w-425 flex-col gap-6 px-3 pb-24 pt-0 sm:px-6 lg:px-8 lg:pb-6 lg:pt-0">
         <AppHeader
           activeTab={activeTab}
           onTabChange={setActiveTab}
@@ -858,7 +858,7 @@ function App() {
                   topGap={136}
                   bottomGap={16}
                   fixedTop={!isOwnDashboard}
-                  className="order-3 flex flex-col gap-5 lg:w-[260px]"
+                  className="order-3 flex flex-col gap-5 lg:w-65"
                 >
                   <div className="hidden lg:block">
                     <ProfileSummary
@@ -981,7 +981,7 @@ function App() {
             )}
 
             <main
-              className={`order-2 min-w-0 rounded-3xl border border-[#151b28] bg-[#06080d] p-4 lg:order-none sm:p-7 lg:p-9 ${matchMovie || matchSerie || isPersonRoute ? "overflow-hidden" : ""}`}
+              className={`order-2 min-w-0 rounded-3xl border border-[#151b28] bg-[#06080d] p-4 lg:order-0 sm:p-7 lg:p-9 ${matchMovie || matchSerie || isPersonRoute ? "overflow-hidden" : ""}`}
             >
               {isProfileRoute && viewedUser && !isOwnDashboard && (
                 <section className="mb-7 text-center sm:mb-9">
@@ -1213,7 +1213,7 @@ function App() {
       </div>
       {isMobileLayout && isNavigationDrawerOpen && (
         <div
-          className="fixed inset-x-0 top-0 z-[60]"
+          className="fixed inset-x-0 top-0 z-60"
           style={{
             bottom: "calc(3.25rem + max(0.75rem, env(safe-area-inset-bottom)))",
           }}
@@ -1252,7 +1252,7 @@ function App() {
                   setLocation(`/${authenticatedSession.username}`);
                   setIsNavigationDrawerOpen(false);
                 }}
-                className="mb-4 flex items-center gap-3 rounded-2xl border border-[#151b28] bg-white/[0.03] p-3 text-left transition hover:bg-white/[0.06]"
+                className="mb-4 flex items-center gap-3 rounded-2xl border border-[#151b28] bg-white/3 p-3 text-left transition hover:bg-white/6"
               >
                 <AvatarDisplay
                   avatarId={currentRankedUser.avatar_id}
@@ -1360,7 +1360,7 @@ function App() {
       {isMobileLayout && (
         <nav
           aria-label="Ações rápidas"
-          className="fixed inset-x-0 bottom-0 z-[70] border-t border-[#151b28] bg-[#06080d]/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_36px_rgba(0,0,0,0.25)] backdrop-blur"
+          className="fixed inset-x-0 bottom-0 z-70 border-t border-[#151b28] bg-[#06080d]/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_36px_rgba(0,0,0,0.25)] backdrop-blur"
         >
           <div className="mx-auto flex max-w-md items-center justify-around">
             <button
@@ -1446,7 +1446,7 @@ function App() {
             onClose={() => setSidebarOpen(false)}
           />
 
-          <div className="flex-1 border border-[#151515] rounded-[32px] bg-[radial-gradient(circle_at_top_right,_rgba(212,175,55,0.08),_transparent_22%),linear-gradient(180deg,_rgba(9,12,18,0.96),_rgba(0,0,0,0.98))] px-5 sm:px-8 lg:px-10 py-8 flex flex-col gap-12 min-w-0">
+          <div className="flex-1 border border-[#151515] rounded-[32px] bg-[radial-gradient(circle_at_top_right,rgba(212,175,55,0.08),transparent_22%),linear-gradient(180deg,rgba(9,12,18,0.96),rgba(0,0,0,0.98))] px-5 sm:px-8 lg:px-10 py-8 flex flex-col gap-12 min-w-0">
             <AppHeader
               activeTab={activeTab}
               onTabChange={setActiveTab}

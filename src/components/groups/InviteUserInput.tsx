@@ -96,7 +96,7 @@ export default function InviteUserInput({
           id="group-invite-suggestions"
           role="listbox"
           aria-label="Sugestões de usuários"
-          className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-72 overflow-y-auto rounded-xl border border-[#222] bg-[#0A0F1E] p-1 shadow-[0_18px_40px_rgba(0,0,0,0.5)]"
+          className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-72 overflow-y-auto rounded-xl border border-[#222] bg-brand-card p-1 shadow-[0_18px_40px_rgba(0,0,0,0.5)]"
         >
           {suggestions.map((user, index) => (
             <li

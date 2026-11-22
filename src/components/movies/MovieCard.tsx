@@ -280,7 +280,7 @@ export default function MovieCard({
                 align="end"
                 onClick={(e) => e.stopPropagation()}
                 onPointerDown={(e) => e.stopPropagation()}
-                className="min-w-[180px] bg-[#0a0f1e]/95 backdrop-blur-md border border-[#222] rounded-xl p-1.5 shadow-xl shadow-black/50 z-20 animate-in fade-in zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:zoom-out-95"
+                className="min-w-45 bg-brand-card/95 backdrop-blur-md border border-[#222] rounded-xl p-1.5 shadow-xl shadow-black/50 z-20 animate-in fade-in zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:zoom-out-95"
               >
                 <DropdownMenu.Item
                   onSelect={(e) => {
@@ -327,7 +327,7 @@ export default function MovieCard({
 
                 {canEdit && (
                   <>
-                    <DropdownMenu.Separator className="h-[1px] bg-[#222] my-1" />
+                    <DropdownMenu.Separator className="h-px bg-[#222] my-1" />
                     <DropdownMenu.Item
                       onSelect={handleDelete}
                       className="flex items-center gap-2 px-2 py-2 text-xs text-red-400 rounded-md cursor-pointer outline-none hover:bg-red-500/10 hover:text-red-500 transition-colors focus:bg-red-500/10 focus:text-red-500"
@@ -378,7 +378,7 @@ export default function MovieCard({
               Onde assistir?
             </button>
             {showProviders ? (
-              <div className="absolute left-0 top-[110%] z-20 min-w-[180px] border border-[#222] rounded-md bg-[#0a0f1e] p-2">
+              <div className="absolute left-0 top-[110%] z-20 min-w-45 border border-[#222] rounded-md bg-brand-card p-2">
                 {providersLoading ? (
                   <div className="flex items-center gap-2 text-xs text-brand-text-muted">
                     <Loader2 size={12} className="animate-spin" /> Carregando...

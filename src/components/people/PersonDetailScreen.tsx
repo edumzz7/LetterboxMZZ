@@ -173,7 +173,7 @@ export default function PersonDetailScreen({
               loading="eager"
               className="h-full w-full object-cover object-top opacity-40 blur-[1px] scale-110"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
+            <div className="absolute inset-0 bg-linear-to-t from-black via-black/60 to-transparent" />
           </>
         )}
         <button
@@ -204,7 +204,7 @@ export default function PersonDetailScreen({
             <p className="mb-2 text-[10px] uppercase tracking-[0.25em] text-brand-gold-alt">
               {isActorPage ? "Ator / atriz" : "Diretor / diretora"}
             </p>
-            <h1 className="break-words text-center text-3xl font-extralight uppercase tracking-wide text-brand-text sm:text-4xl md:text-left md:text-5xl">
+            <h1 className="wrap-break-word text-center text-3xl font-extralight uppercase tracking-wide text-brand-text sm:text-4xl md:text-left md:text-5xl">
               {person.name}
             </h1>
             {person.known_for_department && (
@@ -245,11 +245,11 @@ export default function PersonDetailScreen({
               <span className="block text-[9px] uppercase tracking-widest text-brand-text-muted">
                 Local de nascimento
               </span>
-              <span className="block break-words text-xs font-light text-brand-text sm:text-sm">
+              <span className="block wrap-break-word text-xs font-light text-brand-text sm:text-sm">
                 {person.place_of_birth || "Não informado"}
               </span>
             </div>
-            <div className="col-span-2 mx-auto w-full max-w-[10rem] rounded-2xl border border-[#151515] bg-black/20 p-3 md:col-span-1 md:max-w-none">
+            <div className="col-span-2 mx-auto w-full max-w-40 rounded-2xl border border-[#151515] bg-black/20 p-3 md:col-span-1 md:max-w-none">
               <Film
                 size={14}
                 className="mx-auto mb-2 text-brand-gold md:mx-0"
@@ -332,7 +332,7 @@ export default function PersonDetailScreen({
                       }
                       className="group cursor-pointer overflow-hidden rounded-2xl border border-[#151515] bg-black/20 text-left transition hover:-translate-y-1 hover:border-brand-gold/40"
                     >
-                      <div className="aspect-[2/3] bg-[#0a0f1e]">
+                      <div className="aspect-2/3 bg-brand-card">
                         {credit.poster_path ? (
                           <TmdbImage
                             src={`https://image.tmdb.org/t/p/w342${credit.poster_path}`}

@@ -118,7 +118,7 @@ export default function PersonalMoviesSection({
       {moviesQuery.isLoading ? (
         <PosterGridSkeleton count={8} />
       ) : isPublicLocked ? (
-        <div className="rounded-2xl border border-brand-gold/25 bg-brand-gold/[0.04] px-6 py-12 text-center text-sm text-brand-text-muted">
+        <div className="rounded-2xl border border-brand-gold/25 bg-brand-gold/4 px-6 py-12 text-center text-sm text-brand-text-muted">
           Para visualização completa,{" "}
           <button
             type="button"

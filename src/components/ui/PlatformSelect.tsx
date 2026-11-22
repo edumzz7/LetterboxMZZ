@@ -46,7 +46,7 @@ export function PlatformSelect({
         className={clsx(
           "flex items-center justify-between w-full px-3 py-2 text-xs text-brand-text bg-brand-bg border border-[#222] rounded-md transition-all",
           "hover:border-brand-gold-alt focus:outline-none focus:border-brand-gold",
-          "data-[placeholder]:text-brand-text-muted",
+          "data-placeholder:text-brand-text-muted",
         )}
       >
         <div className="flex items-center gap-2">
@@ -60,7 +60,7 @@ export function PlatformSelect({
 
       <Select.Portal>
         <Select.Content
-          className="overflow-hidden bg-[#0a0f1e] rounded-md border border-[#222] shadow-[0_10px_30px_rgba(0,0,0,0.8)] z-50"
+          className="overflow-hidden bg-brand-card rounded-md border border-[#222] shadow-[0_10px_30px_rgba(0,0,0,0.8)] z-50"
           position="popper"
           sideOffset={5}
         >
@@ -77,8 +77,8 @@ export function PlatformSelect({
                   value={platform.id}
                   className={clsx(
                     "text-xs leading-none rounded-[3px] flex items-center h-8 pr-8 pl-6 relative select-none outline-none",
-                    "data-[disabled]:text-brand-text-muted data-[disabled]:pointer-events-none",
-                    "data-[highlighted]:bg-[#1a2235] data-[highlighted]:text-brand-gold",
+                    "data-disabled:text-brand-text-muted data-disabled:pointer-events-none",
+                    "data-highlighted:bg-[#1a2235] data-highlighted:text-brand-gold",
                   )}
                 >
                   <div className="absolute left-2 flex items-center justify-center">

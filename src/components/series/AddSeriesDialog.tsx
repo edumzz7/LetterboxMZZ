@@ -174,7 +174,7 @@ export default function AddSeriesDialog({
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger asChild>
-        <button className="flex h-32 min-w-0 w-full flex-row items-center justify-center gap-2 rounded-md border border-[#222] border-dashed bg-brand-bg text-xs uppercase tracking-widest text-brand-gold-alt transition-all hover:border-brand-gold hover:text-brand-gold md:h-auto md:min-h-[140px] md:flex-col md:aspect-[2/3] group snap-center">
+        <button className="flex h-32 min-w-0 w-full flex-row items-center justify-center gap-2 rounded-md border border-[#222] border-dashed bg-brand-bg text-xs uppercase tracking-widest text-brand-gold-alt transition-all hover:border-brand-gold hover:text-brand-gold md:h-auto md:min-h-35 md:flex-col md:aspect-2/3 group snap-center">
           <Plus
             size={24}
             className="group-hover:scale-110 transition-transform"
@@ -213,7 +213,7 @@ export default function AddSeriesDialog({
                     if (titulo.trim() && searchResults.length > 0)
                       setShowDropdown(true);
                   }}
-                  className="w-full bg-[#0a0f1e] border border-[#222] text-brand-text p-2.5 rounded focus:outline-none focus:border-brand-gold font-light pr-10"
+                  className="w-full bg-brand-card border border-[#222] text-brand-text p-2.5 rounded focus:outline-none focus:border-brand-gold font-light pr-10"
                   placeholder="Ex: Succession"
                 />
                 {isSearching ? (
@@ -224,7 +224,7 @@ export default function AddSeriesDialog({
               </div>
 
               {showDropdown ? (
-                <div className="absolute top-[100%] left-0 w-full mt-1 bg-[#0a0f1e] border border-[#222] rounded-md shadow-[0_10px_30px_rgba(0,0,0,0.8)] z-50 max-h-60 overflow-y-auto">
+                <div className="absolute top-full left-0 w-full mt-1 bg-brand-card border border-[#222] rounded-md shadow-[0_10px_30px_rgba(0,0,0,0.8)] z-50 max-h-60 overflow-y-auto">
                   {searchResults.length > 0 ? (
                     <ul className="flex flex-col">
                       {searchResults.map((series) => (
@@ -279,7 +279,7 @@ export default function AddSeriesDialog({
                 id="capa"
                 value={capaUrl}
                 onChange={(event) => setCapaUrl(event.target.value)}
-                className="w-full bg-[#0a0f1e] border border-[#222] text-brand-text p-2.5 rounded focus:outline-none focus:border-brand-gold font-light text-sm"
+                className="w-full bg-brand-card border border-[#222] text-brand-text p-2.5 rounded focus:outline-none focus:border-brand-gold font-light text-sm"
                 placeholder="https://..."
               />
             </div>
@@ -299,7 +299,7 @@ export default function AddSeriesDialog({
                   required
                   value={temporada}
                   onChange={(event) => handleSeasonChange(event.target.value)}
-                  className="w-full bg-[#0a0f1e] border border-[#222] text-brand-text p-2.5 rounded focus:outline-none focus:border-brand-gold font-light text-center"
+                  className="w-full bg-brand-card border border-[#222] text-brand-text p-2.5 rounded focus:outline-none focus:border-brand-gold font-light text-center"
                 />
                 {totalSeasons > 0 ? (
                   <span className="text-[10px] text-brand-text-muted uppercase tracking-[0.12em]">
@@ -323,7 +323,7 @@ export default function AddSeriesDialog({
                   value={totalEps}
                   onChange={(event) => setTotalEps(event.target.value)}
                   readOnly
-                  className="w-full bg-[#0a0f1e] border border-[#222] text-brand-text p-2.5 rounded font-light text-center cursor-not-allowed opacity-80"
+                  className="w-full bg-brand-card border border-[#222] text-brand-text p-2.5 rounded font-light text-center cursor-not-allowed opacity-80"
                 />
               </div>
             </div>

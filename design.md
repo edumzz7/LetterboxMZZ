@@ -77,7 +77,7 @@ Use a escala Tailwind de 4 px como base. Os valores mais recorrentes são:
 
 **Grade do perfil (desktop XL):** `260px minmax(0, 1fr) 260px`, com `gap-6`. Em resoluções menores, a leitura é linear; não force barras laterais estreitas.
 
-**Mídia:** posters preservam `aspect-[2/3]`, com `object-cover`. Em grade desktop, o catálogo usa 4 colunas no médio, 5 no grande e 6 em telas `2xl`, com `gap-4`, `md:gap-x-6` e `md:gap-y-8`. No mobile, o item vira uma linha horizontal (poster `80 × 128 px`) para privilegiar leitura e toque.
+**Mídia:** posters preservam `aspect-2/3`, com `object-cover`. Em grade desktop, o catálogo usa 4 colunas no médio, 5 no grande e 6 em telas `2xl`, com `gap-4`, `md:gap-x-6` e `md:gap-y-8`. No mobile, o item vira uma linha horizontal (poster `80 × 128 px`) para privilegiar leitura e toque.
 
 ## 5. Bordas, raios e elevação
 

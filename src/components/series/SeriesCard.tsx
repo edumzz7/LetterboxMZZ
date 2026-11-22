@@ -416,7 +416,7 @@ export default function SeriesCard({
           <div
             onClick={handleCardClick}
             className={clsx(
-              "static h-32 w-20 shrink-0 overflow-hidden rounded-md border border-[#222] bg-brand-card transition-all md:relative md:h-auto md:w-full md:aspect-[2/3]",
+              "static h-32 w-20 shrink-0 overflow-hidden rounded-md border border-[#222] bg-brand-card transition-all md:relative md:h-auto md:w-full md:aspect-2/3",
               canEdit &&
                 "hover:border-brand-gold-alt hover:shadow-[0_0_15px_rgba(212,175,55,0.15)] cursor-pointer",
               isFriendCard && "cursor-pointer",
@@ -458,7 +458,7 @@ export default function SeriesCard({
                     align="end"
                     onClick={(e) => e.stopPropagation()}
                     onPointerDown={(e) => e.stopPropagation()}
-                    className="min-w-[180px] bg-[#0a0f1e]/95 backdrop-blur-md border border-[#222] rounded-xl p-1.5 shadow-xl shadow-black/50 z-20 animate-in fade-in zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:zoom-out-95"
+                    className="min-w-45 bg-brand-card/95 backdrop-blur-md border border-[#222] rounded-xl p-1.5 shadow-xl shadow-black/50 z-20 animate-in fade-in zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:zoom-out-95"
                   >
                     {isFriendCard && (
                       <>
@@ -476,7 +476,7 @@ export default function SeriesCard({
                             </DropdownMenu.Item>
                           ))}
                         </div>
-                        <DropdownMenu.Separator className="h-[1px] bg-[#222] my-1" />
+                        <DropdownMenu.Separator className="h-px bg-[#222] my-1" />
                       </>
                     )}
 
@@ -526,7 +526,7 @@ export default function SeriesCard({
 
                     {canEdit && (
                       <>
-                        <DropdownMenu.Separator className="h-[1px] bg-[#222] my-1" />
+                        <DropdownMenu.Separator className="h-px bg-[#222] my-1" />
                         <DropdownMenu.Item
                           onSelect={(e) => {
                             e.preventDefault();
@@ -561,9 +561,9 @@ export default function SeriesCard({
               </span>
               <span className="text-brand-gold">{progressPercent}%</span>
             </div>
-            <div className="max-md:order-3 w-full h-1 bg-[#0a0f1e] overflow-hidden rounded-full border border-[#222] mt-0.5">
+            <div className="max-md:order-3 w-full h-1 bg-brand-card overflow-hidden rounded-full border border-[#222] mt-0.5">
               <div
-                className="h-full bg-gradient-to-r from-brand-gold-alt to-brand-gold rounded-full transition-all duration-500"
+                className="h-full bg-linear-to-r from-brand-gold-alt to-brand-gold rounded-full transition-all duration-500"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
@@ -646,7 +646,7 @@ export default function SeriesCard({
                 Onde assistir?
               </button>
               {showProviders ? (
-                <div className="absolute left-0 top-[110%] z-20 min-w-[180px] border border-[#222] rounded-md bg-[#0a0f1e] p-2">
+                <div className="absolute left-0 top-[110%] z-20 min-w-45 border border-[#222] rounded-md bg-brand-card p-2">
                   {providersLoading ? (
                     <div className="flex items-center gap-2 text-xs text-brand-text-muted">
                       <Loader2 size={12} className="animate-spin" />{" "}
@@ -736,7 +736,7 @@ export default function SeriesCard({
                         void hydrateSeriesContext(seasonNumber);
                       }
                     }}
-                    className="w-full bg-[#0a0f1e] border border-[#222] text-brand-text p-2 rounded focus:outline-none focus:border-brand-gold text-right"
+                    className="w-full bg-brand-card border border-[#222] text-brand-text p-2 rounded focus:outline-none focus:border-brand-gold text-right"
                   />
                 </div>
 
@@ -753,7 +753,7 @@ export default function SeriesCard({
                     min="1"
                     value={localTotalEps}
                     readOnly
-                    className="w-full bg-[#0a0f1e] border border-[#222] text-brand-text p-2 rounded text-right cursor-not-allowed opacity-80"
+                    className="w-full bg-brand-card border border-[#222] text-brand-text p-2 rounded text-right cursor-not-allowed opacity-80"
                   />
                 </div>
 
@@ -768,7 +768,7 @@ export default function SeriesCard({
                     id="ep-select"
                     value={localEps}
                     onChange={(event) => setLocalEps(event.target.value)}
-                    className="w-full bg-[#0a0f1e] border border-[#222] text-brand-text p-2 rounded focus:outline-none focus:border-brand-gold"
+                    className="w-full bg-brand-card border border-[#222] text-brand-text p-2 rounded focus:outline-none focus:border-brand-gold"
                   >
                     <option value="0">Nenhum</option>
                     {seasonEpisodes.map((episode) => (

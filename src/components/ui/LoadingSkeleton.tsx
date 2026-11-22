@@ -24,7 +24,7 @@ export function PosterGridSkeleton({
     >
       {Array.from({ length: count }, (_, index) => (
         <div key={index} className="min-w-0">
-          <Skeleton className="aspect-[2/3] w-full rounded-xl" />
+          <Skeleton className="aspect-2/3 w-full rounded-xl" />
           <Skeleton className="mt-2 h-3 w-4/5" />
           <Skeleton className="mt-2 h-2.5 w-2/5" />
         </div>
@@ -63,7 +63,7 @@ export function DetailPageSkeleton({
         <Skeleton className="h-3 w-5/6" />
         <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
           {Array.from({ length: 6 }, (_, index) => (
-            <Skeleton key={index} className="aspect-[2/3] rounded-xl" />
+            <Skeleton key={index} className="aspect-2/3 rounded-xl" />
           ))}
         </div>
       </div>

@@ -185,7 +185,7 @@ function MediaCarousel({ items }: { items: TMDBHomeMedia[] }) {
           event.stopPropagation();
           suppressClickRef.current = false;
         }}
-        className="-my-1 flex gap-4 overflow-x-auto px-1 py-1 scroll-smooth select-none touch-pan-y [scrollbar-width:none] [&::-webkit-scrollbar]:hidden cursor-grab active:cursor-grabbing"
+        className="-my-1 flex gap-4 overflow-x-auto px-1 py-1 scroll-smooth select-none touch-pan-y scrollbar-none [&::-webkit-scrollbar]:hidden cursor-grab active:cursor-grabbing"
       >
         {items.map((item) => (
           <HomeCard key={`${item.media_type}-${item.id}`} item={item} />

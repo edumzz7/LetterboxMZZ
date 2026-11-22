@@ -74,7 +74,7 @@ export default function StarRatingInput({
             onMouseMove={(e) => handleMouseMove(e, star)}
             disabled={disabled}
             className={clsx(
-              "leading-none transition relative w-[16px] h-[16px]",
+              "leading-none transition relative w-4 h-4",
               disabled ? "cursor-default" : "cursor-pointer hover:scale-110",
             )}
             title={`${star} estrela(s)`}

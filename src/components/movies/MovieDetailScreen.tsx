@@ -300,7 +300,7 @@ export default function MovieDetailScreen({
               loading="eager"
               className="w-full h-full object-cover object-top opacity-30 blur-[2px] scale-105"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
+            <div className="absolute inset-0 bg-linear-to-t from-black via-black/40 to-transparent" />
           </>
         )}
         <button
@@ -314,7 +314,7 @@ export default function MovieDetailScreen({
       {/* 2. Main Content Grid */}
       <div className="relative z-10 px-0 sm:px-4 -mt-24 sm:-mt-32 md:-mt-40 flex flex-col md:flex-row gap-8 items-start">
         {/* Left Side: Poster */}
-        <div className="w-48 sm:w-56 md:w-64 aspect-[2/3] shrink-0 rounded-2xl overflow-hidden border border-[#222] bg-[#050811] shadow-2xl shadow-black/80 mx-auto md:mx-0">
+        <div className="w-48 sm:w-56 md:w-64 aspect-2/3 shrink-0 rounded-2xl overflow-hidden border border-[#222] bg-[#050811] shadow-2xl shadow-black/80 mx-auto md:mx-0">
           <TmdbImage
             src={imageSrc}
             alt={movie.title}
@@ -326,7 +326,7 @@ export default function MovieDetailScreen({
         {/* Right Side: Information */}
         <div className="flex-1 min-w-0 flex flex-col gap-6 text-center md:text-left">
           <div className="space-y-2">
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extralight tracking-wide text-brand-text break-words uppercase">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extralight tracking-wide text-brand-text wrap-break-word uppercase">
               {movie.title}{" "}
               {releaseYear && (
                 <span className="text-brand-gold-alt font-light text-2xl">

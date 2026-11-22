@@ -214,7 +214,7 @@ export default function GroupPage({ groupId, currentUserId }: GroupPageProps) {
           <p className="text-xs uppercase tracking-[0.25em] text-brand-gold-alt">
             Grupo
           </p>
-          <h1 className="mt-2 break-words text-3xl font-light text-brand-text sm:text-4xl">
+          <h1 className="mt-2 wrap-break-word text-3xl font-light text-brand-text sm:text-4xl">
             {group.name}
           </h1>
           {group.description && (

@@ -80,7 +80,7 @@ export default function AllAchievements() {
               Secreta
             </span>
             {/* Arrow */}
-            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-[1px] border-[5px] border-transparent border-t-black/95" />
+            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-[5px] border-transparent border-t-black/95" />
           </div>
         )}
       </div>

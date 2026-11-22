@@ -154,7 +154,7 @@ export default function PublicHeader({
                   {loginOpen && (
                     <form
                       onSubmit={submitLogin}
-                      className="fixed inset-x-4 top-[72px] z-50 w-auto space-y-3 rounded-2xl border border-[#222] bg-brand-card p-4 shadow-2xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-[calc(100%+10px)] sm:w-[19rem]"
+                      className="fixed inset-x-4 top-18 z-50 w-auto space-y-3 rounded-2xl border border-[#222] bg-brand-card p-4 shadow-2xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-[calc(100%+10px)] sm:w-76"
                     >
                       <div className="flex items-center gap-2 rounded-xl border border-[#222] bg-[#090d18] px-3 py-2">
                         <UserRound size={14} className="text-brand-gold-alt" />

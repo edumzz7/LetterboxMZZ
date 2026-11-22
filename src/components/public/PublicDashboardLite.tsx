@@ -22,7 +22,7 @@ type PublicTab =
 function LockedPanel({ title }: { title: string }) {
   const [, setLocation] = useLocation();
   return (
-    <section className="rounded-3xl border border-brand-gold/25 bg-brand-gold/[0.04] px-6 py-12 text-center">
+    <section className="rounded-3xl border border-brand-gold/25 bg-brand-gold/4 px-6 py-12 text-center">
       <Icons.LockKeyhole className="mx-auto text-brand-gold" size={26} />
       <h2 className="mt-4 text-xl font-light text-brand-text">{title}</h2>
       <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-brand-text-muted">
